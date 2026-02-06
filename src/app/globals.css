@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-red: #C81E4E;
+  --brand-pink: #D91E5B;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-semibold py-3 px-6 rounded-lg hover:shadow-lg transition-all duration-300;
+}
+
+.btn-secondary {
+  @apply bg-white text-[#C81E4E] border-2 border-[#C81E4E] font-semibold py-2 px-6 rounded-lg hover:bg-[#C81E4E] hover:text-white transition-all duration-300;
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+}
+
+.input-field {
+  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent;
+}
+
+.tab-active {
+  @apply border-b-4 border-[#C81E4E] text-[#C81E4E] font-semibold;
+}
+
+.tab-inactive {
+  @apply text-gray-500 hover:text-[#C81E4E] cursor-pointer;
+}
+
+.badge-success {
+  @apply bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.badge-danger {
+  @apply bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.badge-info {
+  @apply bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium;
+}
