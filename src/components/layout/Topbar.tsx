@@ -2,9 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiSearch, FiBell, FiUser, FiLogOut, FiSettings, FiChevronDown } from 'react-icons/fi'
+import { FiSearch, FiBell, FiUser, FiLogOut, FiSettings, FiChevronDown, FiMenu } from 'react-icons/fi'
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuClick: () => void
+}
+
+export default function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter()
   const [showDropdown, setShowDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -14,8 +18,16 @@ export default function Topbar() {
   }
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
+    <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4">
+      <div className="flex items-center justify-between gap-4">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+        >
+          <FiMenu className="text-2xl" />
+        </button>
+
         {/* Search Bar */}
         <div className="flex-1 max-w-2xl">
           <div className="relative">
@@ -33,10 +45,10 @@ export default function Topbar() {
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center space-x-4 ml-6">
+        <div className="flex items-center space-x-2 lg:space-x-4">
           {/* Notifications */}
           <button className="relative p-2 text-gray-600 hover:text-[#C81E4E] hover:bg-gray-100 rounded-lg transition-all">
-            <FiBell className="text-2xl" />
+            <FiBell className="text-xl lg:text-2xl" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
@@ -44,7 +56,7 @@ export default function Topbar() {
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
+              className="flex items-center space-x-2 lg:space-x-3 px-2 lg:px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
             >
               <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold">
                 A

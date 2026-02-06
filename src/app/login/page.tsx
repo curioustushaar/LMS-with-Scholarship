@@ -25,16 +25,16 @@ export default function LoginPage() {
       <div className="max-w-6xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="grid md:grid-cols-2 gap-0">
           {/* Left Side - Branding */}
-          <div className="bg-gradient-to-br from-[#C81E4E] to-[#D91E5B] p-12 flex flex-col justify-center items-center text-white">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-3 tracking-wider">LMS ADMIN</h1>
-              <p className="text-lg opacity-90">LEARNING MANAGEMENT MADE SIMPLE</p>
+          <div className="bg-gradient-to-br from-[#C81E4E] to-[#D91E5B] p-8 md:p-12 flex flex-col justify-center items-center text-white">
+            <div className="text-center mb-6 md:mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 tracking-wider">LMS ADMIN</h1>
+              <p className="text-base md:text-lg opacity-90">LEARNING MANAGEMENT MADE SIMPLE</p>
             </div>
             
-            <div className="relative w-64 h-64 mb-8">
+            <div className="relative w-48 h-48 md:w-64 md:h-64 mb-6 md:mb-8">
               <div className="absolute inset-0 bg-white/10 backdrop-blur-sm rounded-full border-4 border-white/30 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-6xl mb-4">🎓</div>
+                  <div className="text-5xl md:text-6xl mb-4">🎓</div>
                   <p className="text-sm font-medium">Admin Portal</p>
                 </div>
               </div>
@@ -52,24 +52,24 @@ export default function LoginPage() {
           </div>
 
           {/* Right Side - Login Form */}
-          <div className="p-12">
+          <div className="p-6 md:p-12">
             <div className="max-w-md mx-auto">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-                <p className="text-gray-600">Sign in to access admin dashboard</p>
+              <div className="text-center mb-6 md:mb-8">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+                <p className="text-sm md:text-base text-gray-600">Sign in to access admin dashboard</p>
               </div>
 
               {/* Admin/Staff Toggle */}
-              <div className="flex mb-8 bg-gray-100 rounded-lg p-1">
-                <button className="flex-1 py-2 px-4 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold shadow-md">
+              <div className="flex mb-6 md:mb-8 bg-gray-100 rounded-lg p-1">
+                <button className="flex-1 py-2 px-4 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold shadow-md text-sm md:text-base">
                   Admin
                 </button>
-                <button className="flex-1 py-2 px-4 text-gray-600 font-medium">
+                <button className="flex-1 py-2 px-4 text-gray-600 font-medium text-sm md:text-base">
                   Staff
                 </button>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
                 {/* Email Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">

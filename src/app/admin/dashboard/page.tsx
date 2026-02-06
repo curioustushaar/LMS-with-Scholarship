@@ -34,15 +34,15 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome back! Here's what's happening with your LMS today.</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Dashboard</h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1">Welcome back! Here's what's happening with your LMS today.</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {summaryCards.map((card, index) => (
           <div key={index} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow overflow-hidden">
             <div className="p-6">
@@ -72,31 +72,31 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Link href="/admin/tasks/submissions" className="bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
-          <FiCheckSquare className="text-3xl mb-3" />
-          <p className="font-semibold">Evaluate Tasks</p>
-          <p className="text-sm opacity-90 mt-1">43 pending</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Link href="/admin/tasks/submissions" className="bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white p-4 md:p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
+          <FiCheckSquare className="text-2xl md:text-3xl mb-2 md:mb-3" />
+          <p className="font-semibold text-sm md:text-base">Evaluate Tasks</p>
+          <p className="text-xs md:text-sm opacity-90 mt-1">43 pending</p>
         </Link>
-        <Link href="/admin/projects" className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
-          <FiFileText className="text-3xl mb-3" />
-          <p className="font-semibold">Approve Projects</p>
-          <p className="text-sm opacity-90 mt-1">28 pending</p>
+        <Link href="/admin/projects" className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 md:p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
+          <FiFileText className="text-2xl md:text-3xl mb-2 md:mb-3" />
+          <p className="font-semibold text-sm md:text-base">Approve Projects</p>
+          <p className="text-xs md:text-sm opacity-90 mt-1">28 pending</p>
         </Link>
-        <Link href="/admin/support" className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
-          <FiAlertCircle className="text-3xl mb-3" />
-          <p className="font-semibold">View Tickets</p>
-          <p className="text-sm opacity-90 mt-1">15 open</p>
+        <Link href="/admin/support" className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 md:p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
+          <FiAlertCircle className="text-2xl md:text-3xl mb-2 md:mb-3" />
+          <p className="font-semibold text-sm md:text-base">View Tickets</p>
+          <p className="text-xs md:text-sm opacity-90 mt-1">15 open</p>
         </Link>
-        <Link href="/admin/certificates" className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
-          <FiAward className="text-3xl mb-3" />
-          <p className="font-semibold">Issue Certificates</p>
-          <p className="text-sm opacity-90 mt-1">12 eligible</p>
+        <Link href="/admin/certificates" className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4 md:p-6 rounded-xl shadow-md hover:shadow-xl transition-all transform hover:scale-105">
+          <FiAward className="text-2xl md:text-3xl mb-2 md:mb-3" />
+          <p className="font-semibold text-sm md:text-base">Issue Certificates</p>
+          <p className="text-xs md:text-sm opacity-90 mt-1">12 eligible</p>
         </Link>
       </div>
 
       {/* Recent Activities Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Recent Students */}
         <div className="bg-white rounded-xl shadow-md">
           <div className="p-6 border-b border-gray-200">

@@ -15,7 +15,13 @@ import {
   FiSettings,
   FiChevronDown,
   FiChevronRight,
+  FiX,
 } from 'react-icons/fi'
+
+interface SidebarProps {
+  isOpen: boolean
+  onClose: () => void
+}
 
 const menuItems = [
   { name: 'Dashboard', icon: FiHome, path: '/admin/dashboard' },
@@ -47,7 +53,7 @@ const menuItems = [
   { name: 'Settings', icon: FiSettings, path: '/admin/settings' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
 
@@ -62,16 +68,39 @@ export default function Sidebar() {
   const isActive = (path: string) => pathname === path
 
   return (
-    <div className="w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col">
-      {/* Logo/Brand */}
-      <div className="p-6 border-b border-gray-700">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
-          LMS ADMIN
-        </h1>
-        <p className="text-xs text-gray-400 mt-1">Learning Management System</p>
-      </div>
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div className={`
+        fixed lg:sticky top-0 left-0 z-50 lg:z-0
+        w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col h-screen
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Mobile Close Button */}
+        <button
+          onClick={onClose}
+          className="lg:hidden absolute top-4 right-4 p-2 text-white hover:text-gray-300 z-10"
+        >
+          <FiX className="text-2xl" />
+        </button>
 
-      {/* Navigation Menu */}
+        {/* Logo/Brand */}
+        <div className="p-6 border-b border-gray-700">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
+            LMS ADMIN
+          </h1>
+          <p className="text-xs text-gray-400 mt-1">Learning Management System</p>
+        </div>
+
+        {/* Navigation Menu */}
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-3">
           {menuItems.map((item) => (
@@ -137,5 +166,6 @@ export default function Sidebar() {
         </div>
       </div>
     </div>
+    </>
   )
 }
