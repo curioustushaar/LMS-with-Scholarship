@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { settingsAPI } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { FiSearch, FiBell, FiUser, FiLogOut, FiSettings, FiChevronDown, FiMenu } from 'react-icons/fi'
 
@@ -12,6 +13,43 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter()
   const [showDropdown, setShowDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [profile, setProfile] = useState<any>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res: any = await settingsAPI.getProfile()
+        if (res?.success && mounted) setProfile(res.data)
+      } catch (e) {
+        console.error('Failed to load profile in Topbar', e)
+      }
+    })()
+    const onProfileUpdated = async (e?: any) => {
+      try {
+        const res: any = await settingsAPI.getProfile()
+        if (res?.success && mounted) setProfile(res.data)
+      } catch (err) {
+        console.error('Failed to refresh profile on update event', err)
+      }
+    }
+
+    // Listen for same-tab custom event
+    window.addEventListener('profile:updated', onProfileUpdated)
+    // Listen for cross-tab localStorage updates
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === 'profile-updated') {
+        onProfileUpdated()
+      }
+    }
+    window.addEventListener('storage', onStorage)
+
+    return () => {
+      mounted = false
+      window.removeEventListener('profile:updated', onProfileUpdated)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
 
   const handleLogout = () => {
     router.push('/login')
@@ -58,35 +96,49 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               onClick={() => setShowDropdown(!showDropdown)}
               className="flex items-center space-x-2 lg:space-x-3 px-2 lg:px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
             >
-              <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold">
-                A
+              <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
+                {profile?.profile_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold">{(profile?.full_name || 'A').charAt(0)}</div>
+                )}
               </div>
               <div className="text-left hidden md:block">
-                <p className="text-sm font-semibold text-gray-800">Admin User</p>
-                <p className="text-xs text-gray-500">Super Admin</p>
+                <p className="text-sm font-semibold text-gray-800">{profile?.full_name || 'Admin User'}</p>
+                <p className="text-xs text-gray-500">{profile?.role || 'Super Admin'}</p>
               </div>
               <FiChevronDown className="text-gray-600" />
             </button>
 
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
-                <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
-                  <FiUser />
-                  <span>My Profile</span>
-                </button>
-                <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
-                  <FiSettings />
-                  <span>Settings</span>
-                </button>
-                <hr className="my-2" />
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                >
-                  <FiLogOut />
-                  <span>Logout</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowDropdown(false); router.push('/admin/settings') }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <FiUser />
+                    <span>My Profile</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowDropdown(false); router.push('/admin/settings') }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <FiSettings />
+                    <span>Settings</span>
+                  </button>
+                  <hr className="my-2" />
+                  <button
+                    type="button"
+                    onClick={() => { setShowDropdown(false); handleLogout() }}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                  >
+                    <FiLogOut />
+                    <span>Logout</span>
+                  </button>
+                </div>
             )}
           </div>
         </div>

@@ -1,6 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { settingsAPI } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { FiUser, FiLock, FiBell, FiMail, FiSettings as FiSettingsIcon } from 'react-icons/fi'
 
 export default function SettingsPage() {
@@ -57,47 +62,187 @@ export default function SettingsPage() {
 }
 
 function ProfileSettings() {
+  const [loading, setLoading] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [role, setRole] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        setLoading(true)
+        const res: any = await settingsAPI.getProfile()
+        if (res?.success && mounted) {
+          const p = res.data
+          setFullName(p?.full_name || '')
+          setEmail(p?.email || '')
+          setPhone(p?.phone || '')
+          setRole(p?.role || '')
+          setAvatarUrl(p?.profile_image_url || null)
+        }
+      } catch (e) {
+        console.error('Failed to load profile', e)
+      } finally {
+        setLoading(false)
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] || null
+    setAvatarFile(f)
+    if (f) {
+      setPreview(URL.createObjectURL(f))
+    }
+  }
+
+  const handleCancel = () => {
+    setAvatarFile(null)
+    setPreview(null)
+  }
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+
+      let uploadedUrl = avatarUrl
+      if (avatarFile) {
+        const up = await settingsAPI.uploadAvatar(avatarFile)
+        if (up?.success && up.data?.url) {
+          uploadedUrl = up.data.url
+        } else if (up?.url) {
+          uploadedUrl = up.url
+        } else {
+          console.warn('Avatar upload returned unexpected response', up)
+        }
+      }
+
+      const payload: any = { full_name: fullName, email, phone }
+      if (uploadedUrl) payload.profile_image_url = uploadedUrl
+
+      const res = await settingsAPI.updateProfile(payload)
+      if (res?.success) {
+        alert('Profile updated successfully')
+        setAvatarFile(null)
+        setPreview(null)
+        setAvatarUrl(uploadedUrl)
+        // Notify other components (Topbar) in same tab
+        try {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('profile:updated', { detail: { profile: res.data } }))
+            // Also set localStorage key to notify other tabs
+            localStorage.setItem('profile-updated', String(Date.now()))
+          }
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        alert('Failed to update profile: ' + (res?.error || 'unknown'))
+      }
+    } catch (err: any) {
+      console.error('Save error', err)
+      alert('Save failed: ' + (err?.message || err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Admin Profile</h2>
-      
+
       <div className="flex items-center space-x-6">
-        <div className="w-24 h-24 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white text-4xl font-bold">
-          A
+        <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="avatar preview" className="w-full h-full object-cover" />
+          ) : avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-4xl font-bold text-gray-600">A</div>
+          )}
         </div>
-        <button className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all">
-          Change Avatar
-        </button>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Change Avatar</label>
+          <input type="file" accept="image/*" onChange={handleAvatarChange} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-          <input type="text" defaultValue="Admin User" className="input-field" />
+          <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="input-field" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-          <input type="email" defaultValue="admin@lms.com" className="input-field" />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-          <input type="tel" defaultValue="+91 98765 43210" className="input-field" />
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-          <input type="text" defaultValue="Super Admin" className="input-field" readOnly />
+          <input type="text" value={role} className="input-field" readOnly />
         </div>
       </div>
 
       <div className="flex justify-end space-x-3">
-        <button className="btn-secondary">Cancel</button>
-        <button className="btn-primary">Save Changes</button>
+        <button className="btn-secondary" onClick={handleCancel} disabled={loading}>Cancel</button>
+        <button className="btn-primary" onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</button>
       </div>
     </div>
   )
 }
 
 function SecuritySettings() {
+  const router = useRouter()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('New password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      alert('New password and confirm password do not match')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const res: any = await settingsAPI.changePassword(currentPassword, newPassword)
+      if (res?.success) {
+        alert('Password updated. You will be logged out; please login with your new password.')
+        // sign out current session
+        try {
+          await supabase.auth.signOut()
+        } catch (e) {
+          console.warn('Sign out failed locally', e)
+        }
+        router.push('/login')
+      } else {
+        alert('Failed to update password: ' + (res?.error || 'unknown'))
+      }
+    } catch (err: any) {
+      console.error('Password update error', err)
+      alert('Password update failed: ' + (err?.message || err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
@@ -105,15 +250,15 @@ function SecuritySettings() {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-          <input type="password" className="input-field" />
+          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-field" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-          <input type="password" className="input-field" />
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-field" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-          <input type="password" className="input-field" />
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input-field" />
         </div>
       </div>
 
@@ -132,7 +277,7 @@ function SecuritySettings() {
       </div>
 
       <div className="flex justify-end">
-        <button className="btn-primary">Update Password</button>
+        <button className="btn-primary" onClick={handleUpdatePassword} disabled={loading}>{loading ? 'Updating...' : 'Update Password'}</button>
       </div>
     </div>
   )
