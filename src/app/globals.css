@@ -3,8 +3,118 @@
 @tailwind utilities;
 
 :root {
+  /* ========================================
+     BRAND COLORS (Primary Theme)
+     ======================================== */
+  --brand-primary: #C81E4E;
+  --brand-primary-light: #D91E5B;
+  --brand-primary-dark: #A01840;
+  
+  /* For backward compatibility */
   --brand-red: #C81E4E;
   --brand-pink: #D91E5B;
+
+  /* ========================================
+     STATUS COLORS
+     ======================================== */
+  /* Success - Green */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
+  --success-400: #4ade80;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-800: #166534;
+  --success-900: #14532d;
+
+  /* Warning - Yellow */
+  --warning-50: #fefce8;
+  --warning-100: #fef9c3;
+  --warning-200: #fef08a;
+  --warning-300: #fde047;
+  --warning-400: #facc15;
+  --warning-500: #eab308;
+  --warning-600: #ca8a04;
+  --warning-700: #a16207;
+  --warning-800: #854d0e;
+  --warning-900: #713f12;
+
+  /* Danger - Red */
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-300: #fca5a5;
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --danger-800: #991b1b;
+  --danger-900: #7f1d1d;
+
+   /* Info - Blue */
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-200: #bfdbfe;
+  --info-300: #93c5fd;
+  --info-400: #60a5fa;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+  --info-800: #1e40af;
+  --info-900: #1e3a8a;
+
+  /* Progress - Orange */
+  --progress-50: #fff7ed;
+  --progress-100: #ffedd5;
+  --progress-200: #fed7aa;
+  --progress-300: #fdba74;
+  --progress-400: #fb923c;
+  --progress-500: #f97316;
+  --progress-600: #ea580c;
+  --progress-700: #c2410c;
+  --progress-800: #9a3412;
+  --progress-900: #7c2d12;
+
+  /* ========================================
+     GRAY SCALE (Neutral)
+     ======================================== */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* ========================================
+     BACKGROUND COLORS
+     ======================================== */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #f9fafb;
+  --bg-dark: #1f2937;
+
+  /* ========================================
+     TEXT COLORS
+     ======================================== */
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --text-light: #ffffff;
+  --text-brand: var(--brand-primary);
+
+  /* ========================================
+     BORDER COLORS
+     ======================================== */
+  --border-light: #e5e7eb;
+  --border-medium: #d1d5db;
+  --border-dark: #9ca3af;
+  --border-brand: var(--brand-primary);
 }
 
 * {
@@ -15,45 +125,129 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f5f5;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+/* Brand Gradient */
+.bg-brand-gradient {
+  background: linear-gradient(to right, var(--brand-primary), var(--brand-primary-light));
+}
+
+/* Text Colors */
+.text-brand {
+  color: var(--brand-primary);
+}
+
+.text-brand-light {
+  color: var(--brand-primary-light);
+}
+
+/* Background Colors */
+.bg-brand {
+  background-color: var(--brand-primary);
+}
+
+.bg-brand-light {
+  background-color: var(--brand-primary-light);
+}
+
+/* ========================================
+   COMPONENT CLASSES
+   ======================================== */
+
 .btn-primary {
-  @apply bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-semibold py-3 px-6 rounded-lg hover:shadow-lg transition-all duration-300;
+  @apply text-white font-semibold py-3 px-6 rounded-lg hover:shadow-lg transition-all duration-300;
+  background: linear-gradient(to right, var(--brand-primary), var(--brand-primary-light));
 }
 
 .btn-secondary {
-  @apply bg-white text-[#C81E4E] border-2 border-[#C81E4E] font-semibold py-2 px-6 rounded-lg hover:bg-[#C81E4E] hover:text-white transition-all duration-300;
+  @apply font-semibold py-2 px-6 rounded-lg transition-all duration-300;
+  background-color: white;
+  color: var(--brand-primary);
+  border: 2px solid var(--brand-primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--brand-primary);
+  color: white;
 }
 
 .card {
-  @apply bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+  @apply rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+  background-color: var(--bg-primary);
 }
 
 .input-field {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent;
+  @apply w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent;
 }
 
-.tab-active {
-  @apply border-b-4 border-[#C81E4E] text-[#C81E4E] font-semibold;
-}
-
-.tab-inactive {
-  @apply text-gray-500 hover:text-[#C81E4E] cursor-pointer;
-}
+/* ========================================
+   STATUS BADGES
+   ======================================== */
 
 .badge-success {
-  @apply bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium;
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+  background-color: var(--success-100);
+  color: var(--success-800);
 }
 
 .badge-warning {
-  @apply bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium;
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+  background-color: var(--warning-100);
+  color: var(--warning-800);
 }
 
 .badge-danger {
-  @apply bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium;
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+  background-color: var(--danger-100);
+  color: var(--danger-800);
 }
 
 .badge-info {
-  @apply bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium;
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+  background-color: var(--info-100);
+  color: var(--info-800);
+}
+
+.badge-progress {
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+  background-color: var(--progress-100);
+  color: var(--progress-800);
+}
+
+/* ========================================
+   ALERT/NOTIFICATION STYLES
+   ======================================== */
+
+.alert-success {
+  @apply border rounded-lg p-4;
+  background-color: var(--success-50);
+  border-color: var(--success-200);
+  color: var(--success-800);
+}
+
+.alert-warning {
+  @apply border rounded-lg p-4;
+  background-color: var(--warning-50);
+  border-color: var(--warning-200);
+  color: var(--warning-800);
+}
+
+.alert-danger {
+  @apply border rounded-lg p-4;
+  background-color: var(--danger-50);
+  border-color: var(--danger-200);
+  color: var(--danger-800);
+}
+
+.alert-info {
+  @apply border rounded-lg p-4;
+  background-color: var(--info-50);
+  border-color: var(--info-200);
+  color: var(--info-800);
 }

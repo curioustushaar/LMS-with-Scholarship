@@ -1,21 +1,182 @@
 'use client'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FiSearch, FiPlus, FiEye, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiFilter } from 'react-icons/fi'
+import { FiSearch, FiPlus, FiEye, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiFilter, FiX, FiCheck, FiCopy, FiEyeOff } from 'react-icons/fi'
+import { studentsAPI } from '@/lib/api'
+
+interface Student {
+  id: string
+  email: string
+  full_name: string
+  phone?: string
+  role: string
+  status: string
+  enrollment_date?: string
+  last_active?: string
+  profile_image_url?: string
+  created_at?: string
+}
 
 export default function StudentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [students, setStudents] = useState<Student[]>([])
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    newThisWeek: 0
+  })
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordData, setPasswordData] = useState<any>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [copiedField, setCopiedField] = useState('')
 
-  const students = [
-    { id: 1, name: 'Rajesh Kumar', email: 'rajesh@email.com', course: 'Web Development', role: 'Student', status: 'Active', lastLogin: '2026-02-06 09:30 AM' },
-    { id: 2, name: 'Priya Sharma', email: 'priya@email.com', course: 'Data Science', role: 'Student', status: 'Active', lastLogin: '2026-02-05 04:15 PM' },
-    { id: 3, name: 'Amit Patel', email: 'amit@email.com', course: 'Mobile App Dev', role: 'Student', status: 'Active', lastLogin: '2026-02-05 11:20 AM' },
-    { id: 4, name: 'Sneha Reddy', email: 'sneha@email.com', course: 'UI/UX Design', role: 'Student', status: 'Blocked', lastLogin: '2026-01-28 02:45 PM' },
-    { id: 5, name: 'Vikram Joshi', email: 'vikram@email.com', course: 'Web Development', role: 'Mentor', status: 'Active', lastLogin: '2026-02-06 08:00 AM' },
-    { id: 6, name: 'Ananya Singh', email: 'ananya@email.com', course: 'Data Science', role: 'Student', status: 'Active', lastLogin: '2026-02-04 06:30 PM' },
-  ]
+  // Fetch students
+  useEffect(() => {
+    fetchStudents()
+  }, [])
+
+  const fetchStudents = async () => {
+    setLoading(true)
+    console.log('Fetching students...')
+    const response = await studentsAPI.getAll()
+    console.log('Students response:', response)
+    
+    if (response.success && response.data) {
+      const studentsList = Array.isArray(response.data) ? response.data : []
+      setStudents(studentsList)
+      
+      // Calculate stats
+      const active = studentsList.filter((s: Student) => s.status === 'active').length
+      const inactive = studentsList.filter((s: Student) => s.status === 'inactive').length
+      
+      // Students enrolled in last 7 days
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+      const newThisWeek = studentsList.filter((s: Student) => 
+        s.enrollment_date && new Date(s.enrollment_date) > oneWeekAgo
+      ).length
+
+      setStats({
+        total: studentsList.length,
+        active,
+        inactive,
+        newThisWeek
+      })
+    } else {
+      console.error('Failed to fetch students:', response.error)
+      setStudents([])
+    }
+    setLoading(false)
+  }
+
+  // Handle search with debounce
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      handleFilter()
+    }, 500)
+
+    return () => clearTimeout(delayDebounceFn)
+  }, [searchQuery, filterStatus])
+
+  const handleFilter = async () => {
+    setLoading(true)
+    const filters: any = {}
+    
+    if (filterStatus !== 'all') {
+      filters.status = filterStatus
+    }
+    
+    if (searchQuery) {
+      filters.search = searchQuery
+    }
+
+    const response = await studentsAPI.getAll(filters)
+    if (response.success && response.data) {
+      setStudents(response.data)
+    }
+    setLoading(false)
+  }
+
+  const handleResetPassword = async (id: string, name: string) => {
+    if (!confirm(`Generate new password for ${name}?`)) return
+    
+    // Generate new password
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    const numbers = '0123456789'
+    const symbols = '!@#$%^&*'
+    
+    const allChars = uppercase + lowercase + numbers + symbols
+    let password = ''
+    
+    // Ensure at least one character from each type
+    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
+    password += lowercase.charAt(Math.floor(Math.random() * lowercase.length))
+    password += numbers.charAt(Math.floor(Math.random() * numbers.length))
+    password += symbols.charAt(Math.floor(Math.random() * symbols.length))
+    
+    // Fill the rest randomly
+    for (let i = password.length; i < 12; i++) {
+      password += allChars.charAt(Math.floor(Math.random() * allChars.length))
+    }
+    
+    // Shuffle password
+    password = password.split('').sort(() => Math.random() - 0.5).join('')
+    
+    const response = await studentsAPI.resetPassword(id)
+    if (response.success) {
+      // Show modal with new password
+      const student = students.find(s => s.id === id)
+      setPasswordData({
+        studentId: id,
+        name: name,
+        email: student?.email || 'N/A',
+        password: password
+      })
+      setShowPasswordModal(true)
+    } else {
+      alert(response.error || 'Failed to reset password')
+    }
+  }
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(''), 2000)
+  }
+
+  const handleToggleStatus = async (student: Student) => {
+    const newStatus = student.status === 'active' ? 'inactive' : 'active'
+    const action = newStatus === 'inactive' ? 'block' : 'unblock'
+    
+    if (!confirm(`Are you sure you want to ${action} ${student.full_name}?`)) return
+    
+    const response = await studentsAPI.update(student.id, { status: newStatus })
+    if (response.success) {
+      // Refresh students list
+      fetchStudents()
+    } else {
+      alert(response.error || 'Failed to update student status')
+    }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Never'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-IN', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -72,23 +233,23 @@ export default function StudentsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           <p className="text-gray-600 text-sm font-medium">Total Students</p>
-          <p className="text-3xl font-bold text-gray-800 mt-2">1,245</p>
-          <p className="text-sm text-green-600 mt-2">↑ 12% vs last month</p>
+          <p className="text-3xl font-bold text-gray-800 mt-2">{stats.total}</p>
+          <p className="text-sm text-gray-500 mt-2">All registered students</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
           <p className="text-gray-600 text-sm font-medium">Active Students</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">987</p>
-          <p className="text-sm text-gray-500 mt-2">79% of total</p>
+          <p className="text-3xl font-bold text-green-600 mt-2">{stats.active}</p>
+          <p className="text-sm text-gray-500 mt-2">{stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}% of total</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Blocked Students</p>
-          <p className="text-3xl font-bold text-red-600 mt-2">15</p>
-          <p className="text-sm text-gray-500 mt-2">1% of total</p>
+          <p className="text-gray-600 text-sm font-medium">Inactive Students</p>
+          <p className="text-3xl font-bold text-red-600 mt-2">{stats.inactive}</p>
+          <p className="text-sm text-gray-500 mt-2">{stats.total > 0 ? Math.round((stats.inactive / stats.total) * 100) : 0}% of total</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
           <p className="text-gray-600 text-sm font-medium">New This Week</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">28</p>
-          <p className="text-sm text-green-600 mt-2">↑ 8 vs last week</p>
+          <p className="text-3xl font-bold text-blue-600 mt-2">{stats.newThisWeek}</p>
+          <p className="text-sm text-gray-500 mt-2">Last 7 days</p>
         </div>
       </div>
 
@@ -100,76 +261,85 @@ export default function StudentsPage() {
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Login</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Enrolled</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Active</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold mr-3">
-                        {student.name.charAt(0)}
-                      </div>
-                      <div className="font-semibold text-gray-800">{student.name}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.course}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      student.role === 'Mentor' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {student.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      student.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {student.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.lastLogin}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center space-x-3">
-                      <Link 
-                        href={`/admin/students/${student.id}`}
-                        className="text-blue-600 hover:text-blue-800 transition-colors"
-                        title="View Profile"
-                      >
-                        <FiEye className="text-lg" />
-                      </Link>
-                      <button 
-                        className="text-green-600 hover:text-green-800 transition-colors"
-                        title="Edit"
-                      >
-                        <FiEdit className="text-lg" />
-                      </button>
-                      <button 
-                        className="text-orange-600 hover:text-orange-800 transition-colors"
-                        title="Reset Password"
-                      >
-                        <FiRefreshCw className="text-lg" />
-                      </button>
-                      <button 
-                        className={`transition-colors ${
-                          student.status === 'Active' 
-                            ? 'text-red-600 hover:text-red-800' 
-                            : 'text-green-600 hover:text-green-800'
-                        }`}
-                        title={student.status === 'Active' ? 'Block' : 'Unblock'}
-                      >
-                        {student.status === 'Active' ? <FiLock className="text-lg" /> : <FiUnlock className="text-lg" />}
-                      </button>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C81E4E]"></div>
+                      <p className="mt-4 text-gray-600">Loading students...</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    No students found. {searchQuery || filterStatus !== 'all' ? 'Try adjusting your filters.' : 'Add your first student to get started.'}
+                  </td>
+                </tr>
+              ) : (
+                students.map((student) => (
+                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold mr-3">
+                          {student.full_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="font-semibold text-gray-800">{student.full_name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.phone || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                        student.status === 'active' ? 'bg-green-100 text-green-800' : 
+                        student.status === 'inactive' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {student.status ? student.status.charAt(0).toUpperCase() + student.status.slice(1) : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(student.enrollment_date)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(student.last_active)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center space-x-3">
+                        <Link 
+                          href={`/admin/students/${student.id}`}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="View Profile"
+                        >
+                          <FiEye className="text-lg" />
+                        </Link>
+                        <button 
+                          onClick={() => handleResetPassword(student.id, student.full_name)}
+                          className="text-orange-600 hover:text-orange-800 transition-colors"
+                          title="Reset Password"
+                        >
+                          <FiRefreshCw className="text-lg" />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(student)}
+                          className={`transition-colors ${
+                            student.status === 'active' 
+                              ? 'text-red-600 hover:text-red-800' 
+                              : 'text-green-600 hover:text-green-800'
+                          }`}
+                          title={student.status === 'active' ? 'Deactivate' : 'Activate'}
+                        >
+                          {student.status === 'active' ? <FiLock className="text-lg" /> : <FiUnlock className="text-lg" />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -177,27 +347,126 @@ export default function StudentsPage() {
         {/* Pagination */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Showing <span className="font-semibold">1</span> to <span className="font-semibold">6</span> of <span className="font-semibold">1,245</span> results
+            Showing <span className="font-semibold">{students.length}</span> of <span className="font-semibold">{stats.total}</span> students
           </div>
-          <div className="flex space-x-2">
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-              Previous
-            </button>
-            <button className="px-4 py-2 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg text-sm font-medium">
-              1
-            </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-              2
-            </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-              3
-            </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-              Next
-            </button>
+          <div className="text-sm text-gray-500">
+            {searchQuery || filterStatus !== 'all' ? 'Filtered results' : 'All students'}
           </div>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      {showPasswordModal && passwordData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
+            {/* Success Icon */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FiCheck className="text-white text-3xl" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">New Password Generated</h2>
+              <p className="text-gray-600 mt-2">Share this new password with {passwordData.name}</p>
+            </div>
+
+            {/* Credential Fields */}
+            <div className="space-y-4 mb-6">
+              {/* Student Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Student Name</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={passwordData.name}
+                    readOnly
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg font-medium"
+                  />
+                  <button
+                    onClick={() => handleCopy(passwordData.name, 'name')}
+                    className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  >
+                    {copiedField === 'name' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email (Username)</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="email"
+                    value={passwordData.email}
+                    readOnly
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg font-medium"
+                  />
+                  <button
+                    onClick={() => handleCopy(passwordData.email, 'email')}
+                    className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  >
+                    {copiedField === 'email' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordData.password}
+                    readOnly
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg font-mono font-medium"
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  >
+                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                  </button>
+                  <button
+                    onClick={() => handleCopy(passwordData.password, 'password')}
+                    className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  >
+                    {copiedField === 'password' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Warning */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800">
+                <strong>⚠️ Important:</strong> Share this password with the student. They should change it on first login for security.
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex items-center justify-between gap-4">
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`Email: ${passwordData.email}\nPassword: ${passwordData.password}`)
+                  setCopiedField('all')
+                  setTimeout(() => setCopiedField(''), 2000)
+                }}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                  copiedField === 'all' 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                {copiedField === 'all' ? 'Copied All ✓' : 'Copy All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

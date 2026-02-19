@@ -32,7 +32,6 @@ const menuItems = [
     path: '/admin/courses',
     subItems: [
       { name: 'All Courses', path: '/admin/courses' },
-      { name: 'Weeks', path: '/admin/courses/weeks' },
       { name: 'Videos', path: '/admin/courses/videos' },
     ]
   },

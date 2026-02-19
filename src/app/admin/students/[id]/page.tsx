@@ -1,35 +1,109 @@
 'use client'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { FiArrowLeft, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiMail, FiPhone, FiCalendar } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiMail, FiPhone, FiCalendar, FiExternalLink } from 'react-icons/fi'
+import { api } from '@/lib/api'
 
 export default function StudentDetailPage() {
   const params = useParams()
   const [activeTab, setActiveTab] = useState('profile')
+  const [student, setStudent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editData, setEditData] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    loadStudent()
+  }, [params.id])
+
+  const loadStudent = async () => {
+    try {
+      const result = await api.students.getById(params.id as string)
+      if (result.success && result.data) {
+        setStudent(result.data)
+        setEditData(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load student:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const result = await api.students.update(params.id as string, editData)
+      if (result.success) {
+        setStudent(editData)
+        setIsEditing(false)
+        alert('Student updated successfully!')
+      } else {
+        alert('Failed to update student: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error updating student:', error)
+      alert('Error updating student')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setEditData(student)
+    setIsEditing(false)
+  }
+
+  const handleResetPassword = async () => {
+    if (confirm('Are you sure you want to reset the password for this student?')) {
+      try {
+        const result = await api.students.resetPassword(params.id as string)
+        if (result.success) {
+          alert('Password reset email sent successfully!')
+        } else {
+          alert('Failed to reset password')
+        }
+      } catch (error) {
+        console.error('Error resetting password:', error)
+        alert('Error resetting password')
+      }
+    }
+  }
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
+    { id: 'courses', label: 'Enrolled Courses' },
     { id: 'progress', label: 'Course Progress' },
     { id: 'tasks', label: 'Tasks & Submissions' },
-    { id: 'project', label: 'Project' },
     { id: 'badges', label: 'Badges' },
-    { id: 'certificate', label: 'Certificate' },
     { id: 'support', label: 'Support History' },
   ]
 
-  // Mock student data
-  const student = {
-    id: params.id,
-    name: 'Rajesh Kumar',
-    email: 'rajesh@email.com',
-    phone: '+91 98765 43210',
-    course: 'Web Development',
-    role: 'Student',
-    status: 'Active',
-    registrationDate: '2025-12-01',
-    lastLogin: '2026-02-06 09:30 AM',
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C81E4E] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading student data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!student) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600 text-lg">Student not found</p>
+        <Link href="/admin/students" className="text-[#C81E4E] hover:text-[#D91E5B] mt-4 inline-block">
+          Back to Students
+        </Link>
+      </div>
+    )
   }
 
   return (
@@ -45,36 +119,30 @@ export default function StudentDetailPage() {
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-6">
             <div className="w-24 h-24 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white text-4xl font-bold">
-              {student.name.charAt(0)}
+              {student.full_name?.charAt(0) || '?'}
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">{student.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-800">{student.full_name || 'Student'}</h1>
               <div className="flex items-center space-x-4 mt-2">
-                <span className={`px-4 py-1 text-sm font-medium rounded-full ${
-                  student.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {student.status}
+                <span className="px-4 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
+                  {student.status || 'Active'}
                 </span>
                 <span className="px-4 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">
-                  {student.role}
+                  Student
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-gray-600">
                 <div className="flex items-center space-x-2">
                   <FiMail className="text-[#C81E4E]" />
-                  <span>{student.email}</span>
+                  <span>{student.email || '-'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <FiPhone className="text-[#C81E4E]" />
-                  <span>{student.phone}</span>
+                  <span>{student.phone || '-'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <FiCalendar className="text-[#C81E4E]" />
-                  <span>Registered: {student.registrationDate}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FiCalendar className="text-[#C81E4E]" />
-                  <span>Last Login: {student.lastLogin}</span>
+                  <span>Created: {student.created_at ? new Date(student.created_at).toLocaleDateString() : '-'}</span>
                 </div>
               </div>
             </div>
@@ -82,17 +150,19 @@ export default function StudentDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex space-x-3">
-            <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all flex items-center space-x-2">
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all flex items-center space-x-2"
+            >
               <FiEdit />
               <span>Edit Profile</span>
             </button>
-            <button className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all flex items-center space-x-2">
+            <button 
+              onClick={handleResetPassword}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all flex items-center space-x-2"
+            >
               <FiRefreshCw />
               <span>Reset Password</span>
-            </button>
-            <button className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all flex items-center space-x-2">
-              <FiLock />
-              <span>Block Account</span>
             </button>
           </div>
         </div>
@@ -120,82 +190,197 @@ export default function StudentDetailPage() {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'profile' && <ProfileTab student={student} />}
-          {activeTab === 'progress' && <ProgressTab />}
-          {activeTab === 'tasks' && <TasksTab />}
-          {activeTab === 'project' && <ProjectTab />}
-          {activeTab === 'badges' && <BadgesTab />}
-          {activeTab === 'certificate' && <CertificateTab />}
-          {activeTab === 'support' && <SupportTab />}
+          {activeTab === 'profile' && (
+            <ProfileTab 
+              student={student} 
+              isEditing={isEditing}
+              editData={editData}
+              setEditData={setEditData}
+              onSave={handleSave}
+              onCancel={handleCancel}
+              saving={saving}
+            />
+          )}
+          {activeTab === 'courses' && <EnrolledCoursesTab studentId={params.id} />}
+          {activeTab === 'tasks' && <TasksTab studentId={params.id} />}
+          {activeTab === 'badges' && <BadgesTab studentId={params.id} />}
+          {activeTab === 'support' && <SupportTab studentId={params.id} />}
         </div>
       </div>
     </div>
   )
 }
 
-function ProfileTab({ student }: any) {
+function SupportTab({ studentId }: any) {
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadTickets()
+  }, [studentId])
+
+  const loadTickets = async () => {
+    try {
+      const result = await api.tickets.getAll()
+      if (result.success && result.data) {
+        const studentTickets = Array.isArray(result.data)
+          ? result.data.filter((t: any) => t.student_id === studentId)
+          : []
+        setTickets(studentTickets)
+      }
+    } catch (error) {
+      console.error('Failed to load tickets:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">Loading support history...</div>
+  }
+
+  if (tickets.length === 0) {
+    return <div className="text-center py-8 text-gray-500">No support tickets found</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      {tickets.map((ticket) => (
+        <div key={ticket.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-800">{ticket.subject}</h3>
+              <p className="text-sm text-gray-600 mt-1">Created: {new Date(ticket.created_at).toLocaleDateString()}</p>
+            </div>
+            <span className={`px-4 py-2 text-sm font-medium rounded-lg ${
+              ticket.status === 'open' ? 'bg-orange-100 text-orange-800' :
+              ticket.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+              'bg-green-100 text-green-800'
+            }`}>
+              {ticket.status}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ProfileTab({ student, isEditing, editData, setEditData, onSave, onCancel, saving }: any) {
+  if (!student || !editData) {
+    return <div className="text-center py-8 text-gray-500">Loading...</div>
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-6">
+        {/* Full Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
           <input 
             type="text" 
-            value={student.name} 
-            readOnly
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
+            value={editData.full_name || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, full_name: e.target.value })}
+            readOnly={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
           />
         </div>
+
+        {/* Email Address */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
           <input 
             type="email" 
-            value={student.email} 
-            readOnly
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
+            value={editData.email || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, email: e.target.value })}
+            readOnly={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
           />
         </div>
+
+        {/* Phone Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
           <input 
             type="tel" 
-            value={student.phone} 
-            readOnly
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
+            value={editData.phone || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, phone: e.target.value })}
+            readOnly={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
           />
         </div>
+
+        {/* Enrollment Date */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Course Assigned</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Enrollment Date</label>
           <input 
             type="text" 
-            value={student.course} 
+            value={editData.enrollment_date ? new Date(editData.enrollment_date).toLocaleDateString() : '-'} 
             readOnly
             className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
           />
         </div>
+
+        {/* Role */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-          <select className="w-full px-4 py-3 border border-gray-300 rounded-lg">
+          <select 
+            value={editData.role || 'student'} 
+            onChange={(e) => isEditing && setEditData({ ...editData, role: e.target.value })}
+            disabled={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white cursor-pointer' : 'bg-gray-50 cursor-not-allowed'
+            }`}
+          >
             <option value="student">Student</option>
-            <option value="mentor">Mentor</option>
+            <option value="admin">Admin</option>
           </select>
         </div>
+
+        {/* Account Status */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Account Status</label>
-          <select className="w-full px-4 py-3 border border-gray-300 rounded-lg">
+          <select 
+            value={editData.status || 'active'} 
+            onChange={(e) => isEditing && setEditData({ ...editData, status: e.target.value })}
+            disabled={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white cursor-pointer' : 'bg-gray-50 cursor-not-allowed'
+            }`}
+          >
             <option value="active">Active</option>
-            <option value="blocked">Blocked</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
           </select>
         </div>
       </div>
-      <div className="flex justify-end space-x-3">
-        <button className="px-6 py-3 border-2 border-[#C81E4E] text-[#C81E4E] rounded-lg font-semibold hover:bg-[#C81E4E] hover:text-white transition-all">
-          Cancel
-        </button>
-        <button className="px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all">
-          Save Changes
-        </button>
-      </div>
+
+      {/* Form Actions */}
+      {isEditing && (
+        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <button 
+            onClick={onCancel}
+            disabled={saving}
+            className="px-6 py-3 border-2 border-[#C81E4E] text-[#C81E4E] rounded-lg font-semibold hover:bg-[#C81E4E] hover:text-white transition-all disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={onSave}
+            disabled={saving}
+            className="px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center space-x-2"
+          >
+            {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -246,13 +431,37 @@ function ProgressTab() {
     </div>
   )
 }
+function TasksTab({ studentId }: any) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-function TasksTab() {
-  const tasks = [
-    { id: 1, title: 'Build a Portfolio Website', week: 2, submitted: '2026-01-15', status: 'Evaluated', marks: 95, feedback: 'Excellent work!' },
-    { id: 2, title: 'JavaScript Calculator', week: 3, submitted: '2026-01-28', status: 'Evaluated', marks: 88, feedback: 'Good job, minor improvements needed.' },
-    { id: 3, title: 'API Integration Task', week: 3, submitted: '2026-02-05', status: 'Pending', marks: null, feedback: null },
-  ]
+  useEffect(() => {
+    loadTasks()
+  }, [studentId])
+
+  const loadTasks = async () => {
+    try {
+      const result = await api.tasks.getAll()
+      if (result.success && result.data) {
+        const studentTasks = Array.isArray(result.data)
+          ? result.data.filter((t: any) => t.student_id === studentId)
+          : []
+        setTasks(studentTasks)
+      }
+    } catch (error) {
+      console.error('Failed to load tasks:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">Loading tasks...</div>
+  }
+
+  if (tasks.length === 0) {
+    return <div className="text-center py-8 text-gray-500">No tasks found for this student</div>
+  }
 
   return (
     <div className="space-y-4">
@@ -260,8 +469,8 @@ function TasksTab() {
         <div key={task.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-800">{task.title}</h3>
-              <p className="text-sm text-gray-600 mt-1">Week {task.week} • Submitted: {task.submitted}</p>
+              <h3 className="text-lg font-semibold text-gray-800">Task #{task.task_id?.substring(0, 8)}</h3>
+              <p className="text-sm text-gray-600 mt-1">Submitted: {new Date(task.submitted_at).toLocaleDateString()}</p>
               {task.feedback && (
                 <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-3 rounded-lg">
                   <strong>Feedback:</strong> {task.feedback}
@@ -269,33 +478,104 @@ function TasksTab() {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              {task.marks !== null && (
+              {task.marks_obtained !== null && (
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-[#C81E4E]">{task.marks}</p>
+                  <p className="text-3xl font-bold text-[#C81E4E]">{task.marks_obtained}</p>
                   <p className="text-xs text-gray-600">/ 100</p>
                 </div>
               )}
               <span className={`px-4 py-2 text-sm font-medium rounded-lg ${
-                task.status === 'Evaluated' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                task.status === 'evaluated' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
               }`}>
                 {task.status}
               </span>
             </div>
           </div>
-          {task.status === 'Pending' && (
-            <div className="mt-4 flex space-x-3">
-              <input 
-                type="number" 
-                placeholder="Enter marks (0-100)" 
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-              />
-              <button className="px-6 py-2 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all">
-                Evaluate
-              </button>
-            </div>
-          )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function EnrolledCoursesTab({ studentId }: any) {
+  const [enrollments, setEnrollments] = useState<any[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await api.students.getEnrollments(studentId)
+        if (res.success && Array.isArray(res.data)) setEnrollments(res.data)
+        else setEnrollments([])
+      } catch (err) {
+        console.error('Failed to load student enrollments', err)
+        setEnrollments([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [studentId])
+
+  if (loading) return <div className="text-center py-8 text-gray-500">Loading enrolled courses...</div>
+  if (!enrollments || enrollments.length === 0) return <div className="text-center py-8 text-gray-500">No enrolled courses found</div>
+
+  return (
+    <div className="space-y-4">
+      {enrollments.map((e: any) => (
+        <div key={e.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-gray-800">{e.course?.title || 'Unknown Course'}</div>
+            <div className="text-sm text-gray-500">Domain: {e.course?.domain || 'Unspecified'}</div>
+          </div>
+          <div className="text-sm text-gray-500">Enrolled: {new Date(e.enrolled_at || e.created_at).toLocaleDateString()}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BadgesTab({ studentId }: any) {
+  const [badges, setBadges] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadBadges()
+  }, [studentId])
+
+  const loadBadges = async () => {
+    try {
+      // Fetch user_badges for this student
+      const result = await api.badges.getAll()
+      if (result.success && result.data) {
+        const userBadges = Array.isArray(result.data) ? result.data : []
+        setBadges(userBadges)
+      }
+    } catch (error) {
+      console.error('Failed to load badges:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">Loading badges...</div>
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {badges.length === 0 ? (
+        <div className="text-center py-8 text-gray-500 col-span-3">No badges earned yet</div>
+      ) : (
+        badges.map((badge) => (
+          <div key={badge.id} className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-6 text-center">
+            <div className="text-5xl mb-3">{badge.icon || '🏆'}</div>
+            <h3 className="text-lg font-semibold text-gray-800">{badge.name}</h3>
+            <p className="text-sm text-gray-600 mt-2">{badge.description}</p>
+          </div>
+        ))
+      )}
     </div>
   )
 }
@@ -353,46 +633,6 @@ function ProjectTab() {
           Reject Project
         </button>
       </div>
-    </div>
-  )
-}
-
-function BadgesTab() {
-  const badges = [
-    { id: 1, name: 'Early Bird', description: 'Completed Week 1 on time', earned: true, date: '2025-12-08' },
-    { id: 2, name: 'Task Master', description: 'Submitted 5 tasks', earned: true, date: '2026-01-15' },
-    { id: 3, name: 'Perfect Score', description: 'Got 100% in a task', earned: false, date: null },
-    { id: 4, name: 'Course Completer', description: 'Finished entire course', earned: false, date: null },
-  ]
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {badges.map((badge) => (
-        <div 
-          key={badge.id} 
-          className={`border-2 rounded-lg p-6 ${
-            badge.earned ? 'border-[#C81E4E] bg-red-50' : 'border-gray-300 bg-gray-50 opacity-60'
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">{badge.name}</h3>
-              <p className="text-sm text-gray-600 mt-1">{badge.description}</p>
-              {badge.earned && badge.date && (
-                <p className="text-xs text-gray-500 mt-2">Earned on: {badge.date}</p>
-              )}
-            </div>
-            <div className="text-4xl">
-              {badge.earned ? '🏆' : '🔒'}
-            </div>
-          </div>
-          {!badge.earned && (
-            <button className="mt-4 w-full py-2 bg-[#C81E4E] text-white rounded-lg hover:bg-[#D91E5B] transition-all text-sm font-medium">
-              Assign Badge Manually
-            </button>
-          )}
-        </div>
-      ))}
     </div>
   )
 }
@@ -462,56 +702,6 @@ function CertificateTab() {
           </button>
         )}
       </div>
-    </div>
-  )
-}
-
-function SupportTab() {
-  const tickets = [
-    { id: '#T-1234', subject: 'Unable to access Week 3 videos', status: 'Resolved', date: '2026-01-25', priority: 'High' },
-    { id: '#T-1156', subject: 'Login issues', status: 'Resolved', date: '2026-01-10', priority: 'Medium' },
-  ]
-
-  return (
-    <div className="space-y-4">
-      {tickets.length > 0 ? (
-        tickets.map((ticket) => (
-          <div key={ticket.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-gray-800">{ticket.id}: {ticket.subject}</h3>
-                <p className="text-sm text-gray-600 mt-1">Created: {ticket.date}</p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                  ticket.priority === 'High' ? 'bg-red-100 text-red-800' :
-                  ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-blue-100 text-blue-800'
-                }`}>
-                  {ticket.priority}
-                </span>
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                  ticket.status === 'Resolved' ? 'bg-green-100 text-green-800' :
-                  ticket.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                  'bg-orange-100 text-orange-800'
-                }`}>
-                  {ticket.status}
-                </span>
-                <Link 
-                  href={`/admin/support/${ticket.id}`}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm font-medium"
-                >
-                  View
-                </Link>
-              </div>
-            </div>
-          </div>
-        ))
-      ) : (
-        <div className="text-center py-12 text-gray-500">
-          <p>No support tickets raised by this student</p>
-        </div>
-      )}
     </div>
   )
 }

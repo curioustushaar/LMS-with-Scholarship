@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const userId = authResult.id
     const { data, error } = await supabase
-      .from('users')
-      .select('id, email, full_name, phone, profile_image_url, role')
+      .from('profiles')
+      .select('*')
       .eq('id', userId)
       .maybeSingle()
 
@@ -41,28 +41,43 @@ export async function PATCH(request: NextRequest) {
     const allowed: any = {}
     if (body.full_name) allowed.full_name = body.full_name
     if (body.email) allowed.email = body.email
-    if (body.phone) allowed.phone = body.phone
     if (body.profile_image_url) allowed.profile_image_url = body.profile_image_url
+    // Phone is optional - only add if column exists
+    if (body.phone !== undefined) {
+      try {
+        allowed.phone = body.phone
+      } catch (e) {
+        console.warn('Phone column may not exist:', e)
+      }
+    }
 
     if (Object.keys(allowed).length === 0) {
       return NextResponse.json({ success: false, error: 'No valid fields provided' }, { status: 400 })
     }
 
     const { data, error } = await supabaseAdmin
-      .from('users')
+      .from('profiles')
       .update(allowed)
       .eq('id', userId)
-      .select('id, email, full_name, phone, profile_image_url, role')
+      .select('*')
       .maybeSingle()
 
     if (error) {
       console.error('❌ Error updating profile:', error.message)
       // Friendly handling for missing column (common migration issue)
       const msg = error.message || ''
+      
+      if (msg.includes('phone') && (msg.includes('column') || msg.includes('schema cache'))) {
+        return NextResponse.json({
+          success: false,
+          error: 'Database missing phone column. Run add-phone-column-to-profiles.sql from Supabase SQL Editor.'
+        }, { status: 500 })
+      }
+      
       if (msg.includes('profile_image_url') || msg.includes('column') && msg.includes('does not exist')) {
         return NextResponse.json({
           success: false,
-          error: 'Database missing column users.profile_image_url. Run fix-add-profile-image-column.sql in the project root (or add the column in Supabase) and then run NOTIFY pgrst, \"reload schema\".'
+          error: 'Database missing column. Run fix-add-profile-image-column.sql in the project root (or add the column in Supabase) and then run NOTIFY pgrst, \"reload schema\".'
         }, { status: 500 })
       }
 

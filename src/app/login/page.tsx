@@ -4,20 +4,80 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
   })
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement actual authentication
-    router.push('/admin/dashboard')
+    setLoading(true)
+    setError('')
+    
+    try {
+      console.log('Attempting login with:', formData.email)
+      
+      // Sign in with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (authError) throw authError
+      
+      if (!authData.session) {
+        throw new Error('No session received from authentication')
+      }
+
+      console.log('✅ Login successful, auth data:', {
+        user: authData.user?.email,
+        hasSession: !!authData.session,
+        tokenLength: authData.session.access_token.length
+      })
+
+      // Get current session to verify persistence
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.warn('⚠️ Session not persisted, storing token manually')
+        localStorage.setItem('supabase.auth.token', authData.session.access_token)
+      }
+
+      // Check user role from database
+      console.log('Checking role for user ID:', authData.user.id)
+      
+      // Fetch role from profiles table
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle()
+
+      // Final Role Determination
+      const role = userData?.role || authData.user.app_metadata?.role || authData.user.user_metadata?.role || 'student'
+      
+      console.log('Final Role determined:', role)
+
+      if (role === 'admin') {
+        console.log('✅ Admin verified, redirecting to dashboard')
+        router.push('/admin/dashboard')
+      } else {
+        console.log('✅ Student verified, redirecting to portal')
+        router.push('/student/videos')
+      }
+    } catch (err: any) {
+      console.error('❌ Login error:', err)
+      setError(err.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,17 +119,19 @@ export default function LoginPage() {
                 <p className="text-sm md:text-base text-gray-600">Sign in to access admin dashboard</p>
               </div>
 
-              {/* Admin/Staff Toggle */}
-              <div className="flex mb-6 md:mb-8 bg-gray-100 rounded-lg p-1">
-                <button className="flex-1 py-2 px-4 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold shadow-md text-sm md:text-base">
-                  Admin
-                </button>
-                <button className="flex-1 py-2 px-4 text-gray-600 font-medium text-sm md:text-base">
-                  Staff
-                </button>
+              {/* Admin Login Only */}
+              <div className="mb-6 md:mb-8 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-lg p-3">
+                <p className="text-white font-semibold text-sm text-center">🔐 Admin Access Only</p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
                 {/* Email Input */}
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">
@@ -140,10 +202,11 @@ export default function LoginPage() {
                 {/* Sign In Button */}
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-bold py-3 px-6 rounded-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-bold py-3 px-6 rounded-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  Sign In
-                  <span className="ml-2">→</span>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                  {!loading && <span className="ml-2">→</span>}
                 </button>
               </form>
 

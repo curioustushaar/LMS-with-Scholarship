@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase'
+import { logger } from './logger'
 
 const API_BASE_URL = '/api/admin'
 
@@ -17,6 +18,16 @@ interface ApiResponse<T = any> {
   error?: string
   message?: string
   count?: number
+}
+
+/**
+ * Validate token
+ */
+function validateToken(token: string | null): boolean {
+  if (!token || token === 'null' || token === 'undefined' || token.length < 20) {
+    return false
+  }
+  return true
 }
 
 /**
@@ -37,12 +48,16 @@ async function apiRequest<T = any>(
         token = session.access_token
       } else {
         // Fallback to localStorage
-        token = localStorage.getItem('supabase.auth.token')
+        token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
       }
     }
 
-    if (!token) {
-      console.warn('⚠️ No auth token found in session or localStorage')
+    // Validate token before making request
+    if (!validateToken(token)) {
+      return {
+        success: false,
+        error: 'Authentication required'
+      }
     }
 
     const headers = {
@@ -50,8 +65,6 @@ async function apiRequest<T = any>(
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     }
-
-    console.log(`📤 Sending ${options.method || 'GET'} request to:`, endpoint)
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
@@ -62,19 +75,11 @@ async function apiRequest<T = any>(
     try {
       data = await response.json()
     } catch (e) {
-      console.error('❌ Failed to parse response JSON:', e)
-      throw new Error(`Invalid JSON response from server (${response.status})`)
+      throw new Error('Invalid server response')
     }
 
     if (!response.ok) {
-      const errorMessage = data?.error || data?.message || `HTTP ${response.status} error`
-      console.error(`❌ API Error (${response.status}):`, {
-        endpoint,
-        method: options.method || 'GET',
-        error: errorMessage,
-        details: data?.details,
-        fullResponse: data
-      })
+      const errorMessage = data?.error || data?.message || 'Request failed'
 
       // Handle unauthorized errors
       if (response.status === 401) {
@@ -87,19 +92,8 @@ async function apiRequest<T = any>(
       throw new Error(errorMessage)
     }
 
-    console.log(`✅ API Success (${response.status}):`, {
-      endpoint,
-      method: options.method || 'GET',
-      dataLength: JSON.stringify(data).length
-    })
-
     return data
   } catch (error: any) {
-    console.error('💥 API Request Failed:', {
-      error: error.message,
-      endpoint,
-      method: options.method || 'GET'
-    })
     return {
       success: false,
       error: error.message || 'Something went wrong'
@@ -193,9 +187,7 @@ export const coursesAPI = {
   },
 
   getById: async (id: string) => {
-    const result = await apiRequest(`/courses/${id}`)
-    console.log('getById response:', result)
-    return result
+    return apiRequest(`/courses/${id}`)
   },
 
   getEnrollments: async (courseId: string) => {
@@ -228,10 +220,19 @@ export const weeksAPI = {
     const params = new URLSearchParams()
     if (filters?.course_id) params.append('course_id', filters.course_id)
     const query = params.toString() ? `?${params.toString()}` : ''
+    
+    // Check if we're in student context
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/student')) {
+       return apiRequest(`/../student/weeks${query}`)
+    }
     return apiRequest(`/weeks${query}`)
   },
 
   getByCourse: async (courseId: string) => {
+    // Check if we're in student context
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/student')) {
+       return apiRequest(`/../student/weeks?course_id=${courseId}`)
+    }
     return apiRequest(`/weeks?course_id=${courseId}`)
   },
 
@@ -252,6 +253,10 @@ export const weeksAPI = {
 
 export const videosAPI = {
   getByWeek: async (weekId: string) => {
+    // Check if we're in student context
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/student')) {
+       return apiRequest(`/../student/videos?week_id=${weekId}`)
+    }
     return apiRequest(`/videos?week_id=${weekId}`)
   },
 
@@ -296,16 +301,14 @@ export const videosAPI = {
       const data = await response.json()
 
       if (!response.ok) {
-        console.error(`API Error (${response.status}):`, data)
         throw new Error(data.error || data.message || 'Upload failed')
       }
 
       return data
     } catch (error: any) {
-      console.error('Upload Error:', error)
       return {
         success: false,
-        error: error.message || 'Something went wrong'
+        error: error.message || 'Upload failed'
       }
     }
   },
@@ -417,9 +420,24 @@ export const settingsAPI = {
     formData.append('file', file)
 
     try {
-      const token = typeof window !== 'undefined'
-        ? localStorage.getItem('supabase.auth.token')
-        : null
+      // Get auth token from Supabase session (same as apiRequest)
+      let token = null
+
+      if (typeof window !== 'undefined') {
+        // Try to get from Supabase session first
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          token = session.access_token
+        } else {
+          // Fallback to localStorage
+          token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
+        }
+      }
+
+      // Validate token
+      if (!validateToken(token)) {
+        throw new Error('Invalid or missing authentication token')
+      }
 
       const headers: any = {}
       if (token) headers['Authorization'] = `Bearer ${token}`
@@ -434,8 +452,7 @@ export const settingsAPI = {
       if (!response.ok) throw new Error(data.error || data.message || 'Upload failed')
       return data
     } catch (error: any) {
-      console.error('Avatar upload error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: 'Upload failed' }
     }
   }
 }
@@ -584,6 +601,10 @@ export const certificatesAPI = {
     return apiRequest(`/certificates/eligible?course_id=${courseId}`)
   },
 
+  getAllEligible: async () => {
+    return apiRequest('/certificates/eligible/all')
+  },
+
   issueBatch: async (data: {
     course_id: string;
     domain: string;
@@ -655,10 +676,30 @@ export const ticketsAPI = {
     })
   },
 
+  update: async (ticketId: string, data: any) => {
+    return apiRequest(`/tickets/${ticketId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
   delete: async (id: string) => {
     return apiRequest(`/tickets/${id}`, {
       method: 'DELETE',
     })
+  },
+}
+
+// ==========================================
+// USERS API
+// ==========================================
+
+export const usersAPI = {
+  getAll: async (filters?: { role?: string }) => {
+    const params = new URLSearchParams()
+    if (filters?.role) params.append('role', filters.role)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return apiRequest(`/users${query}`)
   },
 }
 
@@ -698,6 +739,13 @@ export const reportsAPI = {
 // ==========================================
 
 export const studentAPI = {
+  // Courses for students
+  courses: {
+    getAll: async () => {
+      return apiRequest('/../student/courses')
+    },
+  },
+
   // Tasks for students
   tasks: {
     getAll: async (filters?: { course_id?: string; status?: string }) => {
@@ -706,15 +754,15 @@ export const studentAPI = {
       if (filters?.status) params.append('status', filters.status)
       const query = params.toString() ? `?${params.toString()}` : ''
       
-      // Use student endpoint instead of admin
-      return apiRequest(`/student/tasks${query}`.replace('/admin', ''))
+      // Use student endpoint
+      return apiRequest(`/../student/tasks${query}`)
     },
   },
 
   // Projects for students
   projects: {
     getAll: async () => {
-      return apiRequest('/student/projects')
+      return apiRequest('/../student/projects')
     },
 
     submit: async (projectId: string, data: { 
@@ -723,7 +771,7 @@ export const studentAPI = {
       status?: string;
       notes?: string 
     }) => {
-      return apiRequest(`/student/projects/${projectId}`, {
+      return apiRequest(`/../student/projects/${projectId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       })
@@ -738,15 +786,32 @@ export const studentAPI = {
       if (filters?.status) params.append('status', filters.status)
       const query = params.toString() ? `?${params.toString()}` : ''
       
-      return apiRequest(`/student/submissions${query}`.replace('/admin', ''))
+      return apiRequest(`/../student/submissions${query}`)
     },
 
+    create: async (data: { 
+      task_id: string; 
+      submission_url?: string; 
+      submission_text?: string;
+      github_url?: string;
+      deploy_url?: string;
+      project_name?: string;
+      submission_file_url?: string;
+      submission_description?: string;
+    }) => {
+      return apiRequest('/../student/submissions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    },
+
+    // Legacy submit method for backward compatibility
     submit: async (data: { 
       task_id: string; 
       submission_url?: string; 
       submission_text?: string 
     }) => {
-      return apiRequest('/student/submissions'.replace('/admin', ''), {
+      return apiRequest('/../student/submissions', {
         method: 'POST',
         body: JSON.stringify(data),
       })
@@ -768,4 +833,5 @@ export const api = {
   tickets: ticketsAPI,
   reports: reportsAPI,
   student: studentAPI,
+  users: usersAPI,
 }

@@ -1,51 +1,269 @@
 'use client'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiX, FiMail, FiUser, FiBook } from 'react-icons/fi'
+import { FiX, FiMail, FiUser, FiPhone, FiEye, FiEyeOff, FiCopy, FiCheck } from 'react-icons/fi'
+import { studentsAPI, coursesAPI } from '@/lib/api'
+
+// Generate secure password
+function generatePassword() {
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+  const numbers = '0123456789'
+  const symbols = '!@#$%^&*'
+  
+  const allChars = uppercase + lowercase + numbers + symbols
+  let password = ''
+  
+  // Ensure at least one character from each type
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
+  password += lowercase.charAt(Math.floor(Math.random() * lowercase.length))
+  password += numbers.charAt(Math.floor(Math.random() * numbers.length))
+  password += symbols.charAt(Math.floor(Math.random() * symbols.length))
+  
+  // Fill the rest randomly
+  for (let i = password.length; i < 12; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length))
+  }
+  
+  // Shuffle password
+  return password.split('').sort(() => Math.random() - 0.5).join('')
+}
 
 export default function CreateStudentPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    full_name: '',
     email: '',
     phone: '',
-    course: '',
-    role: 'student',
-    autoGeneratePassword: true,
-    customPassword: ''
+    password: ''
   })
-  const [generatedPassword, setGeneratedPassword] = useState('')
+  const [courses, setCourses] = useState<any[]>([])
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([])
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successData, setSuccessData] = useState<any>(null)
+  const [copiedField, setCopiedField] = useState('')
 
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
-    let password = ''
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length))
+  // Generate password on component mount
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, password: generatePassword() }))
+    
+    // Fetch all courses on mount
+    const fetchAllCourses = async () => {
+      try {
+        const json = await coursesAPI.getAll() // Fetch ALL courses
+        if (json.success && Array.isArray(json.data)) {
+          setCourses(json.data)
+        }
+      } catch (err) {
+        console.warn('Could not fetch courses', err)
+      }
     }
-    return password
+    
+    fetchAllCourses()
+  }, [])
+
+
+
+  const handleGeneratePassword = () => {
+    setFormData(prev => ({ ...prev, password: generatePassword() }))
+  }
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(''), 2000)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError('')
 
-    const password = formData.autoGeneratePassword ? generatePassword() : formData.customPassword
-    setGeneratedPassword(password)
-
-    // TODO: Implement actual student creation with Supabase Auth
-    setTimeout(() => {
+    // Validate
+    if (!formData.full_name.trim() || !formData.email.trim()) {
+      setError('Name and email are required')
       setLoading(false)
-      alert(`Student created successfully!\n\nEmail: ${formData.email}\nPassword: ${password}\n\nCredentials have been sent to the student's email.`)
-    }, 1500)
+      return
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters')
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Create student with explicit password
+      const response = await studentsAPI.create({
+        email: formData.email,
+        full_name: formData.full_name,
+        phone: formData.phone,
+        password: formData.password,
+        course_ids: selectedCourseIds.length ? selectedCourseIds : undefined
+      })
+      
+      if (response.success) {
+        // Show success with credentials
+        setSuccessData({
+          studentId: response.data?.id || 'N/A',
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.full_name
+        })
+      } else {
+        setError(response.error || 'Failed to create student')
+        console.error('Student creation error:', response)
+      }
+    } catch (err: any) {
+      const errorMsg = err.message || 'Error creating student'
+      setError(errorMsg)
+      console.error('Student creation exception:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const copyCredentials = () => {
-    const credentials = `Email: ${formData.email}\nPassword: ${generatedPassword}`
-    navigator.clipboard.writeText(credentials)
-    alert('Credentials copied to clipboard!')
+  // Success screen
+  if (successData) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiCheck className="text-white text-3xl" />
+            </div>
+            <h1 className="text-3xl font-bold text-green-800 mb-2">Student Created Successfully!</h1>
+            <p className="text-green-700 mb-6">Share the credentials below with the student to login</p>
+          </div>
+        </div>
+
+        {/* Credentials Card */}
+        <div className="bg-white rounded-xl shadow-lg p-8 border-2 border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Student Login Credentials</h2>
+          
+          <div className="space-y-6">
+            {/* Student Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Student Name</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={successData.fullName}
+                  readOnly
+                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium"
+                />
+                <button
+                  onClick={() => handleCopy(successData.fullName, 'name')}
+                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  title="Copy"
+                >
+                  {copiedField === 'name' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                </button>
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email (Username)</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="email"
+                  value={successData.email}
+                  readOnly
+                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium"
+                />
+                <button
+                  onClick={() => handleCopy(successData.email, 'email')}
+                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  title="Copy"
+                >
+                  {copiedField === 'email' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                </button>
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temporary Password</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={successData.password}
+                  readOnly
+                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium font-mono"
+                />
+                <button
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  title={showPassword ? 'Hide' : 'Show'}
+                >
+                  {showPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
+                <button
+                  onClick={() => handleCopy(successData.password, 'password')}
+                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  title="Copy"
+                >
+                  {copiedField === 'password' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                </button>
+              </div>
+            </div>
+
+            {/* Student ID */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={successData.studentId}
+                  readOnly
+                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium font-mono"
+                />
+                <button
+                  onClick={() => handleCopy(successData.studentId, 'id')}
+                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  title="Copy"
+                >
+                  {copiedField === 'id' ? <FiCheck className="text-green-600" /> : <FiCopy />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
+            <p className="text-sm text-yellow-800">
+              <strong>⚠️ Important:</strong> Share these credentials with the student. They should change their password on first login.
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-center space-x-4">
+          <button
+            onClick={() => router.push('/admin/students')}
+            className="px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+          >
+            Go to Students List
+          </button>
+          <button
+            onClick={() => {
+              setSuccessData(null)
+              setFormData({ full_name: '', email: '', phone: '', password: generatePassword() })
+              setError('')
+              setSelectedCourseIds([])
+            }}
+            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+          >
+            Create Another Student
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -54,7 +272,7 @@ export default function CreateStudentPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Create New Student</h1>
-          <p className="text-gray-600 mt-1">Add a new student to the LMS system</p>
+          <p className="text-gray-600 mt-1">Add a new student to the LMS system - Login credentials will be generated automatically</p>
         </div>
         <button
           onClick={() => router.back()}
@@ -68,37 +286,31 @@ export default function CreateStudentPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-8">
         <div className="space-y-6">
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
           {/* Personal Information */}
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
               <FiUser className="text-[#C81E4E]" />
-              <span>Personal Information</span>
+              <span>Student Information</span>
             </h2>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name <span className="text-red-500">*</span>
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="input-field"
-                  placeholder="Enter first name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="input-field"
-                  placeholder="Enter last name"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                  placeholder="Enter student's full name"
                 />
               </div>
               <div>
@@ -110,7 +322,7 @@ export default function CreateStudentPage() {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="input-field"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
                   placeholder="student@example.com"
                 />
               </div>
@@ -122,119 +334,92 @@ export default function CreateStudentPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="input-field"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
                   placeholder="+91 98765 43210"
                 />
               </div>
             </div>
           </div>
 
-          {/* Course Assignment */}
+          {/* Enroll in Courses (domain filtered) */}
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
-              <FiBook className="text-[#C81E4E]" />
-              <span>Course Assignment</span>
+              <FiUser className="text-[#C81E4E]" />
+              <span>Enroll in Courses (optional)</span>
             </h2>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assign Course <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={formData.course}
-                  onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="">Select a course</option>
-                  <option value="web-dev">Web Development</option>
-                  <option value="data-science">Data Science</option>
-                  <option value="mobile-dev">Mobile App Development</option>
-                  <option value="ui-ux">UI/UX Design</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Role
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="student">Student</option>
-                  <option value="mentor">Mentor</option>
-                </select>
-              </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600 mb-3">Select courses to enroll this student</p>
+              {courses.length === 0 ? (
+                <p className="text-sm text-gray-500">No courses available.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {courses.map((c: any) => (
+                    <label key={c.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedCourseIds.includes(c.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedCourseIds(prev => [...prev, c.id])
+                          else setSelectedCourseIds(prev => prev.filter(id => id !== c.id))
+                        }}
+                      />
+                      <span className="text-sm text-gray-700">{c.title}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Password Settings */}
+          {/* Login Credentials */}
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
               <FiMail className="text-[#C81E4E]" />
-              <span>Password & Access</span>
+              <span>Login Credentials</span>
             </h2>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="autoPassword"
-                  checked={formData.autoGeneratePassword}
-                  onChange={(e) => setFormData({ ...formData, autoGeneratePassword: e.target.checked })}
-                  className="w-5 h-5 text-[#C81E4E] border-gray-300 rounded focus:ring-[#C81E4E]"
-                />
-                <label htmlFor="autoPassword" className="text-gray-700 font-medium">
-                  Auto-generate secure password
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Temporary Password (Auto-generated)
                 </label>
-              </div>
-
-              {!formData.autoGeneratePassword && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Custom Password
-                  </label>
+                <div className="flex items-center space-x-2">
                   <input
-                    type="text"
-                    value={formData.customPassword}
-                    onChange={(e) => setFormData({ ...formData, customPassword: e.target.value })}
-                    className="input-field"
-                    placeholder="Enter custom password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    readOnly
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg font-mono text-gray-800"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                  >
+                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-medium"
+                  >
+                    Regenerate
+                  </button>
                 </div>
-              )}
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Login credentials will be automatically sent to the student's email address.
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Generated Credentials Display */}
-          {generatedPassword && (
-            <div className="bg-green-50 border-2 border-green-500 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-green-800 mb-4">✅ Student Created Successfully!</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600">Email:</p>
-                  <p className="font-mono font-semibold text-gray-800">{formData.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Password:</p>
-                  <p className="font-mono font-semibold text-gray-800">{generatedPassword}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={copyCredentials}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm font-medium"
-                >
-                  Copy Credentials
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+            <p className="text-sm text-blue-800">
+              <strong>✓ Student Account Details:</strong>
+            </p>
+            <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>Student will be created with active status</li>
+              <li>Login credentials will be generated automatically</li>
+              <li>Email address is used as username for login</li>
+              <li>Temporary password is shown on success - must be changed on first login</li>
+              <li>All data will be stored in Supabase database</li>
+            </ul>
+          </div>
 
           {/* Form Actions */}
           <div className="flex items-center justify-end space-x-4 pt-6 border-t">

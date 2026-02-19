@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Update user record with profile_image_url (signed or public)
     const { data, error: dbError } = await supabaseAdmin
-      .from('users')
+      .from('profiles')
       .update({ profile_image_url: publicUrl })
       .eq('id', userId)
       .select('id, profile_image_url')
