@@ -28,6 +28,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# SQL files (database scripts - sensitive)
+*.sql
+
 # vercel
 .vercel
 
