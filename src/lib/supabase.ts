@@ -1,30 +1,57 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing required Supabase environment variables!')
+  console.error('Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY')
+}
+
+// Client-side Supabase instance with proper session persistence
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined
+    }
+  }
+)
+
+// Service role client for admin operations (bypasses RLS)
+export const supabaseAdmin = supabaseServiceKey 
+  ? createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseServiceKey
+    )
+  : supabase // Fallback to regular client if service key missing
 
 // Admin API helpers
 export const adminAPI = {
   // Students
   getStudents: async (filters?: any) => {
-    let query = supabase.from('users').select('*')
-    if (filters?.status) query = query.eq('status', filters.status)
+    let query = supabase.from('profiles').select('*')
+    if (filters?.status) query = query.eq('account_status', filters.status)
     if (filters?.role) query = query.eq('role', filters.role)
     return await query
   },
 
   getStudent: async (id: string) => {
-    return await supabase.from('users').select('*').eq('id', id).single()
+    return await supabase.from('profiles').select('*').eq('id', id).single()
   },
 
   createStudent: async (data: any) => {
-    return await supabase.from('users').insert(data)
+    return await supabase.from('profiles').insert(data)
   },
 
   updateStudent: async (id: string, data: any) => {
-    return await supabase.from('users').update(data).eq('id', id)
+    return await supabase.from('profiles').update(data).eq('id', id)
   },
 
   resetPassword: async (id: string) => {
@@ -148,7 +175,7 @@ export const adminAPI = {
   // Analytics
   getDashboardStats: async () => {
     const [students, tasks, projects, tickets, certificates] = await Promise.all([
-      supabase.from('users').select('*', { count: 'exact' }),
+      supabase.from('profiles').select('*', { count: 'exact' }).eq('role', 'student'),
       supabase.from('task_submissions').select('*', { count: 'exact' }).eq('status', 'pending'),
       supabase.from('projects').select('*', { count: 'exact' }).eq('status', 'pending_approval'),
       supabase.from('tickets').select('*', { count: 'exact' }).eq('status', 'open'),
