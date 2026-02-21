@@ -252,7 +252,10 @@ export default function CertificatesPage() {
                       <h3 className="font-bold text-gray-800">{courseData.course_title}</h3>
                     </div>
                     <p className="text-xs text-gray-500">
-                      ✓ {courseData.total_videos} videos • All requirements completed
+                      ✓ {courseData.total_videos} videos
+                      {courseData.total_tasks > 0 && ` • ${courseData.total_tasks} tasks`}
+                      {courseData.total_projects > 0 && ` • ${courseData.total_projects} projects`}
+                      {' • All requirements completed'}
                     </p>
                   </div>
                   <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-bold flex-shrink-0">
@@ -353,38 +356,27 @@ export default function CertificatesPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Select Domain</label>
-                      <select
-                        value={issueData.domain}
-                        onChange={(e) => setIssueData({ ...issueData, domain: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-[#C81E4E] outline-none transition-all font-medium"
-                      >
-                        <option>Web Development</option>
-                        <option>Data Science</option>
-                        <option>Cloud Computing</option>
-                        <option>UI/UX Design</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Select Course</label>
-                      <select
-                        value={issueData.course_id}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setIssueData({ ...issueData, course_id: val });
-                          fetchEligibleStudents(val);
-                        }}
-                        className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-[#C81E4E] outline-none transition-all font-medium"
-                      >
-                        <option value="">Choose course...</option>
-                        {courses.map(course => (
-                          <option key={course.id} value={course.id}>{course.title}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Select Course</label>
+                    <select
+                      value={issueData.course_id}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const selectedCourse = courses.find(c => c.id === val);
+                        setIssueData({ 
+                          ...issueData, 
+                          course_id: val,
+                          domain: selectedCourse?.title || 'Web Development'
+                        });
+                        fetchEligibleStudents(val);
+                      }}
+                      className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-[#C81E4E] outline-none transition-all font-medium"
+                    >
+                      <option value="">Choose course...</option>
+                      {courses.map(course => (
+                        <option key={course.id} value={course.id}>{course.title}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -451,7 +443,9 @@ export default function CertificatesPage() {
                                   <p className="font-bold text-gray-800 truncate">{student.full_name}</p>
                                   <p className="text-xs text-gray-500 truncate">📧 {student.email}</p>
                                   <p className="text-xs text-green-600 font-semibold mt-1">
-                                    ✓ {student.completedCount || 'All'} videos completed
+                                    ✓ Videos: {student.completedVideos || 0}
+                                    {student.completedTasks > 0 && ` • Tasks: ${student.completedTasks}`}
+                                    {student.completedProjects > 0 && ` • Projects: ${student.completedProjects}`}
                                   </p>
                                 </div>
                                 <div className="text-green-500">

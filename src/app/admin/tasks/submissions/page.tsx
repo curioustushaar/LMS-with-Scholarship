@@ -81,11 +81,30 @@ export default function SubmissionsPage() {
     e.preventDefault()
     if (!evaluatingSubmission) return
 
+    // Validate score
+    const maxPoints = evaluatingSubmission.tasks?.max_points || 100
+    const scoreValue = parseInt(score)
+    
+    if (isNaN(scoreValue)) {
+      alert('Please enter a valid score')
+      return
+    }
+    
+    if (scoreValue < 0) {
+      alert('Score cannot be negative')
+      return
+    }
+    
+    if (scoreValue > maxPoints) {
+      alert(`Score cannot exceed maximum points (${maxPoints})`)
+      return
+    }
+
     setSubmitting(true)
     try {
       const result = await api.submissions.evaluate(evaluatingSubmission.id, {
         status: 'approved',
-        points_awarded: parseInt(score),
+        points_awarded: scoreValue,
         feedback: feedback
       })
 
@@ -366,17 +385,46 @@ export default function SubmissionsPage() {
                   <input
                     type="number"
                     value={score}
-                    onChange={(e) => setScore(e.target.value)}
+                    onChange={(e) => {
+                      const maxPoints = evaluatingSubmission.tasks?.max_points || 100
+                      const value = e.target.value
+                      
+                      // Allow empty string for editing
+                      if (value === '') {
+                        setScore('')
+                        return
+                      }
+                      
+                      const numValue = parseInt(value)
+                      
+                      // Prevent negative values and values exceeding max
+                      if (numValue < 0) {
+                        setScore('0')
+                      } else if (numValue > maxPoints) {
+                        setScore(maxPoints.toString())
+                      } else {
+                        setScore(value)
+                      }
+                    }}
                     max={evaluatingSubmission.tasks?.max_points || 100}
                     min="0"
                     placeholder="Enter points awarded"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:bg-white transition-all text-lg font-bold"
+                    className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 transition-all text-lg font-bold ${
+                      score && (parseInt(score) > (evaluatingSubmission.tasks?.max_points || 100) || parseInt(score) < 0)
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-200 focus:ring-[#C81E4E] focus:bg-white'
+                    }`}
                     required
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
                     / {evaluatingSubmission.tasks?.max_points || 100}
                   </div>
                 </div>
+                {score && parseInt(score) > (evaluatingSubmission.tasks?.max_points || 100) && (
+                  <p className="text-red-500 text-xs mt-1 font-semibold">
+                    Score exceeds maximum allowed points
+                  </p>
+                )}
               </div>
 
               <div>

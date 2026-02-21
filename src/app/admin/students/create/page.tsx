@@ -84,9 +84,36 @@ export default function CreateStudentPage() {
     setLoading(true)
     setError('')
 
-    // Validate
-    if (!formData.full_name.trim() || !formData.email.trim()) {
-      setError('Name and email are required')
+    // Validate full name - only letters, spaces, hyphens, apostrophes
+    if (!formData.full_name.trim()) {
+      setError('Full name is required')
+      setLoading(false)
+      return
+    }
+
+    if (!/^[a-zA-Z\s'-]+$/.test(formData.full_name.trim())) {
+      setError('Full name should only contain letters, spaces, hyphens and apostrophes')
+      setLoading(false)
+      return
+    }
+
+    // Validate email
+    if (!formData.email.trim()) {
+      setError('Email is required')
+      setLoading(false)
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Please enter a valid email address')
+      setLoading(false)
+      return
+    }
+
+    // Validate phone if provided
+    if (formData.phone && !/^[0-9\s+()-]+$/.test(formData.phone)) {
+      setError('Phone number should only contain numbers and +, -, (, ) characters')
       setLoading(false)
       return
     }
@@ -308,7 +335,11 @@ export default function CreateStudentPage() {
                   type="text"
                   required
                   value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  onChange={(e) => {
+                    // Only allow letters, spaces, hyphens, and apostrophes in names
+                    const value = e.target.value.replace(/[^a-zA-Z\s'-]/g, '')
+                    setFormData({ ...formData, full_name: value })
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
                   placeholder="Enter student's full name"
                 />
@@ -321,7 +352,7 @@ export default function CreateStudentPage() {
                   type="email"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase().trim() })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
                   placeholder="student@example.com"
                 />
@@ -333,7 +364,11 @@ export default function CreateStudentPage() {
                 <input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => {
+                    // Only allow numbers, spaces, hyphens, parentheses and plus sign
+                    const value = e.target.value.replace(/[^0-9\s+()-]/g, '')
+                    setFormData({ ...formData, phone: value })
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
                   placeholder="+91 98765 43210"
                 />

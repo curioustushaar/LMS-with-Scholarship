@@ -100,37 +100,37 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Tasks & Assignments</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-gray-600">Manage tasks and student submissions</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Tasks & Assignments</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-sm sm:text-base text-gray-600">Manage tasks and student submissions</p>
             {(selectedCourse || statusFilter) && (
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">•</span>
-                <div className="flex gap-2">
+              <>
+                <span className="text-gray-400 hidden sm:inline">•</span>
+                <div className="flex flex-wrap gap-2">
                   {selectedCourse && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                      Course: {courses.find(c => c.id === selectedCourse)?.code || 'Selected'}
+                    <span className="bg-blue-100 text-blue-800 px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium">
+                      Course: {courses.find(c => c.id === selectedCourse)?.title || 'Selected'}
                     </span>
                   )}
                   {statusFilter && (
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                    <span className="bg-green-100 text-green-800 px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium">
                       Status: {statusFilter}
                     </span>
                   )}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
         <Link
           href="/admin/tasks/create"
-          className="bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+          className="w-full sm:w-auto bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center space-x-2 text-sm sm:text-base"
         >
-          <FiPlus className="text-xl" />
+          <FiPlus className="text-lg sm:text-xl" />
           <span>Create Task</span>
         </Link>
       </div>
@@ -142,26 +142,26 @@ export default function TasksPage() {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
-        <div className="flex items-start md:items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 text-gray-700 font-semibold">
-            <FiFilter className="text-lg" />
+      <div className="bg-white rounded-xl shadow-md p-3 sm:p-4 md:p-6">
+        <div className="flex items-start md:items-center gap-3 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm sm:text-base">
+            <FiFilter className="text-base sm:text-lg" />
             <span>Filters:</span>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 w-full sm:w-auto">
             {/* Course Filter */}
             <div className="flex flex-col gap-2 min-w-0 flex-1">
-              <label className="text-sm font-medium text-gray-600">Course:</label>
+              <label className="text-xs sm:text-sm font-medium text-gray-600">Course:</label>
               <select
                 value={selectedCourse}
                 onChange={(e) => setSelectedCourse(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent outline-none w-full"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent outline-none w-full text-sm sm:text-base"
               >
                 <option value="">All Courses</option>
                 {courses.map((course) => (
                   <option key={course.id} value={course.id}>
-                    {course.code} - {course.title}
+                    {course.title}
                   </option>
                 ))}
               </select>
@@ -169,11 +169,11 @@ export default function TasksPage() {
 
             {/* Status Filter */}
             <div className="flex flex-col gap-2 min-w-0 flex-1">
-              <label className="text-sm font-medium text-gray-600">Status:</label>
+              <label className="text-xs sm:text-sm font-medium text-gray-600">Status:</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent outline-none w-full"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent outline-none w-full text-sm sm:text-base"
               >
                 <option value="">All Status</option>
                 <option value="active">Active</option>
@@ -190,7 +190,7 @@ export default function TasksPage() {
                 setSelectedCourse('')
                 setStatusFilter('')
               }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap"
+              className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap mt-2 sm:mt-0"
             >
               Clear Filters
             </button>
@@ -199,22 +199,22 @@ export default function TasksPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Total Tasks</p>
-          <p className="text-3xl font-bold text-gray-800 mt-2">{tasks.length}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+          <p className="text-gray-600 text-xs sm:text-sm font-medium">Total Tasks</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-800 mt-1 sm:mt-2">{tasks.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Active Tasks</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">{tasks.filter(t => t.status === 'active').length}</p>
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+          <p className="text-gray-600 text-xs sm:text-sm font-medium">Active Tasks</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2">{tasks.filter(t => t.status === 'active').length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Draft Tasks</p>
-          <p className="text-3xl font-bold text-orange-600 mt-2">{tasks.filter(t => t.status === 'draft').length}</p>
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+          <p className="text-gray-600 text-xs sm:text-sm font-medium">Draft Tasks</p>
+          <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-1 sm:mt-2">{tasks.filter(t => t.status === 'draft').length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Completed</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">{tasks.filter(t => t.status === 'completed').length}</p>
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+          <p className="text-gray-600 text-xs sm:text-sm font-medium">Completed</p>
+          <p className="text-2xl sm:text-3xl font-bold text-blue-600 mt-1 sm:mt-2">{tasks.filter(t => t.status === 'completed').length}</p>
         </div>
       </div>
 

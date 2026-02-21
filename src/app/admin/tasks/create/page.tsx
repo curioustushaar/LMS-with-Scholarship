@@ -45,8 +45,52 @@ export default function CreateTaskPage() {
     setLoading(true)
     setError('')
 
-    if (!formData.title.trim() || !formData.description.trim() || !formData.deadline || !formData.course_id) {
-      setError('Please fill in all required fields')
+    // Validation
+    if (!formData.title.trim()) {
+      setError('Task title is required')
+      setLoading(false)
+      return
+    }
+
+    if (formData.title.trim().length < 5) {
+      setError('Task title must be at least 5 characters long')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.description.trim()) {
+      setError('Task description is required')
+      setLoading(false)
+      return
+    }
+
+    if (formData.description.trim().length < 20) {
+      setError('Task description must be at least 20 characters long')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.course_id) {
+      setError('Please select a course')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.deadline) {
+      setError('Deadline is required')
+      setLoading(false)
+      return
+    }
+
+    const deadlineDate = new Date(formData.deadline)
+    if (deadlineDate < new Date()) {
+      setError('Deadline cannot be in the past')
+      setLoading(false)
+      return
+    }
+
+    if (formData.max_points < 1 || formData.max_points > 1000) {
+      setError('Maximum marks must be between 1 and 1000')
       setLoading(false)
       return
     }
@@ -83,19 +127,19 @@ export default function CreateTaskPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Create New Task</h1>
-          <p className="text-gray-600 mt-1">Add a new assignment or task for students</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Create New Task</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Add a new assignment or task for students</p>
         </div>
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all flex items-center space-x-2"
+          className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all flex items-center space-x-2 text-sm sm:text-base"
         >
-          <FiX className="text-xl" />
-          <span>Cancel</span>
+          <FiX className="text-lg sm:text-xl" />
+          <span className="hidden sm:inline">Cancel</span>
         </button>
       </div>
 
@@ -122,11 +166,19 @@ export default function CreateTaskPage() {
                 <input
                   type="text"
                   required
+                  minLength={5}
+                  maxLength={200}
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value.length <= 200) {
+                      setFormData({ ...formData, title: value })
+                    }
+                  }}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm sm:text-base"
                   placeholder="e.g., Build a Portfolio Website"
                 />
+                <p className="text-xs text-gray-500 mt-1">{formData.title.length}/200 characters</p>
               </div>
 
               <div>
@@ -136,11 +188,19 @@ export default function CreateTaskPage() {
                 <textarea
                   required
                   rows={4}
+                  minLength={20}
+                  maxLength={1000}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
-                  placeholder="Provide a brief description of the task"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value.length <= 1000) {
+                      setFormData({ ...formData, description: value })
+                    }
+                  }}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] resize-none text-sm sm:text-base"
+                  placeholder="Provide a brief description of the task (minimum 20 characters)"
                 />
+                <p className="text-xs text-gray-500 mt-1">{formData.description.length}/1000 characters</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -152,7 +212,7 @@ export default function CreateTaskPage() {
                     required
                     value={formData.course_id}
                     onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm sm:text-base"
                     disabled={loadingCourses}
                   >
                     <option value="">{loadingCourses ? 'Loading courses...' : 'Select a course'}</option>
@@ -171,7 +231,7 @@ export default function CreateTaskPage() {
                   <select
                     value={formData.week_id}
                     onChange={(e) => setFormData({ ...formData, week_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm sm:text-base"
                   >
                     <option value="">Select a week (optional)</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((w) => (
@@ -197,9 +257,10 @@ export default function CreateTaskPage() {
                 <input
                   type="datetime-local"
                   required
+                  min={new Date().toISOString().slice(0, 16)}
                   value={formData.deadline}
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm sm:text-base"
                 />
               </div>
 
@@ -213,8 +274,13 @@ export default function CreateTaskPage() {
                   min="1"
                   max="1000"
                   value={formData.max_points}
-                  onChange={(e) => setFormData({ ...formData, max_points: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value)
+                    if (!isNaN(value) && value >= 1 && value <= 1000) {
+                      setFormData({ ...formData, max_points: value })
+                    }
+                  }}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm sm:text-base"
                 />
               </div>
             </div>
@@ -228,25 +294,28 @@ export default function CreateTaskPage() {
             <textarea
               value={formData.instructions}
               onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] resize-none text-sm sm:text-base"
               rows={3}
-              placeholder="Add instructions for students"
+              maxLength={500}
+              placeholder="Add instructions for students (optional)"
             />
+            <p className="text-xs text-gray-500 mt-1">{formData.instructions.length}/500 characters</p>
           </div>
 
           {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
             <button
               type="submit"
               disabled={loading || loadingCourses}
-              className="flex-1 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+              className="flex-1 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
             >
               {loading ? 'Creating...' : 'Create Task'}
             </button>
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all"
+              disabled={loading}
+              className="flex-1 bg-gray-100 text-gray-700 py-2 sm:py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all disabled:opacity-50 text-sm sm:text-base"
             >
               Cancel
             </button>
