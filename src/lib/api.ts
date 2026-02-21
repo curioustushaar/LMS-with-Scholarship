@@ -415,6 +415,13 @@ export const settingsAPI = {
     })
   },
 
+  changePassword: async (current_password: string, new_password: string) => {
+    return apiRequest('/settings/password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password, new_password }),
+    })
+  },
+
   uploadAvatar: async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -455,14 +462,6 @@ export const settingsAPI = {
       return { success: false, error: 'Upload failed' }
     }
   }
-}
-
-// change password
-settingsAPI.changePassword = async (current_password: string, new_password: string) => {
-  return apiRequest('/settings/password', {
-    method: 'POST',
-    body: JSON.stringify({ current_password, new_password }),
-  })
 }
 
 // ==========================================

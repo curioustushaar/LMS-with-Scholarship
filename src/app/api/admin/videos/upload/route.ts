@@ -65,10 +65,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('❌ Storage upload error:', {
-        message: uploadError.message,
-        code: uploadError.code
-      })
+      console.error('❌ Storage upload error:', uploadError.message)
       return NextResponse.json(
         { success: false, error: 'Failed to upload video', details: uploadError.message },
         { status: 500 }
