@@ -140,3 +140,63 @@ export async function PATCH(
         )
     }
 }
+
+/**
+ * DELETE /api/admin/tickets/[id]
+ * Delete a support ticket and all its messages
+ */
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    const authResult = await requireAdmin(request)
+    if (authResult instanceof Response) return authResult
+
+    try {
+        const { id: ticketId } = params
+
+        console.log('🗑️ Deleting ticket:', { ticketId })
+
+        // First, delete all related ticket messages
+        const { error: messagesError } = await supabaseAdmin
+            .from('ticket_messages')
+            .delete()
+            .eq('ticket_id', ticketId)
+
+        if (messagesError) {
+            console.error('❌ Failed to delete ticket messages:', messagesError)
+            return NextResponse.json(
+                { success: false, error: 'Failed to delete ticket messages', details: messagesError.message },
+                { status: 500 }
+            )
+        }
+
+        // Then delete the ticket itself
+        const { error: ticketError } = await supabaseAdmin
+            .from('tickets')
+            .delete()
+            .eq('id', ticketId)
+
+        if (ticketError) {
+            console.error('❌ Failed to delete ticket:', ticketError)
+            return NextResponse.json(
+                { success: false, error: 'Failed to delete ticket', details: ticketError.message },
+                { status: 500 }
+            )
+        }
+
+        console.log('✅ Ticket and messages deleted successfully')
+
+        return NextResponse.json({
+            success: true,
+            message: 'Ticket deleted successfully'
+        })
+
+    } catch (error: any) {
+        console.error('💥 Unexpected error in DELETE /tickets/[id]:', error)
+        return NextResponse.json(
+            { success: false, error: 'Internal server error', details: error.message },
+            { status: 500 }
+        )
+    }
+}

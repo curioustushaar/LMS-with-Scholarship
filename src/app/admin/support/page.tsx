@@ -59,12 +59,20 @@ export default function SupportPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure?')) return
+    setActiveActionId(null) // Close the dropdown menu
+    if (!confirm('Are you sure you want to delete this ticket? This will permanently delete the ticket and all its messages. This action cannot be undone.')) return
+    
     try {
-      await api.tickets.delete(id)
-      loadTickets()
+      const result = await api.tickets.delete(id)
+      if (result.success) {
+        alert('✅ Ticket deleted successfully')
+        loadTickets()
+      } else {
+        alert('❌ Failed to delete ticket: ' + (result.error || 'Unknown error'))
+      }
     } catch (error) {
       console.error('Delete failed:', error)
+      alert('❌ Error deleting ticket. Please try again.')
     }
   }
 

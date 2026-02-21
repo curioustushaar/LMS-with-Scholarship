@@ -126,6 +126,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <li key={subItem.path}>
                           <Link
                             href={subItem.path}
+                            onClick={onClose}
                             className={`block px-4 py-2 rounded-lg text-sm transition-all ${
                               isActive(subItem.path)
                                 ? 'bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-medium'
@@ -142,6 +143,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               ) : (
                 <Link
                   href={item.path}
+                  onClick={onClose}
                   className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                     isActive(item.path)
                       ? 'bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-medium shadow-lg'
