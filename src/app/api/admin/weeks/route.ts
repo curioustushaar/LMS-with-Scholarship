@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const courseId = searchParams.get('course_id')
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('weeks')
       .select('*')
       .order('week_number', { ascending: true })
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { course_id, week_number, title, description } = body
 
+    console.log('Creating week with data:', { course_id, week_number, title, description })
+
     if (!course_id || !week_number || !title) {
       return NextResponse.json(
         { success: false, error: 'course_id, week_number, and title are required' },
@@ -66,12 +68,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if week number already exists for this course
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabaseAdmin
       .from('weeks')
       .select('id')
       .eq('course_id', course_id)
       .eq('week_number', week_number)
-      .single()
+      .maybeSingle()
+
+    console.log('Existing week check:', { existing, checkError })
 
     if (existing) {
       return NextResponse.json(
@@ -80,22 +84,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const weekData = {
+    // Create minimal week data - only required fields
+    const weekData: any = {
       course_id,
       week_number,
       title,
-      description: description || null,
-      // We removed 'locked: true' here to let the database DEFAULT TRUE handle it
-      // This helps bypass schema cache errors if the new column isn't recognized yet
+    }
+    
+    // Add optional fields only if provided
+    if (description) {
+      weekData.description = description
     }
 
-    const { data, error } = await supabase
+    console.log('Inserting week data:', weekData)
+
+    const { data, error } = await supabaseAdmin
       .from('weeks')
       .insert(weekData)
-      .select() // Use default '*' to avoid hard errors on missing column names in cache
+      .select()
       .single()
 
+    console.log('Week insertion result:', { data, error })
+
     if (error) {
+      console.error('Supabase error details:', error)
       return NextResponse.json(
         { success: false, error: 'Failed to create week', details: error.message },
         { status: 500 }
@@ -109,6 +121,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error: any) {
+    console.error('Exception creating week:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error', details: error.message },
       { status: 500 }

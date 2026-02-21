@@ -29,17 +29,52 @@ export async function GET(request: NextRequest) {
 
         if (videosError) throw videosError
         const totalVideoCount = courseVideos?.length || 0
+        
+        // 2. Get all tasks in this course
+        const { data: courseTasks, error: tasksError } = await supabase
+            .from('tasks')
+            .select('id')
+            .eq('course_id', courseId)
+        
+        if (tasksError) throw tasksError
+        const totalTaskCount = courseTasks?.length || 0
+        
+        // 3. Get all projects for this course
+        const { data: courseProjects, error: projectsError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('course_id', courseId)
+        
+        if (projectsError) throw projectsError
+        const totalProjectCount = courseProjects?.length || 0
 
-        // 3. Get all students who have any progress in this course
-        // Note: Joining with 'profiles' because video_progress references profiles in this DB
-        const { data: progress, error: progressError } = await supabase
+        // 4. Get all students who have video progress in this course
+        const { data: videoProgress, error: progressError } = await supabase
             .from('video_progress')
             .select('user_id, completed, video_id, profiles(id, full_name, email)')
-            .in('video_id', courseVideos.map(v => v.id))
+            .in('video_id', courseVideos?.map(v => v.id) || [])
 
         if (progressError) throw progressError
+        
+        // 5. Get all task submissions for this course
+        const { data: taskSubmissions, error: taskSubError } = await supabase
+            .from('task_submissions')
+            .select('user_id, task_id, status, tasks!inner(course_id)')
+            .eq('tasks.course_id', courseId)
+            .in('status', ['approved', 'reviewed'])
+        
+        if (taskSubError) throw taskSubError
+        
+        // 6. Get all approved projects for this course
+        const { data: projectSubmissions, error: projSubError } = await supabase
+            .from('projects')
+            .select('user_id, id, status')
+            .eq('course_id', courseId)
+            .eq('status', 'approved')
+        
+        if (projSubError) throw projSubError
 
-        // 3. Get already issued certificates for this course
+        // 7. Get already issued certificates for this course
         const { data: existingCerts, error: certsError } = await supabase
             .from('certificates')
             .select('user_id')
@@ -48,42 +83,83 @@ export async function GET(request: NextRequest) {
         if (certsError) throw certsError
         const issuedStudentIds = new Set(existingCerts.map(c => c.user_id))
 
-        // 4. Calculate eligibility per student
+        // 8. Calculate eligibility per student
         const studentStats: Record<string, {
             id: string,
             full_name: string,
             email: string,
-            completedCount: number
+            completedVideos: number,
+            completedTasks: number,
+            completedProjects: number
         }> = {}
-
-        progress.forEach(p => {
-            // Handle profiles relation (it might come as an array or object depending on relationship type, usually object for foreign key)
-            const u = p.profiles as any
-            // Fallback if profiles is array
-            const profile = Array.isArray(u) ? u[0] : u
-
-            if (!studentStats[p.user_id]) {
-                studentStats[p.user_id] = {
-                    id: p.user_id,
-                    full_name: profile?.full_name || 'Unknown',
-                    email: profile?.email || 'N/A',
-                    completedCount: 0
-                }
+        
+        // First, collect all unique user IDs
+        const allUserIds = new Set<string>()
+        videoProgress.forEach(p => allUserIds.add(p.user_id))
+        if (taskSubmissions) taskSubmissions.forEach(t => allUserIds.add(t.user_id))
+        if (projectSubmissions) projectSubmissions.forEach(p => allUserIds.add(p.user_id))
+        
+        // Get profile data for all users
+        if (allUserIds.size > 0) {
+            const { data: userProfiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', Array.from(allUserIds))
+            
+            if (userProfiles) {
+                userProfiles.forEach(profile => {
+                    studentStats[profile.id] = {
+                        id: profile.id,
+                        full_name: profile.full_name || 'Unknown',
+                        email: profile.email || 'N/A',
+                        completedVideos: 0,
+                        completedTasks: 0,
+                        completedProjects: 0
+                    }
+                })
             }
-            if (p.completed) {
-                studentStats[p.user_id].completedCount++
+        }
+
+        // Count video completions
+        videoProgress.forEach(p => {
+            if (studentStats[p.user_id] && p.completed) {
+                studentStats[p.user_id].completedVideos++
             }
         })
+        
+        // Count task completions
+        if (taskSubmissions) {
+            taskSubmissions.forEach(t => {
+                if (studentStats[t.user_id]) {
+                    studentStats[t.user_id].completedTasks++
+                }
+            })
+        }
+        
+        // Count project completions
+        if (projectSubmissions) {
+            projectSubmissions.forEach(proj => {
+                if (studentStats[proj.user_id]) {
+                    studentStats[proj.user_id].completedProjects++
+                }
+            })
+        }
 
-        // 5. Filter for fully completed and not already issued
-        const eligibleStudents = Object.values(studentStats).filter(s =>
-            s.completedCount === totalVideoCount && totalVideoCount > 0 && !issuedStudentIds.has(s.id)
-        )
+        // 9. Filter for fully completed and not already issued
+        const eligibleStudents = Object.values(studentStats).filter(s => {
+            const videosComplete = totalVideoCount === 0 || s.completedVideos >= totalVideoCount
+            const tasksComplete = totalTaskCount === 0 || s.completedTasks >= totalTaskCount
+            const projectsComplete = totalProjectCount === 0 || s.completedProjects >= totalProjectCount
+            
+            return videosComplete && tasksComplete && projectsComplete && !issuedStudentIds.has(s.id)
+        })
 
         return NextResponse.json({
             success: true,
             data: eligibleStudents,
             total_videos_required: totalVideoCount,
+            total_tasks_required: totalTaskCount,
+            total_projects_required: totalProjectCount,
             count: eligibleStudents.length
         })
 

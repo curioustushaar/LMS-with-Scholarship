@@ -130,11 +130,35 @@ export default function ProjectsPage() {
 
   const handleSaveEval = async () => {
     if (!evalProject) return
+    
+    // Validate score
+    const scoreValue = parseInt(score)
+    
+    if (isNaN(scoreValue)) {
+      alert('Please enter a valid score')
+      return
+    }
+    
+    if (scoreValue < 0) {
+      alert('Score cannot be negative')
+      return
+    }
+    
+    if (scoreValue > 100) {
+      alert('Score cannot exceed 100')
+      return
+    }
+    
+    if (!feedback || feedback.trim() === '') {
+      alert('Please provide feedback')
+      return
+    }
+    
     setSubmittingEval(true)
     try {
       const result = await api.projects.approve(evalProject.id, {
-        status: parseInt(score) >= 40 ? 'approved' : 'rejected',
-        score: parseInt(score),
+        status: scoreValue >= 40 ? 'approved' : 'rejected',
+        score: scoreValue,
         feedback
       })
       if (result.success) {
@@ -468,41 +492,51 @@ export default function ProjectsPage() {
 
       {/* Evaluation Modal */}
       {showEvalModal && evalProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
-            <div className="p-6 border-b">
-              <h3 className="text-2xl font-bold text-gray-800">Evaluate Project</h3>
-              <p className="text-gray-600 mt-1">For: {evalProject.users?.full_name}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8">
+            <div className="p-4 md:p-6 border-b bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-t-xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-bold text-white">Evaluate Project</h3>
+                  <p className="text-pink-100 text-sm mt-1">For: {evalProject.users?.full_name}</p>
+                </div>
+                <button
+                  onClick={() => setShowEvalModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
+                >
+                  <FiX className="text-xl" />
+                </button>
+              </div>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
               <div>
-                <h4 className="font-semibold text-lg text-gray-800">{evalProject.title}</h4>
+                <h4 className="font-semibold text-base md:text-lg text-gray-800">{evalProject.title}</h4>
                 <p className="text-sm text-gray-500">{evalProject.courses?.title}</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h5 className="font-semibold text-gray-700 mb-3">Submitted Links & Files</h5>
-                  <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-700 mb-3 text-sm md:text-base">Submitted Links & Files</h5>
+                  <div className="space-y-2 md:space-y-3">
                     {evalProject.github_url && evalProject.github_url.trim() && (
-                      <div className="flex items-start">
-                        <span className="text-sm font-medium text-gray-700 w-20">GitHub:</span>
-                        <a href={evalProject.github_url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center text-blue-600 hover:underline break-all">
+                      <div className="flex flex-col md:flex-row md:items-start">
+                        <span className="text-xs md:text-sm font-medium text-gray-700 md:w-20 mb-1 md:mb-0">GitHub:</span>
+                        <a href={evalProject.github_url} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-600 hover:underline break-all text-xs md:text-sm">
                           {evalProject.github_url} <FiExternalLink className="ml-1 flex-shrink-0" />
                         </a>
                       </div>
                     )}
                     {evalProject.project_url && evalProject.project_url.trim() && (
-                      <div className="flex items-start">
-                        <span className="text-sm font-medium text-gray-700 w-20">Deploy:</span>
-                        <a href={evalProject.project_url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center text-green-600 hover:underline break-all">
+                      <div className="flex flex-col md:flex-row md:items-start">
+                        <span className="text-xs md:text-sm font-medium text-gray-700 md:w-20 mb-1 md:mb-0">Deploy:</span>
+                        <a href={evalProject.project_url} target="_blank" rel="noopener noreferrer" className="flex items-center text-green-600 hover:underline break-all text-xs md:text-sm">
                           {evalProject.project_url} <FiExternalLink className="ml-1 flex-shrink-0" />
                         </a>
                       </div>
                     )}
                     {evalProject.project_deliverables && evalProject.project_deliverables.length > 0 && evalProject.project_deliverables.map((d, i) => (
-                      <div key={d.id} className="flex items-start">
-                        <span className="text-sm font-medium text-gray-700 w-20">File {i+1}:</span>
-                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center text-purple-600 hover:underline break-all">
+                      <div key={d.id} className="flex flex-col md:flex-row md:items-start">
+                        <span className="text-xs md:text-sm font-medium text-gray-700 md:w-20 mb-1 md:mb-0">File {i+1}:</span>
+                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center text-purple-600 hover:underline break-all text-xs md:text-sm">
                           {d.description || 'View File'} <FiExternalLink className="ml-1 flex-shrink-0" />
                         </a>
                       </div>
@@ -510,42 +544,82 @@ export default function ProjectsPage() {
                     {(!evalProject.github_url || !evalProject.github_url.trim()) && 
                      (!evalProject.project_url || !evalProject.project_url.trim()) && 
                      (!evalProject.project_deliverables || evalProject.project_deliverables.length === 0) && (
-                      <p className="text-sm text-gray-500">No links or files submitted.</p>
+                      <p className="text-xs md:text-sm text-gray-500">No links or files submitted.</p>
                     )}
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   <div>
-                    <label htmlFor="score" className="block text-sm font-medium text-gray-700 mb-1">Score (e.g., 85 / 100)</label>
-                    <input
-                      type="text"
-                      id="score"
-                      value={score}
-                      onChange={(e) => setScore(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
-                      placeholder="Enter score"
-                    />
+                    <label htmlFor="score" className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Score (Max 100)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        id="score"
+                        value={score}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          
+                          // Allow empty string for editing
+                          if (value === '') {
+                            setScore('')
+                            return
+                          }
+                          
+                          const numValue = parseInt(value)
+                          
+                          // Prevent negative values and values exceeding 100
+                          if (numValue < 0) {
+                            setScore('0')
+                          } else if (numValue > 100) {
+                            setScore('100')
+                          } else {
+                            setScore(value)
+                          }
+                        }}
+                        max="100"
+                        min="0"
+                        className={`w-full px-3 md:px-4 py-2 md:py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all text-base md:text-lg font-bold ${
+                          score && (parseInt(score) > 100 || parseInt(score) < 0)
+                            ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                            : 'border-gray-300 focus:ring-[#C81E4E] bg-gray-50 focus:bg-white'
+                        }`}
+                        placeholder="Enter score"
+                      />
+                      <div className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm md:text-base">
+                        / 100
+                      </div>
+                    </div>
+                    {score && (parseInt(score) > 100 || parseInt(score) < 0) && (
+                      <p className="text-red-500 text-xs mt-1 font-semibold">
+                        {parseInt(score) > 100 ? 'Score exceeds maximum (100)' : 'Score cannot be negative'}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-1">Feedback</label>
+                    <label htmlFor="feedback" className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Feedback</label>
                     <textarea
                       id="feedback"
-                      rows={5}
+                      rows={4}
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
+                      className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:bg-white transition-all resize-none text-sm md:text-base"
                       placeholder="Provide constructive feedback..."
                     />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="p-6 bg-gray-50 flex justify-end space-x-3 rounded-b-xl">
-              <button onClick={() => setShowEvalModal(false)} className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
+            <div className="p-4 md:p-6 bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 rounded-b-xl">
+              <button 
+                onClick={() => setShowEvalModal(false)} 
+                className="w-full sm:w-auto px-6 py-2 md:py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 font-semibold transition-colors"
+              >
+                Cancel
+              </button>
               <button 
                 onClick={handleSaveEval} 
                 disabled={submittingEval}
-                className="px-6 py-2 text-white bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-lg disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2 md:py-3 text-white bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-lg disabled:opacity-50 font-semibold hover:shadow-lg transition-all"
               >
                 {submittingEval ? 'Saving...' : 'Save Evaluation'}
               </button>
