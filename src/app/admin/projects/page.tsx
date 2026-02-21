@@ -12,6 +12,7 @@ interface Project {
   title: string
   description?: string
   user_id: string
+  course_id?: string
   status: string
   progress: number
   mentor_id?: string
@@ -27,6 +28,7 @@ interface Project {
     email: string
   }
   courses?: {
+    id?: string
     title: string
   }
   project_deliverables?: {
