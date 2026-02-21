@@ -90,7 +90,7 @@ export async function PATCH(
       console.log('🏅 Task approved! Checking for badge awards...')
       badgeResult = await checkAndAwardTaskBadges(submission.user_id, submission.task_id)
       
-      if (badgeResult.success && badgeResult.badges_awarded > 0) {
+      if (badgeResult.success && (badgeResult.badges_awarded || 0) > 0) {
         console.log(`✅ Awarded ${badgeResult.badges_awarded} badge(s) to student`)
       }
     }
