@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -16,7 +16,9 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiX,
+  FiShield,
 } from 'react-icons/fi'
+import { supabase } from '@/lib/supabase'
 
 interface SidebarProps {
   isOpen: boolean
@@ -55,6 +57,41 @@ const menuItems = [
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
+
+  useEffect(() => {
+    checkSuperadminRole()
+  }, [])
+
+  const checkSuperadminRole = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.id) {
+        // Use regular supabase client - RLS policies allow users to read their own profile
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (error) {
+          console.error('Error fetching role:', error)
+          return
+        }
+        
+        console.log('Sidebar - User role detected:', data?.role)
+        
+        if (data?.role === 'superadmin') {
+          console.log('✅ Superadmin detected - showing button')
+          setIsSuperadmin(true)
+        } else {
+          console.log('❌ Not superadmin - role is:', data?.role)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking superadmin role:', error)
+    }
+  }
 
   const toggleExpand = (name: string) => {
     setExpandedItems(prev =>
@@ -158,6 +195,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </ul>
       </nav>
+
+      {/* Superadmin Panel Link */}
+      {isSuperadmin && (
+        <div className="px-3 pb-4">
+          <Link
+            href="/superadmin"
+            onClick={onClose}
+            className="flex items-center space-x-3 px-4 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg transition-all"
+          >
+            <FiShield className="text-xl" />
+            <span className="text-sm font-medium">Superadmin Panel</span>
+          </Link>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-700">

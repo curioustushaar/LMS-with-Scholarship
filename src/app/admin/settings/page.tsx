@@ -342,10 +342,11 @@ function ProfileSettings() {
             <input 
               type="email" 
               value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none" 
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 cursor-not-allowed" 
+              readOnly
               placeholder="admin@example.com"
             />
+            <span className="absolute right-3 top-3 text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full font-semibold">Read-only</span>
           </div>
         </div>
 

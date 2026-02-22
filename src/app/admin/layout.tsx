@@ -50,6 +50,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           return
         }
 
+        // Check if account is active
+        if (userData.account_status !== 'active') {
+          console.warn('⛔ Account is suspended or inactive. Status:', userData.account_status)
+          alert('Your account has been suspended. Please contact the administrator.')
+          await supabase.auth.signOut()
+          router.push('/login')
+          return
+        }
+
         console.log('✅ Admin verified successfully')
         setIsLoading(false)
       } catch (err) {
@@ -59,6 +68,31 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
 
     checkAdmin()
+
+    // Set up periodic check for account status (every 30 seconds)
+    const intervalId = setInterval(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        const { data: userData } = await supabaseAdmin
+          .from('profiles')
+          .select('account_status')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (userData && userData.account_status !== 'active') {
+          console.warn('⛔ Account status changed to:', userData.account_status)
+          alert('Your account has been suspended. You will be logged out.')
+          await supabase.auth.signOut()
+          router.push('/login')
+        }
+      } catch (err) {
+        console.error('Error checking account status:', err)
+      }
+    }, 30000) // Check every 30 seconds
+
+    return () => clearInterval(intervalId)
   }, [router])
 
   if (isLoading) {

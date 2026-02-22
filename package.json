@@ -6,7 +6,8 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "setup:superadmin": "node create-superadmin-complete.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",

@@ -1,17 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
  * GET /api/admin/reports/overview
  * Get overall system statistics
+ * - Admins: Only see stats for students in their assigned courses
+ * - Superadmins: See all stats
  */
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request)
   if (authResult instanceof Response) return authResult
 
   try {
-    console.log('📊 Fetching overview statistics...')
+    console.log('📊 Fetching overview statistics for:', authResult.role, authResult.id)
+
+    let studentIds: string[] = []
+    let courseIds: string[] = []
+
+    // If admin (not superadmin), filter by assigned courses
+    if (authResult.role === 'admin') {
+      // Get admin's assigned course IDs
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      courseIds = assignments?.map(a => a.course_id) || []
+      
+      if (courseIds.length === 0) {
+        console.log('⚠️ Admin has no assigned courses')
+        return NextResponse.json({
+          success: true,
+          data: {
+            students: { total: 0, active: 0, inactive: 0, new_this_week: 0, avg_completion: 0 },
+            courses: { total: 0, active: 0, draft: 0 },
+            tasks: { total: 0, active: 0, pending_evaluations: 0, avg_score: 0 },
+            projects: { total: 0, submitted: 0, in_progress: 0, approved: 0, pending_review: 0 },
+            tickets: { total: 0, open: 0, urgent: 0, resolved: 0 },
+            certificates: { total: 0, issued_this_month: 0 }
+          },
+          timestamp: new Date().toISOString()
+        })
+      }
+
+      // Get students enrolled in admin's assigned courses
+      const { data: enrollments } = await supabaseAdmin
+        .from('enrollments')
+        .select('user_id')
+        .in('course_id', courseIds)
+
+      studentIds = [...new Set(enrollments?.map(e => e.user_id) || [])]
+      console.log(`📚 Admin has ${courseIds.length} courses, ${studentIds.length} students`)
+    }
 
     // Get all statistics in parallel
     const [
@@ -24,29 +65,45 @@ export async function GET(request: NextRequest) {
       submissionsStatsResult,
       taskSubmissionsResult
     ] = await Promise.all([
-      // Students stats - Using profiles table with role check
-      supabase.from('profiles').select('id, account_status, created_at').eq('role', 'student'),
+      // Students stats - filter by assigned courses for admins
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('profiles').select('id, account_status, created_at').eq('role', 'student').in('id', studentIds)
+        : supabaseAdmin.from('profiles').select('id, account_status, created_at').eq('role', 'student'),
 
-      // Courses stats - handle missing status column gracefully
-      supabase.from('courses').select('id'),
+      // Courses stats - filter by assigned courses for admins
+      authResult.role === 'admin' && courseIds.length > 0
+        ? supabaseAdmin.from('courses').select('id').in('id', courseIds)
+        : supabaseAdmin.from('courses').select('id'),
 
-      // Tasks stats
-      supabase.from('tasks').select('id, status'),
+      // Tasks stats - filter by assigned courses for admins
+      authResult.role === 'admin' && courseIds.length > 0
+        ? supabaseAdmin.from('tasks').select('id, status').in('course_id', courseIds)
+        : supabaseAdmin.from('tasks').select('id, status'),
 
-      // Projects stats
-      supabase.from('projects').select('id, status'),
+      // Projects stats - filter by students in assigned courses for admins
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('projects').select('id, status').in('student_id', studentIds)
+        : supabaseAdmin.from('projects').select('id, status'),
 
-      // Tickets stats
-      supabase.from('tickets').select('id, status, priority'),
+      // Tickets stats - filter by students in assigned courses for admins
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('tickets').select('id, status, priority').in('student_id', studentIds)
+        : supabaseAdmin.from('tickets').select('id, status, priority'),
 
-      // Certificates stats
-      supabase.from('certificates').select('id, issued_at'),
+      // Certificates stats - filter by students in assigned courses for admins
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('certificates').select('id, issued_at').in('student_id', studentIds)
+        : supabaseAdmin.from('certificates').select('id, issued_at'),
 
-      // Points/Scores from task submissions for avg score
-      supabase.from('task_submissions').select('points_awarded').not('points_awarded', 'is', null),
+      // Points/Scores from task submissions for avg score - filter by students
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('task_submissions').select('points_awarded').in('student_id', studentIds).not('points_awarded', 'is', null)
+        : supabaseAdmin.from('task_submissions').select('points_awarded').not('points_awarded', 'is', null),
 
-      // Task submissions needing evaluation (pending/submitted)
-      supabase.from('task_submissions').select('id, status')
+      // Task submissions needing evaluation - filter by students
+      authResult.role === 'admin' && studentIds.length > 0
+        ? supabaseAdmin.from('task_submissions').select('id, status').in('student_id', studentIds)
+        : supabaseAdmin.from('task_submissions').select('id, status')
     ])
 
     // Check for errors in any query
@@ -168,9 +225,11 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('✅ Overview statistics calculated:', {
+      role: authResult.role,
       totalStudents: students.length,
       totalCourses: courses.length,
-      totalTasks: tasks.length
+      totalTasks: tasks.length,
+      isFiltered: authResult.role === 'admin'
     })
 
     return NextResponse.json({

@@ -17,13 +17,15 @@ export async function POST(request: NextRequest) {
       description, 
       thumbnail_url, 
       duration_weeks, 
-      level
+      level,
+      assigned_admin_ids // New: For superadmin to assign courses to admins
     } = body
 
     console.log('📝 Creating course with data:', {
       title,
       duration_weeks,
-      level
+      level,
+      assigned_admins: assigned_admin_ids
     })
 
     if (!title || !title.trim()) {
@@ -39,7 +41,8 @@ export async function POST(request: NextRequest) {
       thumbnail_url: thumbnail_url || null,
       duration_weeks: duration_weeks || null,
       level: level || 'beginner',
-      status: body.status || 'draft'
+      status: body.status || 'draft',
+      created_by: authResult.id
     }
 
     console.log('🔄 Inserting course into database')
@@ -52,6 +55,7 @@ export async function POST(request: NextRequest) {
       duration_weeks: courseData.duration_weeks,
       level: courseData.level,
       status: courseData.status,
+      created_by: courseData.created_by
     }
 
     const { data, error } = await supabaseAdmin
@@ -73,6 +77,26 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Course created successfully:', data.id)
+
+    // If superadmin and admin IDs provided, assign courses to admins
+    if (authResult.role === 'superadmin' && assigned_admin_ids && Array.isArray(assigned_admin_ids) && assigned_admin_ids.length > 0) {
+      const assignments = assigned_admin_ids.map((admin_id: string) => ({
+        admin_id,
+        course_id: data.id,
+        assigned_by: authResult.id
+      }))
+
+      const { error: assignError } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .insert(assignments)
+
+      if (assignError) {
+        console.warn('⚠️ Failed to assign course to admins:', assignError.message)
+        // Don't fail the whole request, just log warning
+      } else {
+        console.log(`✅ Course assigned to ${assigned_admin_ids.length} admin(s)`)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -104,12 +128,36 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
 
-    console.log('📥 Fetching courses with filters:', { status })
+    console.log('📥 Fetching courses with filters:', { status, role: authResult.role })
 
     let query = supabaseAdmin
       .from('courses')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // If admin (not superadmin), filter by assigned courses only
+    if (authResult.role === 'admin') {
+      // Get admin's assigned course IDs
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const assignedCourseIds = assignments?.map(a => a.course_id) || []
+      
+      if (assignedCourseIds.length === 0) {
+        // Admin has no assigned courses
+        console.log('⚠️ Admin has no assigned courses')
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          message: 'No courses assigned to you yet'
+        })
+      }
+
+      query = query.in('id', assignedCourseIds)
+    }
 
     if (status) {
       query = query.eq('status', status)

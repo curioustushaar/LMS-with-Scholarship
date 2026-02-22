@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -79,7 +79,7 @@ export async function PUT(
 
     console.log('📝 Updating course:', { courseId: id, updates: body })
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('courses')
       .update(body)
       .eq('id', id)
@@ -127,18 +127,22 @@ export async function DELETE(
   try {
     const { id } = params
 
-    const { error } = await supabase
+    console.log('🗑️ Deleting course:', { courseId: id, admin: authResult.id })
+
+    const { error } = await supabaseAdmin
       .from('courses')
       .delete()
       .eq('id', id)
 
     if (error) {
+      console.error('❌ Failed to delete course:', error)
       return NextResponse.json(
         { success: false, error: 'Failed to delete course', details: error.message },
         { status: 500 }
       )
     }
 
+    console.log('✅ Course deleted successfully:', id)
     return NextResponse.json({
       success: true,
       message: 'Course deleted successfully'
