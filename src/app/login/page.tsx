@@ -65,7 +65,10 @@ export default function LoginPage() {
       
       console.log('Final Role determined:', role)
 
-      if (role === 'admin') {
+      if (role === 'superadmin') {
+        console.log('✅ Superadmin verified, redirecting to superadmin panel')
+        router.push('/superadmin')
+      } else if (role === 'admin') {
         console.log('✅ Admin verified, redirecting to dashboard')
         router.push('/admin/dashboard')
       } else {
@@ -210,8 +213,14 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-8 text-center text-sm text-gray-600">
-                <p>Protected by enterprise-grade security</p>
+              <div className="mt-8 text-center space-y-2">
+                <p className="text-sm text-gray-600">Protected by enterprise-grade security</p>
+                <a 
+                  href="/superadmin/login" 
+                  className="text-xs text-gray-400 hover:text-purple-600 transition-colors inline-block"
+                >
+                  Superadmin Access →
+                </a>
               </div>
             </div>
           </div>

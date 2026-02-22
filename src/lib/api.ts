@@ -46,17 +46,24 @@ async function apiRequest<T = any>(
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
         token = session.access_token
+        console.log('✅ Token retrieved from Supabase session')
       } else {
         // Fallback to localStorage
         token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
+        if (token) {
+          console.log('⚠️ Token retrieved from localStorage (fallback)')
+        } else {
+          console.error('❌ No token found in session or localStorage')
+        }
       }
     }
 
     // Validate token before making request
     if (!validateToken(token)) {
+      console.warn('⚠️ Invalid or missing authentication token')
       return {
         success: false,
-        error: 'Authentication required'
+        error: 'Authentication required. Please log in again.'
       }
     }
 
@@ -66,7 +73,10 @@ async function apiRequest<T = any>(
       ...options.headers,
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    // Use endpoint as-is if it starts with /api/, otherwise prepend API_BASE_URL
+    const url = endpoint.startsWith('/api/') ? endpoint : `${API_BASE_URL}${endpoint}`
+    
+    const response = await fetch(url, {
       ...options,
       headers,
     })
@@ -240,6 +250,12 @@ export const weeksAPI = {
     return apiRequest('/weeks', {
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  },
+
+  delete: async (id: string) => {
+    return apiRequest(`/weeks/${id}`, {
+      method: 'DELETE',
     })
   },
 
@@ -818,6 +834,127 @@ export const studentAPI = {
   },
 }
 
+// ==========================================
+// SUPERADMIN API
+// ==========================================
+
+export const superadminAPI = {
+  /**
+   * Get superadmin profile settings
+   */
+  getSettings: async () => {
+    return apiRequest('/api/superadmin/settings')
+  },
+
+  /**
+   * Update superadmin profile settings
+   */
+  updateSettings: async (data: any) => {
+    return apiRequest('/api/superadmin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * Get all admins with activity summary
+   */
+  getAllAdmins: async () => {
+    return apiRequest('/api/superadmin/admins')
+  },
+
+  /**
+   * Get specific admin with detailed activity
+   */
+  getAdminById: async (id: string) => {
+    return apiRequest(`/api/superadmin/admins/${id}`)
+  },
+
+  /**
+   * Create new admin
+   */
+  createAdmin: async (data: {
+    email: string
+    password: string
+    full_name: string
+    phone?: string
+  }) => {
+    return apiRequest('/api/superadmin/admins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * Update admin details
+   */
+  updateAdmin: async (id: string, data: Partial<{
+    full_name: string
+    phone: string
+    account_status: string
+  }>) => {
+    return apiRequest(`/api/superadmin/admins/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * Toggle admin status (enable/disable)
+   */
+  toggleAdminStatus: async (id: string, status: 'active' | 'suspended') => {
+    return apiRequest(`/api/superadmin/admins/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ account_status: status }),
+    })
+  },
+
+  /**
+   * Delete admin (soft delete)
+   */
+  deleteAdmin: async (id: string) => {
+    return apiRequest(`/api/superadmin/admins/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  /**
+   * Get analytics and statistics
+   */
+  getAnalytics: async () => {
+    return apiRequest('/api/superadmin/analytics')
+  },
+
+  /**
+   * Get course assignments
+   */
+  getCourseAssignments: async (adminId?: string) => {
+    const url = adminId 
+      ? `/api/superadmin/course-assignments?admin_id=${adminId}`
+      : '/api/superadmin/course-assignments'
+    return apiRequest(url)
+  },
+
+  /**
+   * Assign courses to an admin
+   */
+  assignCourses: async (admin_id: string, course_ids: string[]) => {
+    return apiRequest('/api/superadmin/course-assignments', {
+      method: 'POST',
+      body: JSON.stringify({ admin_id, course_ids }),
+    })
+  },
+
+  /**
+   * Remove course assignment
+   */
+  removeCourseAssignment: async (admin_id: string, course_id: string) => {
+    return apiRequest(`/api/superadmin/course-assignments?admin_id=${admin_id}&course_id=${course_id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
 // Export default API object
 export const api = {
   students: studentsAPI,
@@ -833,4 +970,5 @@ export const api = {
   reports: reportsAPI,
   student: studentAPI,
   users: usersAPI,
+  superadmin: superadminAPI,
 }

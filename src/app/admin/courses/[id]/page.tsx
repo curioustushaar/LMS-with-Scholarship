@@ -77,6 +77,24 @@ export default function CourseDetailPage() {
     loadCourseData()
   }
 
+  const handleDeleteWeek = async (weekId: string, weekTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${weekTitle}"? This will also delete all videos in this week. This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const result = await api.weeks.delete(weekId)
+      if (result.success) {
+        alert('Week deleted successfully!')
+        loadCourseData()
+      } else {
+        alert('Failed to delete week: ' + result.error)
+      }
+    } catch (error: any) {
+      alert('Error deleting week: ' + error.message)
+    }
+  }
+
   const loadCourseData = async () => {
     try {
       const result = await api.courses.getById(courseId)
@@ -218,6 +236,7 @@ export default function CourseDetailPage() {
               courseId={courseId}
               onOpenVideoModal={handleOpenVideoModal}
               onOpenAddWeekModal={handleOpenAddWeekModal}
+              onDeleteWeek={handleDeleteWeek}
             />
           )}
           {activeTab === 'students' && <StudentsTab courseId={courseId} />}
@@ -281,10 +300,34 @@ function CourseInfoTab({ course }: any) {
   )
 }
 
-function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal }: any) {
+function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal, onDeleteWeek }: any) {
   const [expandedWeekId, setExpandedWeekId] = useState<string | null>(null)
   const [weekVideos, setWeekVideos] = useState<{ [key: string]: Video[] }>({})
   const [loadingVideos, setLoadingVideos] = useState<{ [key: string]: boolean }>({})
+
+  const handleDeleteVideo = async (videoId: string, videoTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${videoTitle}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const result = await api.videos.delete(videoId)
+      if (result.success) {
+        alert('Video deleted successfully!')
+        // Refresh the videos for the current expanded week
+        if (expandedWeekId) {
+          setWeekVideos(prev => ({
+            ...prev,
+            [expandedWeekId]: prev[expandedWeekId]?.filter(v => v.id !== videoId) || []
+          }))
+        }
+      } else {
+        alert('Failed to delete video: ' + result.error)
+      }
+    } catch (error: any) {
+      alert('Error deleting video: ' + error.message)
+    }
+  }
 
   const loadVideosForWeek = async (weekId: string) => {
     if (weekVideos[weekId]) {
@@ -386,7 +429,10 @@ function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal }: any
                     <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all text-sm font-medium flex items-center justify-center">
                       <FiEdit />
                     </button>
-                    <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm font-medium flex items-center justify-center">
+                    <button 
+                      onClick={() => onDeleteWeek(week.id, week.title)}
+                      className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm font-medium flex items-center justify-center"
+                    >
                       <FiTrash2 />
                     </button>
                   </div>
@@ -426,7 +472,10 @@ function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal }: any
                             >
                               View
                             </a>
-                            <button className="flex-1 sm:flex-none px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+                            <button 
+                              onClick={() => handleDeleteVideo(video.id, video.title)}
+                              className="flex-1 sm:flex-none px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                            >
                               Delete
                             </button>
                           </div>

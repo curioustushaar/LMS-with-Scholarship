@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const userId = authResult.id
-    const { data, error } = await supabase
+    
+    console.log('📥 Fetching profile for user:', userId)
+    
+    // Use supabaseAdmin to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -22,6 +26,8 @@ export async function GET(request: NextRequest) {
       console.error('❌ Error fetching profile:', error.message)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
+
+    console.log('✅ Profile fetched:', data)
 
     return NextResponse.json({ success: true, data })
   } catch (err: any) {
@@ -38,18 +44,14 @@ export async function PATCH(request: NextRequest) {
     const userId = authResult.id
     const body = await request.json()
 
+    console.log('📝 Updating profile for user:', userId, body)
+
     const allowed: any = {}
-    if (body.full_name) allowed.full_name = body.full_name
-    if (body.email) allowed.email = body.email
-    if (body.profile_image_url) allowed.profile_image_url = body.profile_image_url
-    // Phone is optional - only add if column exists
-    if (body.phone !== undefined) {
-      try {
-        allowed.phone = body.phone
-      } catch (e) {
-        console.warn('Phone column may not exist:', e)
-      }
-    }
+    if (body.full_name !== undefined) allowed.full_name = body.full_name
+    // Email is read-only from auth.users, don't allow updating via settings
+    if (body.profile_image_url !== undefined) allowed.profile_image_url = body.profile_image_url
+    // Phone is optional
+    if (body.phone !== undefined) allowed.phone = body.phone
 
     if (Object.keys(allowed).length === 0) {
       return NextResponse.json({ success: false, error: 'No valid fields provided' }, { status: 400 })
@@ -83,6 +85,8 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
+
+    console.log('✅ Profile updated successfully:', data)
 
     return NextResponse.json({ success: true, data })
   } catch (err: any) {

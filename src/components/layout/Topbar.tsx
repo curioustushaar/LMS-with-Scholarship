@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { settingsAPI } from '@/lib/api'
-import { useRouter } from 'next/navigation'
+import { settingsAPI, superadminAPI } from '@/lib/api'
+import { useRouter, usePathname } from 'next/navigation'
 import { FiSearch, FiBell, FiUser, FiLogOut, FiSettings, FiChevronDown, FiMenu } from 'react-icons/fi'
 
 interface TopbarProps {
@@ -11,15 +11,22 @@ interface TopbarProps {
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [showDropdown, setShowDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profile, setProfile] = useState<any>(null)
+  
+  // Detect if we're in superadmin context
+  const isSuperadmin = pathname?.startsWith('/superadmin')
 
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const res: any = await settingsAPI.getProfile()
+        // Use appropriate API based on context
+        const res: any = isSuperadmin 
+          ? await superadminAPI.getSettings()
+          : await settingsAPI.getProfile()
         if (res?.success && mounted) setProfile(res.data)
       } catch (e) {
         console.error('Failed to load profile in Topbar', e)
@@ -27,7 +34,9 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
     })()
     const onProfileUpdated = async (e?: any) => {
       try {
-        const res: any = await settingsAPI.getProfile()
+        const res: any = isSuperadmin 
+          ? await superadminAPI.getSettings()
+          : await settingsAPI.getProfile()
         if (res?.success && mounted) setProfile(res.data)
       } catch (err) {
         console.error('Failed to refresh profile on update event', err)
@@ -49,10 +58,15 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
       window.removeEventListener('profile:updated', onProfileUpdated)
       window.removeEventListener('storage', onStorage)
     }
-  }, [])
+  }, [isSuperadmin])
 
   const handleLogout = () => {
-    router.push('/login')
+    router.push(isSuperadmin ? '/superadmin/login' : '/login')
+  }
+  
+  const handleSettings = () => {
+    setShowDropdown(false)
+    router.push(isSuperadmin ? '/superadmin/settings' : '/admin/settings')
   }
 
   return (
@@ -106,7 +120,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               </div>
               <div className="text-left hidden md:block">
                 <p className="text-sm font-semibold text-gray-800">{profile?.full_name || 'Admin User'}</p>
-                <p className="text-xs text-gray-500">{profile?.role || 'Super Admin'}</p>
+                <p className="text-xs text-gray-500 capitalize">{profile?.role || 'Admin'}</p>
               </div>
               <FiChevronDown className="text-gray-600" />
             </button>
@@ -115,7 +129,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                   <button
                     type="button"
-                    onClick={() => { setShowDropdown(false); router.push('/admin/settings') }}
+                    onClick={handleSettings}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >
                     <FiUser />
@@ -123,7 +137,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowDropdown(false); router.push('/admin/settings') }}
+                    onClick={handleSettings}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >
                     <FiSettings />
