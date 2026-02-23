@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 
 interface Ticket {
   id: string
-  student_id: string
+  user_id: string
   subject: string
   category: string
   priority: string
@@ -205,8 +205,8 @@ export default function SupportPage() {
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
                     <div className="flex items-center space-x-1.5">
                       <FiUser size={14} />
-                      <span className="font-medium truncate max-w-[120px]" title={ticket.user?.full_name || ticket.student_id}>
-                        {ticket.user?.full_name || ticket.student_id}
+                      <span className="font-medium truncate max-w-[120px]" title={ticket.user?.full_name || ticket.user_id}>
+                        {ticket.user?.full_name || ticket.user_id}
                       </span>
                     </div>
                     <div className="flex items-center space-x-1.5">
