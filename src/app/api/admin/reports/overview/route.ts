@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         .select('user_id')
         .in('course_id', courseIds)
 
-      studentIds = [...new Set(enrollments?.map(e => e.user_id) || [])]
+      studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
       console.log(`📚 Admin has ${courseIds.length} courses, ${studentIds.length} students`)
     }
 
