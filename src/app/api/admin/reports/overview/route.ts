@@ -82,27 +82,27 @@ export async function GET(request: NextRequest) {
 
       // Projects stats - filter by students in assigned courses for admins
       authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('projects').select('id, status').in('student_id', studentIds)
+        ? supabaseAdmin.from('projects').select('id, status').in('user_id', studentIds)
         : supabaseAdmin.from('projects').select('id, status'),
 
       // Tickets stats - filter by students in assigned courses for admins
       authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('tickets').select('id, status, priority').in('student_id', studentIds)
+        ? supabaseAdmin.from('tickets').select('id, status, priority').in('user_id', studentIds)
         : supabaseAdmin.from('tickets').select('id, status, priority'),
 
       // Certificates stats - filter by students in assigned courses for admins
       authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('certificates').select('id, issued_at').in('student_id', studentIds)
+        ? supabaseAdmin.from('certificates').select('id, issued_at').in('user_id', studentIds)
         : supabaseAdmin.from('certificates').select('id, issued_at'),
 
       // Points/Scores from task submissions for avg score - filter by students
       authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('task_submissions').select('points_awarded').in('student_id', studentIds).not('points_awarded', 'is', null)
+        ? supabaseAdmin.from('task_submissions').select('points_awarded').in('user_id', studentIds).not('points_awarded', 'is', null)
         : supabaseAdmin.from('task_submissions').select('points_awarded').not('points_awarded', 'is', null),
 
       // Task submissions needing evaluation - filter by students
       authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('task_submissions').select('id, status').in('student_id', studentIds)
+        ? supabaseAdmin.from('task_submissions').select('id, status').in('user_id', studentIds)
         : supabaseAdmin.from('task_submissions').select('id, status')
     ])
 
