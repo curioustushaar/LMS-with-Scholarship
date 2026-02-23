@@ -224,7 +224,7 @@ function SupportTab({ studentId }: any) {
       const result = await api.tickets.getAll()
       if (result.success && result.data) {
         const studentTickets = Array.isArray(result.data)
-          ? result.data.filter((t: any) => t.student_id === studentId)
+          ? result.data.filter((t: any) => t.user_id === studentId)
           : []
         setTickets(studentTickets)
       }
@@ -443,9 +443,9 @@ function TasksTab({ studentId }: any) {
     try {
       const result = await api.tasks.getAll()
       if (result.success && result.data) {
-        const studentTasks = Array.isArray(result.data)
-          ? result.data.filter((t: any) => t.student_id === studentId)
-          : []
+        // Tasks don't have student_id - they belong to courses
+        // This needs to be implemented properly - for now show empty
+        const studentTasks: any[] = []
         setTasks(studentTasks)
       }
     } catch (error) {
