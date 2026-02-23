@@ -65,10 +65,15 @@ export default function LoginPage() {
       
       console.log('Final Role determined:', role)
 
+      // SECURITY: Only allow admin and student roles on this login page
+      // Superadmin must use /superadmin/login
       if (role === 'superadmin') {
-        console.log('✅ Superadmin verified, redirecting to superadmin panel')
-        router.push('/superadmin')
-      } else if (role === 'admin') {
+        console.warn('⚠️ Superadmin trying to login via admin page')
+        await supabase.auth.signOut()
+        throw new Error('Access denied. Please use the Superadmin login portal.')
+      }
+
+      if (role === 'admin') {
         console.log('✅ Admin verified, redirecting to dashboard')
         router.push('/admin/dashboard')
       } else {

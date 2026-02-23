@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { week_id, title, description, video_url, duration_minutes, order } = body
+    const { week_id, title, description, video_url, duration_minutes, order_index } = body
 
     console.log('📝 Creating video:', { week_id, title, video_url: video_url?.substring(0, 50) + '...' })
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       description: description || null,
       video_url,
       duration_minutes: duration_minutes || null,
-      order_index: order || 0
+      order_index: order_index || 0
     }
 
     console.log('📤 Inserting video data:', { ...videoData, video_url: videoData.video_url.substring(0, 50) + '...' })
