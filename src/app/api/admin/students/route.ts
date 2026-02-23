@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         .select('user_id')
         .in('course_id', assignedCourseIds)
 
-      const studentIds = [...new Set(enrollments?.map(e => e.user_id) || [])]
+      const studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
       
       if (studentIds.length === 0) {
         console.log('⚠️ No students enrolled in admin\'s assigned courses')
