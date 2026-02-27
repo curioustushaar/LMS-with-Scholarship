@@ -130,43 +130,175 @@ export async function GET(req: NextRequest) {
       console.log('Project submissions table not found or error:', e)
     }
 
-    // Get admin performance (last 7 days)
+    // Get admin performance (last 7 days) - Calculate from actual tables
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const sevenDaysAgoISO = sevenDaysAgo.toISOString()
+    
+    console.log('📊 Fetching recent activity from:', sevenDaysAgoISO)
 
-    const { data: recentActivities } = await supabaseAdmin
-      .from('admin_activities')
-      .select(`
-        activity_date,
-        courses_added,
-        students_added,
-        projects_evaluated,
-        tasks_created,
-        tickets_resolved
-      `)
-      .gte('activity_date', sevenDaysAgo.toISOString().split('T')[0])
-      .order('activity_date', { ascending: false })
+    // Get students added (last 7 days) - grouped by date
+    // Using created_at from auth metadata if table column is null
+    const { data: studentsAdded, error: studentsQueryError } = await supabaseAdmin
+      .from('profiles')
+      .select('created_at, id')
+      .eq('role', 'student')
+      .gte('created_at', sevenDaysAgoISO)
+      .order('created_at', { ascending: false })
+    
+    console.log('📊 Students added in last 7 days (via created_at):', studentsAdded?.length || 0)
+    if (studentsQueryError) {
+      console.error('❌ Error fetching students:', studentsQueryError.message)
+    }
+    
+    // For students without created_at, get from auth users as fallback
+    let authStudentsAdded: any[] = []
+    try {
+      const { data: authData } = await supabaseAdmin.auth.admin.listUsers()
+      if (authData?.users) {
+        // Filter students created in last 7 days from auth
+        authStudentsAdded = authData.users
+          .filter(u => {
+            const isStudent = u.user_metadata?.role === 'student' || u.role === 'student'
+            const createdAt = new Date(u.created_at)
+            const isRecent = createdAt >= sevenDaysAgo
+            return isStudent && isRecent
+          })
+          .map(u => ({
+            id: u.id,
+            created_at: u.created_at
+          }))
+        console.log('📊 Students from auth (last 7 days):', authStudentsAdded.length)
+      }
+    } catch (authError: any) {
+      console.error('⚠️ Error fetching auth users:', authError.message)
+    }
+    
+    // Merge students from both sources, removing duplicates
+    const allStudents = [...(studentsAdded || []), ...authStudentsAdded]
+    const uniqueStudents = Array.from(
+      new Map(allStudents.map(s => [s.id, s])).values()
+    )
+    console.log('📊 Total unique students added in last 7 days:', uniqueStudents.length)
+
+    // Get courses added (last 7 days) - grouped by date
+    const { data: coursesAdded } = await supabaseAdmin
+      .from('courses')
+      .select('created_at')
+      .gte('created_at', sevenDaysAgoISO)
+      .order('created_at', { ascending: false })
+    
+    console.log('📊 Courses added in last 7 days:', coursesAdded?.length || 0)
+
+    // Get projects created (last 7 days) - grouped by date
+    const { data: projectsCreated } = await supabaseAdmin
+      .from('projects')
+      .select('created_at')
+      .gte('created_at', sevenDaysAgoISO)
+      .order('created_at', { ascending: false })
+    
+    console.log('📊 Projects created in last 7 days:', projectsCreated?.length || 0)
+
+    // Get tasks created (last 7 days) - grouped by date
+    const { data: tasksCreated } = await supabaseAdmin
+      .from('tasks')
+      .select('created_at')
+      .gte('created_at', sevenDaysAgoISO)
+      .order('created_at', { ascending: false })
+    
+    console.log('📊 Tasks created in last 7 days:', tasksCreated?.length || 0)
+
+    // Get tickets resolved (last 7 days) - grouped by date
+    const { data: ticketsResolved } = await supabaseAdmin
+      .from('tickets')
+      .select('resolved_at')
+      .eq('status', 'resolved')
+      .gte('resolved_at', sevenDaysAgoISO)
+      .order('resolved_at', { ascending: false })
+    
+    console.log('📊 Tickets resolved in last 7 days:', ticketsResolved?.length || 0)
 
     // Group activities by date
     const activityByDate: any = {}
-    recentActivities?.forEach((activity) => {
-      const date = activity.activity_date
-      if (!activityByDate[date]) {
-        activityByDate[date] = {
-          date,
-          courses_added: 0,
-          students_added: 0,
-          projects_evaluated: 0,
-          tasks_created: 0,
-          tickets_resolved: 0
-        }
+    
+    // Helper function to get date string (handles both ISO strings and Date objects)
+    const getDateStr = (timestamp: string | Date) => {
+      try {
+        if (!timestamp) return null
+        const dateStr = timestamp instanceof Date 
+          ? timestamp.toISOString().split('T')[0]
+          : timestamp.split('T')[0]
+        return dateStr
+      } catch (e) {
+        console.error('Error parsing date:', timestamp, e)
+        return null
       }
-      activityByDate[date].courses_added += activity.courses_added || 0
-      activityByDate[date].students_added += activity.students_added || 0
-      activityByDate[date].projects_evaluated += activity.projects_evaluated || 0
-      activityByDate[date].tasks_created += activity.tasks_created || 0
-      activityByDate[date].tickets_resolved += activity.tickets_resolved || 0
+    }
+    
+    // Initialize last 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
+      activityByDate[dateStr] = {
+        date: dateStr,
+        courses_added: 0,
+        students_added: 0,
+        projects_evaluated: 0,
+        tasks_created: 0,
+        tickets_resolved: 0
+      }
+    }
+    
+    console.log('📊 Initialized activity dates:', Object.keys(activityByDate))
+    
+    // Count students by date (using merged unique students)
+    uniqueStudents?.forEach((student) => {
+      const dateStr = getDateStr(student.created_at)
+      if (dateStr && activityByDate[dateStr]) {
+        activityByDate[dateStr].students_added++
+      }
     })
+    
+    console.log('📊 Students grouped by date:', 
+      Object.entries(activityByDate).map(([date, data]: [string, any]) => 
+        `${date}: ${data.students_added}`
+      ).join(', ')
+    )
+    
+    // Count courses by date
+    coursesAdded?.forEach((course) => {
+      const dateStr = getDateStr(course.created_at)
+      if (dateStr && activityByDate[dateStr]) {
+        activityByDate[dateStr].courses_added++
+      }
+    })
+    
+    // Count projects by date (projects created count as projects evaluated)
+    projectsCreated?.forEach((project) => {
+      const dateStr = getDateStr(project.created_at)
+      if (dateStr && activityByDate[dateStr]) {
+        activityByDate[dateStr].projects_evaluated++
+      }
+    })
+    
+    // Count tasks by date
+    tasksCreated?.forEach((task) => {
+      const dateStr = getDateStr(task.created_at)
+      if (dateStr && activityByDate[dateStr]) {
+        activityByDate[dateStr].tasks_created++
+      }
+    })
+    
+    // Count tickets by date
+    ticketsResolved?.forEach((ticket) => {
+      const dateStr = getDateStr(ticket.resolved_at)
+      if (dateStr && activityByDate[dateStr]) {
+        activityByDate[dateStr].tickets_resolved++
+      }
+    })
+    
+    console.log('📊 Activity by date calculated:', Object.keys(activityByDate).length, 'days')
 
     // Get top performing admins
     const { data: adminProfiles } = await supabaseAdmin
@@ -175,32 +307,67 @@ export async function GET(req: NextRequest) {
       .in('role', ['admin', 'superadmin'])
       .order('created_at', { ascending: false })
 
-    // Calculate activity stats for each admin
+    // Calculate activity stats for each admin - using actual data
     const adminsWithActivity = await Promise.all(
       (adminProfiles || []).map(async (admin) => {
-        const { data: activities } = await supabaseAdmin
-          .from('admin_activities')
-          .select('*')
+        // Count students created by this admin (using created_by_admin_id field)
+        const { count: studentsCount } = await supabaseAdmin
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('role', 'student')
+          .eq('created_by_admin_id', admin.id)
+        
+        // Count courses created by this admin (if course has created_by field)
+        const { count: coursesCount } = await supabaseAdmin
+          .from('courses')
+          .select('*', { count: 'exact', head: true })
+          .eq('created_by', admin.id)
+        
+        // Count projects in courses assigned to this admin
+        const { data: adminCourses } = await supabaseAdmin
+          .from('admin_course_assignments')
+          .select('course_id')
           .eq('admin_id', admin.id)
+        
+        const courseIds = adminCourses?.map(ac => ac.course_id) || []
+        
+        let projectsCount = 0
+        let tasksCount = 0
+        
+        if (courseIds.length > 0) {
+          const { count: pCount } = await supabaseAdmin
+            .from('projects')
+            .select('*', { count: 'exact', head: true })
+            .in('course_id', courseIds)
+          projectsCount = pCount || 0
+          
+          const { count: tCount } = await supabaseAdmin
+            .from('tasks')
+            .select('*', { count: 'exact', head: true })
+            .in('course_id', courseIds)
+          tasksCount = tCount || 0
+        }
+        
+        // Count tickets resolved by this admin (if tickets has resolved_by or assigned_to)
+        const { count: ticketsCount } = await supabaseAdmin
+          .from('tickets')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'resolved')
+          .eq('assigned_to', admin.id)
+        
+        // Calculate active days based on creation date
+        const createdDate = new Date(admin.created_at)
+        const today = new Date()
+        const daysDiff = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24))
 
-        const totalStats = activities?.reduce(
-          (acc, activity) => ({
-            total_courses_added: acc.total_courses_added + (activity.courses_added || 0),
-            total_students_added: acc.total_students_added + (activity.students_added || 0),
-            total_projects_evaluated: acc.total_projects_evaluated + (activity.projects_evaluated || 0),
-            total_tasks_created: acc.total_tasks_created + (activity.tasks_created || 0),
-            total_tickets_resolved: acc.total_tickets_resolved + (activity.tickets_resolved || 0),
-            active_days: acc.active_days + 1,
-          }),
-          {
-            total_courses_added: 0,
-            total_students_added: 0,
-            total_projects_evaluated: 0,
-            total_tasks_created: 0,
-            total_tickets_resolved: 0,
-            active_days: 0,
-          }
-        )
+        const totalStats = {
+          total_courses_added: coursesCount || 0,
+          total_students_added: studentsCount || 0,
+          total_projects_evaluated: projectsCount,
+          total_tasks_created: tasksCount,
+          total_tickets_resolved: ticketsCount || 0,
+          active_days: daysDiff > 0 ? daysDiff : 1,
+        }
 
         // Get assigned students count and other assignment data
         let assignedStudentsCount = 0
