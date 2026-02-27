@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       full_name,
       role: 'student',
       account_status: 'active',
+      created_at: new Date().toISOString(), // Explicitly set created_at
       created_by_admin_id: authResult.id  // Track which admin created this student
     }
 
