@@ -14,10 +14,35 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const courseId = searchParams.get('course_id')
 
+    // For admins, filter by assigned courses
+    let allowedCourseIds: string[] = []
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      allowedCourseIds = assignments?.map(a => a.course_id) || []
+
+      if (allowedCourseIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          message: 'No courses assigned to you yet'
+        })
+      }
+    }
+
     let query = supabaseAdmin
       .from('weeks')
       .select('*')
       .order('week_number', { ascending: true })
+
+    // Filter by admin's allowed courses
+    if (authResult.role === 'admin' && allowedCourseIds.length > 0) {
+      query = query.in('course_id', allowedCourseIds)
+    }
 
     if (courseId) {
       query = query.eq('course_id', courseId)
@@ -65,6 +90,23 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'course_id, week_number, and title are required' },
         { status: 400 }
       )
+    }
+
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied. You can only create weeks for your assigned courses.' },
+          { status: 403 }
+        )
+      }
     }
 
     // Check if week number already exists for this course

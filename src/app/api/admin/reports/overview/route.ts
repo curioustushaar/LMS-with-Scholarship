@@ -28,30 +28,18 @@ export async function GET(request: NextRequest) {
 
       courseIds = assignments?.map(a => a.course_id) || []
       
-      if (courseIds.length === 0) {
-        console.log('⚠️ Admin has no assigned courses')
-        return NextResponse.json({
-          success: true,
-          data: {
-            students: { total: 0, active: 0, inactive: 0, new_this_week: 0, avg_completion: 0 },
-            courses: { total: 0, active: 0, draft: 0 },
-            tasks: { total: 0, active: 0, pending_evaluations: 0, avg_score: 0 },
-            projects: { total: 0, submitted: 0, in_progress: 0, approved: 0, pending_review: 0 },
-            tickets: { total: 0, open: 0, urgent: 0, resolved: 0 },
-            certificates: { total: 0, issued_this_month: 0 }
-          },
-          timestamp: new Date().toISOString()
-        })
+      console.log(`📚 Admin has ${courseIds.length} assigned courses`)
+
+      if (courseIds.length > 0) {
+        // Get students enrolled in admin's assigned courses
+        const { data: enrollments } = await supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .in('course_id', courseIds)
+
+        studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+        console.log(`👥 Admin has ${studentIds.length} students in assigned courses`)
       }
-
-      // Get students enrolled in admin's assigned courses
-      const { data: enrollments } = await supabaseAdmin
-        .from('enrollments')
-        .select('user_id')
-        .in('course_id', courseIds)
-
-      studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-      console.log(`📚 Admin has ${courseIds.length} courses, ${studentIds.length} students`)
     }
 
     // Get all statistics in parallel
@@ -65,44 +53,60 @@ export async function GET(request: NextRequest) {
       submissionsStatsResult,
       taskSubmissionsResult
     ] = await Promise.all([
-      // Students stats - filter by assigned courses for admins
+      // Students stats - filter by student IDs for admins
       authResult.role === 'admin' && studentIds.length > 0
         ? supabaseAdmin.from('profiles').select('id, account_status, created_at').eq('role', 'student').in('id', studentIds)
+        : authResult.role === 'admin'
+        ? Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('profiles').select('id, account_status, created_at').eq('role', 'student'),
 
       // Courses stats - filter by assigned courses for admins
-      authResult.role === 'admin' && courseIds.length > 0
-        ? supabaseAdmin.from('courses').select('id').in('id', courseIds)
+      authResult.role === 'admin'
+        ? courseIds.length > 0
+          ? supabaseAdmin.from('courses').select('id').in('id', courseIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('courses').select('id'),
 
-      // Tasks stats - filter by assigned courses for admins
-      authResult.role === 'admin' && courseIds.length > 0
-        ? supabaseAdmin.from('tasks').select('id, status').in('course_id', courseIds)
+      // Tasks stats - filter by course_id for admins
+      authResult.role === 'admin'
+        ? courseIds.length > 0
+          ? supabaseAdmin.from('tasks').select('id, status').in('course_id', courseIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('tasks').select('id, status'),
 
-      // Projects stats - filter by students in assigned courses for admins
-      authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('projects').select('id, status').in('user_id', studentIds)
+      // Projects stats - filter by students created by this admin
+      authResult.role === 'admin'
+        ? studentIds.length > 0
+          ? supabaseAdmin.from('projects').select('id, status').in('user_id', studentIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('projects').select('id, status'),
 
-      // Tickets stats - filter by students in assigned courses for admins
-      authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('tickets').select('id, status, priority').in('user_id', studentIds)
+      // Tickets stats - filter by students created by this admin
+      authResult.role === 'admin'
+        ? studentIds.length > 0
+          ? supabaseAdmin.from('tickets').select('id, status, priority').in('user_id', studentIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('tickets').select('id, status, priority'),
 
-      // Certificates stats - filter by students in assigned courses for admins
-      authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('certificates').select('id, issued_at').in('user_id', studentIds)
+      // Certificates stats - filter by students created by this admin
+      authResult.role === 'admin'
+        ? studentIds.length > 0
+          ? supabaseAdmin.from('certificates').select('id, issued_at').in('user_id', studentIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('certificates').select('id, issued_at'),
 
       // Points/Scores from task submissions for avg score - filter by students
-      authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('task_submissions').select('points_awarded').in('user_id', studentIds).not('points_awarded', 'is', null)
+      authResult.role === 'admin'
+        ? studentIds.length > 0
+          ? supabaseAdmin.from('task_submissions').select('points_awarded').in('user_id', studentIds).not('points_awarded', 'is', null)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('task_submissions').select('points_awarded').not('points_awarded', 'is', null),
 
       // Task submissions needing evaluation - filter by students
-      authResult.role === 'admin' && studentIds.length > 0
-        ? supabaseAdmin.from('task_submissions').select('id, status').in('user_id', studentIds)
+      authResult.role === 'admin'
+        ? studentIds.length > 0
+          ? supabaseAdmin.from('task_submissions').select('id, status').in('user_id', studentIds)
+          : Promise.resolve({ data: [], error: null })
         : supabaseAdmin.from('task_submissions').select('id, status')
     ])
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -18,6 +18,37 @@ export async function GET(request: NextRequest) {
     const dateLimit = new Date()
     dateLimit.setDate(dateLimit.getDate() - days)
 
+    // Get admin's assigned courses and student IDs
+    let allowedStudentIds: string[] = []
+    let courseIds: string[] = []
+    
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: enrollments } = await supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .in('course_id', courseIds)
+
+        allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+      }
+
+      if (allowedStudentIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          period: `Last ${days} days`
+        })
+      }
+    }
+
     // Get recent activities from different tables
     const [
       newStudents,
@@ -26,40 +57,87 @@ export async function GET(request: NextRequest) {
       newTickets,
       issuedCertificates
     ] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, full_name, email, created_at')
-        .gte('created_at', dateLimit.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(limit),
+      // New students - filter by allowed students for admins
+      authResult.role === 'admin'
+        ? supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, created_at')
+            .eq('role', 'student')
+            .in('id', allowedStudentIds)
+            .gte('created_at', dateLimit.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(limit)
+        : supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, email, created_at')
+            .eq('role', 'student')
+            .gte('created_at', dateLimit.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(limit),
 
-      supabase
-        .from('task_submissions')
-        .select('*, profiles!user_id(full_name), tasks(title)')
-        .gte('submitted_at', dateLimit.toISOString())
-        .order('submitted_at', { ascending: false })
-        .limit(limit),
+      // Task submissions - filter by allowed students for admins
+      authResult.role === 'admin'
+        ? supabaseAdmin
+            .from('task_submissions')
+            .select('*, profiles!user_id(full_name), tasks(title)')
+            .in('user_id', allowedStudentIds)
+            .gte('submitted_at', dateLimit.toISOString())
+            .order('submitted_at', { ascending: false })
+            .limit(limit)
+        : supabaseAdmin
+            .from('task_submissions')
+            .select('*, profiles!user_id(full_name), tasks(title)')
+            .gte('submitted_at', dateLimit.toISOString())
+            .order('submitted_at', { ascending: false })
+            .limit(limit),
 
-      supabase
-        .from('projects')
-        .select('*, profiles!user_id(full_name)')
-        .gte('submitted_at', dateLimit.toISOString())
-        .order('submitted_at', { ascending: false })
-        .limit(limit),
+      // Project submissions - filter by allowed students for admins
+      authResult.role === 'admin'
+        ? supabaseAdmin
+            .from('projects')
+            .select('*, profiles!user_id(full_name)')
+            .in('user_id', allowedStudentIds)
+            .gte('submitted_at', dateLimit.toISOString())
+            .order('submitted_at', { ascending: false })
+            .limit(limit)
+        : supabaseAdmin
+            .from('projects')
+            .select('*, profiles!user_id(full_name)')
+            .gte('submitted_at', dateLimit.toISOString())
+            .order('submitted_at', { ascending: false })
+            .limit(limit),
 
-      supabase
-        .from('tickets')
-        .select('*, profiles!user_id(full_name)')
-        .gte('created_at', dateLimit.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(limit),
+      // Tickets - filter by allowed students for admins
+      authResult.role === 'admin'
+        ? supabaseAdmin
+            .from('tickets')
+            .select('*, profiles!user_id(full_name)')
+            .in('user_id', allowedStudentIds)
+            .gte('created_at', dateLimit.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(limit)
+        : supabaseAdmin
+            .from('tickets')
+            .select('*, profiles!user_id(full_name)')
+            .gte('created_at', dateLimit.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(limit),
 
-      supabase
-        .from('certificates')
-        .select('*, profiles!user_id(full_name), courses(title)')
-        .gte('issued_at', dateLimit.toISOString())
-        .order('issued_at', { ascending: false })
-        .limit(limit)
+      // Certificates - filter by allowed students for admins
+      authResult.role === 'admin'
+        ? supabaseAdmin
+            .from('certificates')
+            .select('*, profiles!user_id(full_name), courses(title)')
+            .in('user_id', allowedStudentIds)
+            .gte('issued_at', dateLimit.toISOString())
+            .order('issued_at', { ascending: false })
+            .limit(limit)
+        : supabaseAdmin
+            .from('certificates')
+            .select('*, profiles!user_id(full_name), courses(title)')
+            .gte('issued_at', dateLimit.toISOString())
+            .order('issued_at', { ascending: false })
+            .limit(limit)
     ])
 
     // Format activities

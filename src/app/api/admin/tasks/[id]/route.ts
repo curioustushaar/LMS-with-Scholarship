@@ -47,6 +47,23 @@ export async function GET(
       )
     }
 
+    // If admin (not superadmin), verify access to task's course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', data.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied to this task', success: false },
+          { status: 403 }
+        )
+      }
+    }
+
     console.log('✅ Task fetched successfully:', data.id)
 
     return NextResponse.json({
@@ -107,6 +124,23 @@ export async function PUT(
         { error: 'Course ID is required', success: false },
         { status: 400 }
       )
+    }
+
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied. You can only update tasks for your assigned courses.', success: false },
+          { status: 403 }
+        )
+      }
     }
 
     // Validate week_id if provided (must be valid UUID format, not "week-1" strings)
@@ -198,6 +232,37 @@ export async function DELETE(
     const { id } = params
 
     console.log('🗑️ Deleting task:', id)
+
+    // First, get the task to check course access
+    const { data: task } = await supabaseAdmin
+      .from('tasks')
+      .select('course_id')
+      .eq('id', id)
+      .single()
+
+    if (!task) {
+      return NextResponse.json(
+        { error: 'Task not found', success: false },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify access to task's course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', task.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied. You can only delete tasks for your assigned courses.', success: false },
+          { status: 403 }
+        )
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from('tasks')

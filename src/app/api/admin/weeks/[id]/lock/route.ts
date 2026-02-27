@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -23,6 +23,37 @@ export async function PATCH(
         { error: 'locked field must be a boolean' },
         { status: 400 }
       )
+    }
+
+    // First, get the week to check course access
+    const { data: week } = await supabaseAdmin
+      .from('weeks')
+      .select('course_id')
+      .eq('id', id)
+      .single()
+
+    if (!week) {
+      return NextResponse.json(
+        { error: 'Week not found' },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify access to week's course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', week.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied to this week' },
+          { status: 403 }
+        )
+      }
     }
 
     // Note: You'll need to add a 'locked' column to weeks table

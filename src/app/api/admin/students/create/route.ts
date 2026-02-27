@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
       email,
       full_name,
       role: 'student',
-      account_status: 'active'
+      account_status: 'active',
+      created_by_admin_id: authResult.id  // Track which admin created this student
     }
 
     // Note: Phone is stored in user_metadata, not in profiles table
@@ -132,10 +133,29 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Student profile created in database')
 
-    // Enroll student into selected courses if provided
+    // Determine which courses to enroll the student in
+    let coursesToEnroll: string[] = []
+    
     if (Array.isArray(body.course_ids) && body.course_ids.length > 0) {
+      // Use explicitly provided courses
+      coursesToEnroll = body.course_ids
+      console.log('📋 Using provided course IDs:', coursesToEnroll)
+    } else if (authResult.role === 'admin') {
+      // Auto-enroll in admin's assigned courses
+      console.log('📋 No courses provided, fetching admin\'s assigned courses...')
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+      
+      coursesToEnroll = assignments?.map(a => a.course_id) || []
+      console.log(`📋 Auto-enrolling in ${coursesToEnroll.length} admin-assigned courses`)
+    }
+
+    // Enroll student into courses
+    if (coursesToEnroll.length > 0) {
       try {
-        const enrollPayload = body.course_ids.map((courseId: string) => ({
+        const enrollPayload = coursesToEnroll.map((courseId: string) => ({
           user_id: authUser.user.id,
           course_id: courseId,
           enrolled_at: new Date().toISOString()
@@ -152,11 +172,13 @@ export async function POST(request: NextRequest) {
         if (enrollError) {
           console.error('❌ Failed to insert enrollments:', enrollError.message, enrollError)
         } else {
-          console.log(`✅ Enrolled student in ${enrollData?.length || body.course_ids.length} courses:`, enrollData)
+          console.log(`✅ Enrolled student in ${enrollData?.length || coursesToEnroll.length} courses:`, enrollData)
         }
       } catch (err: any) {
         console.error('💥 Unexpected error while inserting enrollments:', err.message, err)
       }
+    } else {
+      console.log('⚠️ No courses to enroll student in')
     }
 
     return NextResponse.json({

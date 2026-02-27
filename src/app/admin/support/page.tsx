@@ -76,6 +76,31 @@ export default function SupportPage() {
     }
   }
 
+  const handleMarkResolved = async (id: string) => {
+    setActiveActionId(null) // Close the dropdown menu
+    
+    try {
+      console.log('🔄 Marking ticket as resolved:', id)
+      const result = await api.tickets.updateStatus(id, { status: 'resolved' })
+      console.log('📥 Update status response:', result)
+      
+      if (result.success) {
+        alert('✅ Ticket marked as resolved')
+        loadTickets() // Refresh the tickets list
+      } else {
+        const errorMsg = result.error || 'Unknown error'
+        const details = (result as any).details ? `\nDetails: ${(result as any).details}` : ''
+        const code = (result as any).code ? `\nCode: ${(result as any).code}` : ''
+        const hint = (result as any).hint ? `\nHint: ${(result as any).hint}` : ''
+        console.error('❌ Mark resolved failed:', result)
+        alert('❌ Failed to update ticket:\n' + errorMsg + details + code + hint)
+      }
+    } catch (error) {
+      console.error('💥 Update exception:', error)
+      alert('❌ Error updating ticket. Please try again.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -237,7 +262,10 @@ export default function SupportPage() {
                     {activeActionId === ticket.id && (
                       <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200 origin-bottom-right">
                         {ticket.status !== 'resolved' && (
-                          <button className="w-full text-left px-4 py-3 hover:bg-green-50 text-sm font-bold text-gray-700 hover:text-green-600 transition-colors border-b border-gray-50">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleMarkResolved(ticket.id); }}
+                            className="w-full text-left px-4 py-3 hover:bg-green-50 text-sm font-bold text-gray-700 hover:text-green-600 transition-colors border-b border-gray-50"
+                          >
                             Mark Resolved
                           </button>
                         )}

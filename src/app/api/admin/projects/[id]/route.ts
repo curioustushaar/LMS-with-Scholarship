@@ -39,6 +39,40 @@ export async function GET(
             )
         }
 
+        // If admin (not superadmin), verify access to this project's user
+        if (authResult.role === 'admin') {
+            // Get admin's assigned courses
+            const { data: assignments } = await supabaseAdmin
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+
+            const courseIds = assignments?.map(a => a.course_id) || []
+
+            if (courseIds.length > 0) {
+                // Check if project's user is enrolled in any assigned course
+                const { data: enrollment } = await supabaseAdmin
+                    .from('enrollments')
+                    .select('user_id')
+                    .eq('user_id', data.user_id)
+                    .in('course_id', courseIds)
+                    .limit(1)
+                    .single()
+
+                if (!enrollment) {
+                    return NextResponse.json(
+                        { success: false, error: 'Access denied to this project' },
+                        { status: 403 }
+                    )
+                }
+            } else {
+                return NextResponse.json(
+                    { success: false, error: 'No courses assigned to you' },
+                    { status: 403 }
+                )
+            }
+        }
+
         return NextResponse.json({
             success: true,
             data
@@ -69,6 +103,47 @@ export async function PUT(
         const body = await request.json()
 
         console.log('📝 Updating project:', { projectId: id, updates: body })
+
+        // First, get the project to check access
+        const { data: project } = await supabaseAdmin
+            .from('projects')
+            .select('user_id')
+            .eq('id', id)
+            .single()
+
+        if (!project) {
+            return NextResponse.json(
+                { success: false, error: 'Project not found' },
+                { status: 404 }
+            )
+        }
+
+        // If admin (not superadmin), verify access to this project's user
+        if (authResult.role === 'admin') {
+            const { data: assignments } = await supabaseAdmin
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+
+            const courseIds = assignments?.map(a => a.course_id) || []
+
+            if (courseIds.length > 0) {
+                const { data: enrollment } = await supabaseAdmin
+                    .from('enrollments')
+                    .select('user_id')
+                    .eq('user_id', project.user_id)
+                    .in('course_id', courseIds)
+                    .limit(1)
+                    .single()
+
+                if (!enrollment) {
+                    return NextResponse.json(
+                        { success: false, error: 'Access denied to this project' },
+                        { status: 403 }
+                    )
+                }
+            }
+        }
 
         const { data, error } = await supabaseAdmin
             .from('projects')
@@ -115,6 +190,47 @@ export async function DELETE(
 
     try {
         const { id } = params
+
+        // First, get the project to check access
+        const { data: project } = await supabaseAdmin
+            .from('projects')
+            .select('user_id')
+            .eq('id', id)
+            .single()
+
+        if (!project) {
+            return NextResponse.json(
+                { success: false, error: 'Project not found' },
+                { status: 404 }
+            )
+        }
+
+        // If admin (not superadmin), verify access to this project's user
+        if (authResult.role === 'admin') {
+            const { data: assignments } = await supabaseAdmin
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+
+            const courseIds = assignments?.map(a => a.course_id) || []
+
+            if (courseIds.length > 0) {
+                const { data: enrollment } = await supabaseAdmin
+                    .from('enrollments')
+                    .select('user_id')
+                    .eq('user_id', project.user_id)
+                    .in('course_id', courseIds)
+                    .limit(1)
+                    .single()
+
+                if (!enrollment) {
+                    return NextResponse.json(
+                        { success: false, error: 'Access denied to this project' },
+                        { status: 403 }
+                    )
+                }
+            }
+        }
 
         const { error } = await supabaseAdmin
             .from('projects')

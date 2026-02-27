@@ -29,6 +29,23 @@ export async function GET(
       )
     }
 
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabase
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', data.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied to this certificate' },
+          { status: 403 }
+        )
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data
@@ -54,6 +71,37 @@ export async function DELETE(
   if (authResult instanceof Response) return authResult
 
   try {
+    // First, get the certificate to check course access
+    const { data: cert } = await supabase
+      .from('certificates')
+      .select('course_id')
+      .eq('id', params.id)
+      .single()
+
+    if (!cert) {
+      return NextResponse.json(
+        { error: 'Certificate not found' },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabase
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', cert.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied to this certificate' },
+          { status: 403 }
+        )
+      }
+    }
+
     const { error } = await supabase
       .from('certificates')
       .delete()
@@ -92,6 +140,37 @@ export async function PATCH(
 
   try {
     const body = await request.json()
+
+    // First, get the certificate to check course access
+    const { data: cert } = await supabase
+      .from('certificates')
+      .select('course_id')
+      .eq('id', params.id)
+      .single()
+
+    if (!cert) {
+      return NextResponse.json(
+        { error: 'Certificate not found' },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabase
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', cert.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied to this certificate' },
+          { status: 403 }
+        )
+      }
+    }
 
     const { data, error } = await supabase
       .from('certificates')

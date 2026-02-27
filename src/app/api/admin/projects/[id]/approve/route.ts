@@ -48,6 +48,38 @@ export async function PATCH(
       )
     }
 
+    // If admin (not superadmin), verify access to this project's user
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: enrollment } = await supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .eq('user_id', project.user_id)
+          .in('course_id', courseIds)
+          .limit(1)
+          .single()
+
+        if (!enrollment) {
+          return NextResponse.json(
+            { error: 'Access denied to this project' },
+            { status: 403 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'No courses assigned to you' },
+          { status: 403 }
+        )
+      }
+    }
+
     const updateData = {
       status,
       feedback: feedback || null,

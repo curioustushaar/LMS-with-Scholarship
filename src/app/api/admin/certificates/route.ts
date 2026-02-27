@@ -15,13 +15,39 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const course_id = searchParams.get('course_id')
 
-    console.log('📜 Fetching certificates with filters:', { status, course_id })
+    console.log('📜 Fetching certificates with filters:', { status, course_id, role: authResult.role })
+
+    // If admin (not superadmin), get only certificates from assigned courses
+    let allowedCourseIds: string[] = []
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      allowedCourseIds = assignments?.map(a => a.course_id) || []
+      console.log(`📚 Admin has ${allowedCourseIds.length} assigned courses`)
+
+      if (allowedCourseIds.length === 0) {
+        console.log('⚠️ Admin has no assigned courses')
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0
+        })
+      }
+    }
 
     // Use admin client to bypass RLS
     let certQuery = supabaseAdmin
       .from('certificates')
       .select('*')
       .order('issued_at', { ascending: false })
+
+    // Apply admin's course restriction
+    if (authResult.role === 'admin' && allowedCourseIds.length > 0) {
+      certQuery = certQuery.in('course_id', allowedCourseIds)
+    }
 
     if (status) {
       certQuery = certQuery.eq('status', status)
@@ -46,38 +72,44 @@ export async function GET(request: NextRequest) {
     // Manually join with users and courses using admin client
     const enrichedCertificates = await Promise.all(
       (certificates || []).map(async (cert) => {
-        console.log(`📜 Enriching certificate ${cert.certificate_number}...`)
+        console.log(`📜 Enriching certificate ${cert.certificate_number} - CourseID: ${cert.course_id}`)
         
         // Get user data using admin client
         const { data: user, error: userError } = await supabaseAdmin
           .from('users')
           .select('id, full_name, email')
           .eq('id', cert.user_id)
-          .single()
+          .maybeSingle()
 
         if (userError) {
           console.error(`❌ User fetch error for ${cert.user_id}:`, userError)
-        } else {
+        } else if (user) {
           console.log(`✅ User found: ${user?.full_name}`)
+        } else {
+          console.warn(`⚠️ User not found for ID: ${cert.user_id}`)
         }
 
-        // Get course data using admin client
-        const { data: course, error: courseError } = await supabaseAdmin
+        // Get course data using admin client - try both courses and profiles tables
+        let course = null
+        const { data: courseData, error: courseError } = await supabaseAdmin
           .from('courses')
-          .select('id, title, description')
+          .select('id, title, description, domain')
           .eq('id', cert.course_id)
-          .single()
+          .maybeSingle()
 
         if (courseError) {
           console.error(`❌ Course fetch error for ${cert.course_id}:`, courseError)
-        } else {
+        } else if (courseData) {
+          course = courseData
           console.log(`✅ Course found: ${course?.title}`)
+        } else {
+          console.warn(`⚠️ Course not found for ID: ${cert.course_id}`)
         }
 
         return {
           ...cert,
-          users: user || null,
-          courses: course || null
+          users: user || { id: cert.user_id, full_name: 'User Not Found', email: 'N/A' },
+          courses: course || { id: cert.course_id, title: 'Course Not Found', description: null }
         }
       })
     )

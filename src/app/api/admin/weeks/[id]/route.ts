@@ -18,7 +18,38 @@ export async function DELETE(
 
     console.log('🗑️ Deleting week:', { id })
 
-    // First, get all videos associated with this week
+    // First, get the week to check course access
+    const { data: week } = await supabaseAdmin
+      .from('weeks')
+      .select('course_id')
+      .eq('id', id)
+      .single()
+
+    if (!week) {
+      return NextResponse.json(
+        { success: false, error: 'Week not found' },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify access to week's course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', week.course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied. You can only delete weeks from your assigned courses.' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Get all videos associated with this week
     const { data: videos, error: videosError } = await supabaseAdmin
       .from('videos')
       .select('*')
