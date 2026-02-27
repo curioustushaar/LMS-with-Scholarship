@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import { FiPlus, FiFolder, FiClock, FiCheckCircle, FiXCircle, FiUpload } from 'react-icons/fi'
+import { FiPlus, FiFolder, FiClock, FiCheckCircle, FiXCircle, FiUpload, FiFile, FiExternalLink } from 'react-icons/fi'
 import { api } from '@/lib/api'
 
 interface Project {
@@ -20,6 +20,14 @@ interface Project {
   courses?: {
     title: string
   }
+  project_deliverables?: {
+    id: string
+    file_url: string
+    github_url?: string
+    deploy_url?: string
+    external_link?: string
+    description?: string
+  }[]
 }
 
 export default function StudentProjectsPage() {
@@ -33,6 +41,9 @@ export default function StudentProjectsPage() {
     github_url: '',
     notes: ''
   })
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileDescription, setFileDescription] = useState('')
 
   useEffect(() => {
     loadProjects()
@@ -66,6 +77,43 @@ export default function StudentProjectsPage() {
   const handleSubmitProject = async (projectId: string) => {
     setSelectedProject(projectId)
     setShowSubmitModal(true)
+  }
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) return
+
+    setUploadingFile(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      if (fileDescription) {
+        formData.append('description', fileDescription)
+      }
+
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/student/projects/${selectedProject}/upload-file`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert('File uploaded successfully!')
+        setSelectedFile(null)
+        setFileDescription('')
+        loadProjects()
+      } else {
+        alert(result.error || 'File upload failed')
+      }
+    } catch (error) {
+      alert('Error uploading file')
+    } finally {
+      setUploadingFile(false)
+    }
   }
 
   const submitProject = async () => {
@@ -205,6 +253,75 @@ export default function StudentProjectsPage() {
                 </div>
               )}
 
+              {/* Uploaded Files */}
+              {project.project_deliverables && project.project_deliverables.length > 0 && (
+                <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                  <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                    <FiFile /> Submitted Links & Files:
+                  </p>
+                  <div className="space-y-2">
+                    {project.project_deliverables.map((d, i) => (
+                      <div key={d.id} className="space-y-1">
+                        {d.github_url && d.github_url.trim() ? (
+                          <a 
+                            href={d.github_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-purple-700 hover:text-purple-900 font-medium flex items-center gap-2 text-sm"
+                          >
+                            <FiFile />
+                            GitHub Repository
+                            <FiExternalLink className="text-xs" />
+                          </a>
+                        ) : null}
+                        {d.deploy_url && d.deploy_url.trim() ? (
+                          <a 
+                            href={d.deploy_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-green-700 hover:text-green-900 font-medium flex items-center gap-2 text-sm"
+                          >
+                            <FiExternalLink />
+                            Live Project
+                            <FiExternalLink className="text-xs" />
+                          </a>
+                        ) : null}
+                        {d.external_link && d.external_link.trim() ? (
+                          <a 
+                            href={d.external_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-700 hover:text-blue-900 font-medium flex items-center gap-2 text-sm"
+                          >
+                            <FiExternalLink />
+                            External Link
+                            <FiExternalLink className="text-xs" />
+                          </a>
+                        ) : null}
+                        {d.file_url && d.file_url.trim() ? (
+                          <a 
+                            href={d.file_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-purple-700 hover:text-purple-900 font-medium flex items-center gap-2 text-sm"
+                          >
+                            <FiFile />
+                            Document {i + 1}
+                            <FiExternalLink className="text-xs" />
+                          </a>
+                        ) : null}
+                        {!d.github_url && !d.deploy_url && !d.external_link && !d.file_url && (
+                          <span className="text-gray-500 text-sm">Entry {i + 1} (No links)</span>
+                        )}
+                        {d.description && (
+                          <p className="text-gray-600 text-xs mt-1 ml-6 italic">{d.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="pt-3 border-t">
                 {project.status === 'in_progress' && (
@@ -287,6 +404,38 @@ export default function StudentProjectsPage() {
                   placeholder="Any additional notes about your submission..."
                 />
               </div>
+
+              {/* File Upload Section */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Document (Optional)
+                </label>
+                <input
+                  type="file"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm"
+                  accept=".pdf,.doc,.docx,.txt,.zip"
+                />
+                {selectedFile && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-gray-600">Selected: {selectedFile.name}</p>
+                    <input
+                      type="text"
+                      placeholder="File description (optional)"
+                      value={fileDescription}
+                      onChange={(e) => setFileDescription(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] text-sm"
+                    />
+                    <button
+                      onClick={handleFileUpload}
+                      disabled={uploadingFile}
+                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm"
+                    >
+                      {uploadingFile ? 'Uploading...' : 'Upload File'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-4 mt-6">
@@ -300,6 +449,8 @@ export default function StudentProjectsPage() {
                 onClick={() => {
                   setShowSubmitModal(false)
                   setSubmissionData({ project_url: '', github_url: '', notes: '' })
+                  setSelectedFile(null)
+                  setFileDescription('')
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
               >

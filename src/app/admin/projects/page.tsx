@@ -34,6 +34,9 @@ interface Project {
   project_deliverables?: {
     id: string
     file_url: string
+    github_url?: string
+    deploy_url?: string
+    external_link?: string
     description?: string
     created_at: string
   }[]
@@ -88,6 +91,20 @@ export default function ProjectsPage() {
             project_url: p.project_url,
             deliverables: p.project_deliverables?.length || 0
           })
+          // Log each deliverable file URL for debugging
+          if (p.project_deliverables && p.project_deliverables.length > 0) {
+            p.project_deliverables.forEach((d: any, i: number) => {
+              console.log(`  📎 Deliverable ${i + 1}:`, {
+                id: d.id,
+                file_url: d.file_url,
+                github_url: d.github_url,
+                deploy_url: d.deploy_url,
+                external_link: d.external_link,
+                description: d.description,
+                has_links: !!(d.file_url || d.github_url || d.deploy_url || d.external_link)
+              })
+            })
+          }
         })
         
         setProjects(projectsData)
@@ -373,19 +390,67 @@ export default function ProjectsPage() {
                           </p>
                           <div className="space-y-2">
                             {project.project_deliverables.map((d, i) => (
-                              <div key={i} className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                                <a 
-                                  href={d.file_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="text-purple-700 hover:text-purple-900 font-medium flex items-center gap-2 text-sm"
-                                >
-                                  <FiFile />
-                                  Document {i + 1}
-                                  <FiExternalLink className="text-xs" />
-                                </a>
+                              <div key={i} className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                {/* GitHub URL */}
+                                {d.github_url && d.github_url.trim() && (
+                                  <a 
+                                    href={d.github_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-purple-700 hover:text-purple-900 font-medium flex items-center gap-2 text-sm mb-2"
+                                  >
+                                    <FiFile />
+                                    GitHub: {d.github_url.length > 40 ? d.github_url.substring(0, 40) + '...' : d.github_url}
+                                    <FiExternalLink className="text-xs" />
+                                  </a>
+                                )}
+                                {/* Deploy/Project URL */}
+                                {d.deploy_url && d.deploy_url.trim() && (
+                                  <a 
+                                    href={d.deploy_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-green-700 hover:text-green-900 font-medium flex items-center gap-2 text-sm mb-2"
+                                  >
+                                    <FiExternalLink />
+                                    Deploy: {d.deploy_url.length > 40 ? d.deploy_url.substring(0, 40) + '...' : d.deploy_url}
+                                    <FiExternalLink className="text-xs" />
+                                  </a>
+                                )}
+                                {/* External Link */}
+                                {d.external_link && d.external_link.trim() && (
+                                  <a 
+                                    href={d.external_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-blue-700 hover:text-blue-900 font-medium flex items-center gap-2 text-sm mb-2"
+                                  >
+                                    <FiExternalLink />
+                                    Link: {d.external_link.length > 40 ? d.external_link.substring(0, 40) + '...' : d.external_link}
+                                    <FiExternalLink className="text-xs" />
+                                  </a>
+                                )}
+                                {/* File URL */}
+                                {d.file_url && d.file_url.trim() && (
+                                  <a 
+                                    href={d.file_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-purple-700 hover:text-purple-900 font-medium flex items-center gap-2 text-sm"
+                                  >
+                                    <FiFile />
+                                    Document {i + 1}
+                                    <FiExternalLink className="text-xs" />
+                                  </a>
+                                )}
+                                {!d.github_url && !d.deploy_url && !d.external_link && !d.file_url && (
+                                  <div className="text-gray-500 flex items-center gap-2 text-sm">
+                                    <FiFile />
+                                    <span>Entry {i + 1} (No URLs)</span>
+                                  </div>
+                                )}
                                 {d.description && (
-                                  <p className="text-gray-600 text-xs mt-1 ml-6">{d.description}</p>
+                                  <p className="text-gray-600 text-xs mt-2 ml-6 italic">{d.description}</p>
                                 )}
                               </div>
                             ))}
@@ -452,11 +517,34 @@ export default function ProjectsPage() {
                               <FiExternalLink className="ml-1" />
                             </a>
                           )}
+                          {/* Links from deliverables */}
                           {project.project_deliverables && project.project_deliverables.length > 0 && project.project_deliverables.map((d, i) => (
-                            <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-purple-600 hover:underline text-sm">
-                              <FiFile className="mr-1" /> File {i+1}
-                              <FiExternalLink className="ml-1" />
-                            </a>
+                            <div key={d.id} className="flex flex-col gap-1">
+                              {d.github_url && d.github_url.trim() && (
+                                <a href={d.github_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-purple-600 hover:underline text-sm">
+                                  <FiFile className="mr-1" /> GitHub {i+1}
+                                  <FiExternalLink className="ml-1" />
+                                </a>
+                              )}
+                              {d.deploy_url && d.deploy_url.trim() && (
+                                <a href={d.deploy_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-green-600 hover:underline text-sm">
+                                  <FiExternalLink className="mr-1" /> Deploy {i+1}
+                                  <FiExternalLink className="ml-1" />
+                                </a>
+                              )}
+                              {d.external_link && d.external_link.trim() && (
+                                <a href={d.external_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-blue-600 hover:underline text-sm">
+                                  <FiExternalLink className="mr-1" /> Link {i+1}
+                                  <FiExternalLink className="ml-1" />
+                                </a>
+                              )}
+                              {d.file_url && d.file_url.trim() && (
+                                <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-purple-600 hover:underline text-sm">
+                                  <FiFile className="mr-1" /> File {i+1}
+                                  <FiExternalLink className="ml-1" />
+                                </a>
+                              )}
+                            </div>
                           ))}
                           {(!project.github_url || !project.github_url.trim()) && 
                            (!project.project_url || !project.project_url.trim()) && 

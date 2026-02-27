@@ -139,6 +139,20 @@ export async function GET(request: NextRequest) {
         deliverables_count: deliverables?.length || 0
       })
       
+      // Log deliverables data
+      if (deliverables && deliverables.length > 0) {
+        console.log(`  📦 Deliverables for project ${project.id}:`)
+        deliverables.forEach((d: any, i: number) => {
+          console.log(`    ${i + 1}:`, {
+            id: d.id,
+            github_url: d.github_url || 'null',
+            deploy_url: d.deploy_url || 'null',
+            file_url: d.file_url || 'null',
+            external_link: d.external_link || 'null'
+          })
+        })
+      }
+      
       enrichedData.push(enrichedProject)
     }
 

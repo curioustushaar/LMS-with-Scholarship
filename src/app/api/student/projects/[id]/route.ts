@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * PUT /api/student/projects/[id]
@@ -23,14 +23,8 @@ export async function PUT(
 
     const token = authHeader.replace('Bearer ', '')
     
-    // Set auth token for this request
-    await supabase.auth.setSession({
-      access_token: token,
-      refresh_token: ''
-    })
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Verify user with supabaseAdmin
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
     
     if (authError || !user) {
       return NextResponse.json(
@@ -56,7 +50,7 @@ export async function PUT(
     }
 
     // Check if project belongs to this user
-    const { data: existingProject, error: checkError } = await supabase
+    const { data: existingProject, error: checkError } = await supabaseAdmin
       .from('projects')
       .select('user_id, description')
       .eq('id', id)
@@ -95,9 +89,15 @@ export async function PUT(
         : `Submission Notes:\n${notes.trim()}`
     }
 
-    console.log('🔄 Updating project in database:', updateData)
+    console.log('🔄 Updating project in database:', {
+      id,
+      userId: user.id,
+      project_url: updateData.project_url,
+      github_url: updateData.github_url,
+      status: updateData.status
+    })
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('projects')
       .update(updateData)
       .eq('id', id)
@@ -121,7 +121,12 @@ export async function PUT(
       )
     }
 
-    console.log('✅ Project updated successfully:', data.id)
+    console.log('✅ Project updated successfully:', {
+      id: data.id,
+      project_url: data.project_url,
+      github_url: data.github_url,
+      status: data.status
+    })
 
     return NextResponse.json({
       success: true,

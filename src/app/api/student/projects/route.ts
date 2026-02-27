@@ -52,6 +52,12 @@ export async function GET(request: NextRequest) {
           title,
           description,
           domain
+        ),
+        project_deliverables (
+          id,
+          file_url,
+          description,
+          created_at
         )
       `)
       .in('course_id', enrolledCourseIds)
