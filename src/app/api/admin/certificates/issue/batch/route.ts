@@ -21,6 +21,23 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // If admin (not superadmin), verify access to this course
+        if (authResult.role === 'admin') {
+            const { data: assignment } = await supabase
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+                .eq('course_id', course_id)
+                .single()
+
+            if (!assignment) {
+                return NextResponse.json(
+                    { error: 'Access denied to this course' },
+                    { status: 403 }
+                )
+            }
+        }
+
         const results = {
             processed: 0,
             already_issued: 0,

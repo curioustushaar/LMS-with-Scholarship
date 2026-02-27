@@ -11,10 +11,31 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof Response) return authResult
 
     try {
-        // 1. Get all courses
-        const { data: courses } = await supabase
+        // 1. Get courses (filtered by admin assignment if not superadmin)
+        let coursesQuery = supabase
             .from('courses')
             .select('id, title')
+
+        // If admin (not superadmin), get only assigned courses
+        if (authResult.role === 'admin') {
+            const { data: assignments } = await supabase
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+
+            const assignedCourseIds = assignments?.map(a => a.course_id) || []
+
+            if (assignedCourseIds.length === 0) {
+                return NextResponse.json({
+                    success: true,
+                    data: { courses: [], total_eligible: 0, courses_with_eligible: 0 }
+                })
+            }
+
+            coursesQuery = coursesQuery.in('id', assignedCourseIds)
+        }
+
+        const { data: courses } = await coursesQuery
 
         if (!courses || courses.length === 0) {
             return NextResponse.json({

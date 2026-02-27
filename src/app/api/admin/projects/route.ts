@@ -16,13 +16,50 @@ export async function GET(request: NextRequest) {
     const user_id = searchParams.get('user_id')
     const course_id = searchParams.get('course_id')
 
-    console.log('📥 Fetching projects with filters:', { status, user_id, course_id })
+    console.log('📥 Fetching projects with filters:', { status, user_id, course_id, role: authResult.role })
+
+    // For admins, only show projects from students in assigned courses
+    let allowedStudentIds: string[] = []
+    if (authResult.role === 'admin') {
+      // Get admin's assigned courses
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        // Get students enrolled in these courses
+        const { data: enrollments } = await supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .in('course_id', courseIds)
+
+        allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+      }
+
+      console.log(`👥 Admin can see projects from ${allowedStudentIds.length} students`)
+
+      if (allowedStudentIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0
+        })
+      }
+    }
 
     // First try simple query without joins
     let query = supabaseAdmin
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // Filter by allowed students for admin
+    if (authResult.role === 'admin' && allowedStudentIds.length > 0) {
+      query = query.in('user_id', allowedStudentIds)
+    }
 
     if (status) {
       query = query.eq('status', status)

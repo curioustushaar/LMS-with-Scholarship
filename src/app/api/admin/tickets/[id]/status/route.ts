@@ -4,12 +4,14 @@ import { requireAdmin } from '@/lib/auth'
 
 /**
  * PATCH /api/admin/tickets/[id]/status
- * Update ticket status
+ * Update ticket status - SIMPLIFIED VERSION FOR TESTING
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log('\n🚀 ========== STATUS UPDATE API CALLED ==========')
+  
   const authResult = await requireAdmin(request)
   if (authResult instanceof Response) return authResult
 
@@ -18,108 +20,86 @@ export async function PATCH(
     const body = await request.json()
     const { status, assigned_to, priority } = body
 
-    console.log('📝 Updating ticket status:', { ticketId, status, priority })
+    console.log('📝 Request Details:')
+    console.log('   - Ticket ID:', ticketId)
+    console.log('   - New status:', status)
+    console.log('   - Body:', JSON.stringify(body))
 
-    // Check if ticket exists
-    const { data: ticket, error: ticketError } = await supabaseAdmin
-      .from('tickets')
-      .select('*')
-      .eq('id', ticketId)
-      .single()
-
-    if (ticketError || !ticket) {
-      console.error('❌ Ticket not found:', ticketError)
-      return NextResponse.json(
-        { success: false, error: 'Ticket not found' },
-        { status: 404 }
-      )
-    }
-
-    const updateData: any = {}
-
+    // BYPASS SUPABASE CLIENT - Use direct REST API call
     if (status) {
-      const validStatuses = ['open', 'in_progress', 'resolved', 'closed']
-      if (!validStatuses.includes(status)) {
-        return NextResponse.json(
-          { success: false, error: `Status must be one of: ${validStatuses.join(', ')}` },
-          { status: 400 }
-        )
-      }
-      updateData.status = status
+      console.log('🔧 Attempting direct REST API call:', status)
       
-      if (status === 'resolved' || status === 'closed') {
-        updateData.resolved_at = new Date().toISOString()
-      }
-    }
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+      
+      const response = await fetch(`${supabaseUrl}/rest/v1/tickets?id=eq.${ticketId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ status })
+      })
 
-    if (assigned_to !== undefined) {
-      updateData.assigned_to = assigned_to
-    }
-
-    if (priority) {
-      const validPriorities = ['low', 'medium', 'high', 'urgent']
-      if (!validPriorities.includes(priority)) {
+      console.log('📊 Direct REST API Result:')
+      console.log('   - Status:', response.status)
+      console.log('   - Status Text:', response.statusText)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('   - Error:', errorText)
+        
         return NextResponse.json(
-          { success: false, error: `Priority must be one of: ${validPriorities.join(', ')}` },
-          { status: 400 }
+          {
+            success: false,
+            error: 'Database update failed',
+            details: errorText
+          },
+          { status: 500 }
         )
       }
-      updateData.priority = priority
+      
+      const error = null
+
+      if (error) {
+        console.error('❌ UPDATE FAILED!')
+        console.error('   - Error message:', error.message)
+        console.error('   - Error code:', error.code)
+        console.error('   - Error details:', error.details)
+        console.error('   - Error hint:', error.hint)
+        
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Database update failed',
+            details: error.message,
+            code: error.code,
+            hint: error.hint
+          },
+          { status: 500 }
+        )
+      }
+
+      console.log('✅ UPDATE SUCCESSFUL!')
+      console.log('='.repeat(50) + '\n')
+
+      return NextResponse.json({
+        success: true,
+        message: 'Status updated successfully'
+      })
     }
 
-    const { data: updatedTicket, error } = await supabaseAdmin
-      .from('tickets')
-      .update(updateData)
-      .eq('id', ticketId)
-      .select('*')
-      .single()
-
-    if (error) {
-      console.error('❌ Failed to update ticket:', error)
-      return NextResponse.json(
-        { success: false, error: 'Failed to update ticket', details: error.message },
-        { status: 500 }
-      )
-    }
-
-    // Get user details separately
-    let userData = null
-    let assignedUserData = null
-
-    if (updatedTicket.user_id) {
-      const { data: userProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('id', updatedTicket.user_id)
-        .single()
-      userData = userProfile
-    }
-
-    if (updatedTicket.assigned_to) {
-      const { data: assignedProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name')
-        .eq('id', updatedTicket.assigned_to)
-        .single()
-      assignedUserData = assignedProfile
-    }
-
-    const data = {
-      ...updatedTicket,
-      user: userData,
-      assigned_to_user: assignedUserData
-    }
-
-    console.log('✅ Ticket updated successfully')
-
-    return NextResponse.json({
-      success: true,
-      data,
-      message: 'Ticket updated successfully'
-    })
+    return NextResponse.json(
+      { success: false, error: 'No status provided' },
+      { status: 400 }
+    )
 
   } catch (error: any) {
-    console.error('💥 Unexpected error in PATCH /tickets/[id]/status:', error)
+    console.error('💥 UNEXPECTED ERROR:')
+    console.error('   - Message:', error.message)
+    console.error('   - Stack:', error.stack)
     return NextResponse.json(
       { success: false, error: 'Internal server error', details: error.message },
       { status: 500 }

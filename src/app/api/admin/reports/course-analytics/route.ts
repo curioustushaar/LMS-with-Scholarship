@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -14,27 +14,49 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const courseId = searchParams.get('course_id')
 
+    // Get admin's assigned courses
+    let allowedCourseIds: string[] = []
+    
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      allowedCourseIds = assignments?.map(a => a.course_id) || []
+    }
+
     if (courseId) {
+      // For admins, verify access to this course
+      if (authResult.role === 'admin') {
+        if (allowedCourseIds.length === 0 || !allowedCourseIds.includes(courseId)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied' },
+            { status: 403 }
+          )
+        }
+      }
+
       // Get specific course analytics
       const [course, weeks, enrollments, certificates] = await Promise.all([
-        supabase
+        supabaseAdmin
           .from('courses')
           .select('*')
           .eq('id', courseId)
           .single(),
         
-        supabase
+        supabaseAdmin
           .from('weeks')
           .select('*, videos(*)')
           .eq('course_id', courseId),
         
-        // Count unique students who watched videos in this course
-        supabase
-          .from('video_progress')
-          .select('user_id, videos!inner(week_id, weeks!inner(course_id))')
-          .eq('videos.weeks.course_id', courseId),
+        // Get enrollments for this course
+        supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .eq('course_id', courseId),
         
-        supabase
+        supabaseAdmin
           .from('certificates')
           .select('*')
           .eq('course_id', courseId)
@@ -71,20 +93,34 @@ export async function GET(request: NextRequest) {
 
     } else {
       // Get all courses analytics
-      const { data: courses } = await supabase
+      // For admins, only show their assigned courses
+      let coursesQuery = supabaseAdmin
         .from('courses')
         .select('id, title, status')
+
+      if (authResult.role === 'admin') {
+        if (allowedCourseIds.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            count: 0
+          })
+        }
+        coursesQuery = coursesQuery.in('id', allowedCourseIds)
+      }
+
+      const { data: courses } = await coursesQuery
 
       const analytics = []
 
       for (const course of courses || []) {
         const [weeks, certificates] = await Promise.all([
-          supabase
+          supabaseAdmin
             .from('weeks')
             .select('id, videos(id)')
             .eq('course_id', course.id),
           
-          supabase
+          supabaseAdmin
             .from('certificates')
             .select('id')
             .eq('course_id', course.id)

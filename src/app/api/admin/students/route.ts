@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Fetching students with filters:', { status, search, role: authResult.role })
 
-    // If admin (not superadmin), get only students in assigned courses
+    // If admin (not superadmin), get only students from assigned courses
     if (authResult.role === 'admin') {
       // Get admin's assigned course IDs
       const { data: assignments } = await supabaseAdmin
@@ -29,13 +29,15 @@ export async function GET(request: NextRequest) {
 
       const assignedCourseIds = assignments?.map(a => a.course_id) || []
       
+      console.log(`📚 Admin has ${assignedCourseIds.length} assigned courses`)
+
       if (assignedCourseIds.length === 0) {
-        console.log('⚠️ Admin has no assigned courses, cannot see any students')
+        console.log('⚠️ No courses assigned to admin')
         return NextResponse.json({
           success: true,
           data: [],
           count: 0,
-          message: 'No students found (no courses assigned to you)'
+          message: 'No courses assigned to you yet'
         })
       }
 
@@ -46,9 +48,11 @@ export async function GET(request: NextRequest) {
         .in('course_id', assignedCourseIds)
 
       const studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-      
+
+      console.log(`👥 Found ${studentIds.length} students in assigned courses`)
+
       if (studentIds.length === 0) {
-        console.log('⚠️ No students enrolled in admin\'s assigned courses')
+        console.log('⚠️ No students enrolled in assigned courses')
         return NextResponse.json({
           success: true,
           data: [],
@@ -79,7 +83,7 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      console.log(`✅ Found ${data?.length || 0} students in admin's assigned courses`)
+      console.log(`✅ Found ${data?.length || 0} students in assigned courses`)
 
       const students = (data || []).map(s => ({
         ...s,

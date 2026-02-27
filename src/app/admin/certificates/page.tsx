@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import { FiDownload, FiPlus, FiTrash2, FiFilter, FiCheck, FiX } from 'react-icons/fi'
+import { FiDownload, FiPlus, FiTrash2, FiCheck, FiX } from 'react-icons/fi'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 
@@ -21,8 +21,7 @@ interface Certificate {
 }
 
 export default function CertificatesPage() {
-  // State management
-  const [filterCourse, setFilterCourse] = useState('all')
+  // State management - Removed filterCourse as it will be automatic
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
@@ -151,11 +150,6 @@ export default function CertificatesPage() {
     }
   }
 
-  const getFilteredCertificates = () => {
-    if (filterCourse === 'all') return certificates
-    return certificates.filter(c => c.course_id === filterCourse)
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -167,8 +161,6 @@ export default function CertificatesPage() {
     )
   }
 
-  const filteredCerts = getFilteredCertificates()
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -176,6 +168,14 @@ export default function CertificatesPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Certificates</h1>
           <p className="text-gray-600 mt-1 text-xs md:text-base">Manage course completion certificates</p>
+          {courses.length > 0 && (
+            <p className="text-sm text-gray-500 mt-2">
+              Managing {courses.length} course{courses.length !== 1 ? 's' : ''}:{' '}
+              <span className="font-semibold text-[#C81E4E]">
+                {courses.map(c => c.title).join(', ')}
+              </span>
+            </p>
+          )}
         </div>
         <button
           onClick={() => {
@@ -201,19 +201,19 @@ export default function CertificatesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           <p className="text-gray-600 text-sm font-medium">Total Issued</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">{stats.total}</p>
+          <p className="text-3xl font-bold text-blue-600 mt-2">{certificates.length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <p className="text-gray-600 text-sm font-medium">Eligible Students</p>
+          <p className="text-3xl font-bold text-green-600 mt-2">{allEligible?.total_eligible || 0}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
           <p className="text-gray-600 text-sm font-medium">Issued This Month</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">{stats.thisMonth}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <p className="text-gray-600 text-sm font-medium">Active Certificates</p>
-          <p className="text-3xl font-bold text-purple-600 mt-2">{stats.total}</p>
+          <p className="text-3xl font-bold text-purple-600 mt-2">{stats.thisMonth}</p>
         </div>
       </div>
 
-      {/* Eligible Students Section - NEW */}
+      {/* Eligible Students Section */}
       {loadingEligible ? (
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="animate-pulse">
@@ -221,7 +221,7 @@ export default function CertificatesPage() {
             <div className="h-20 bg-gray-200 rounded"></div>
           </div>
         </div>
-      ) : allEligible && allEligible.total_eligible > 0 ? (
+      ) : allEligible && allEligible.courses && allEligible.courses.length > 0 ? (
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl shadow-lg p-6 border-2 border-yellow-300">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -303,8 +303,12 @@ export default function CertificatesPage() {
         <div className="bg-gray-50 rounded-xl shadow-md p-6 border-2 border-dashed border-gray-200">
           <div className="text-center py-4">
             <span className="text-4xl mb-2 block">✅</span>
-            <p className="text-gray-600 font-medium">No students currently eligible for certificates</p>
-            <p className="text-gray-500 text-sm mt-1">Students will appear here when they complete all course videos</p>
+            <p className="text-gray-600 font-medium">
+              No students currently eligible for certificates
+            </p>
+            <p className="text-gray-500 text-sm mt-1">
+              Students will appear here when they complete all course requirements
+            </p>
           </div>
         </div>
       )}
@@ -505,92 +509,98 @@ export default function CertificatesPage() {
         </div>
       )}
 
-      {/* Filter */}
-      <div className="bg-white rounded-xl shadow-md p-4">
-        <div className="flex items-center space-x-4">
-          <FiFilter className="text-gray-600 text-xl" />
-          <div className="flex-1">
-            <label className="text-sm font-medium text-gray-700 block mb-2">Filter by Course/Domain:</label>
-            <select
-              value={filterCourse}
-              onChange={(e) => setFilterCourse(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E]"
-            >
-              <option value="all">All Domains</option>
-              {courses.map(course => (
-                <option key={course.id} value={course.id}>
-                  {course.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Certificates List */}
-      {filteredCerts.length === 0 ? (
+      {certificates.length === 0 ? (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <p className="text-gray-500 text-lg">No certificates found.</p>
+          <p className="text-gray-400 text-sm mt-2">Certificates will appear here once they are issued.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {filteredCerts.map(cert => (
-            <div
-              key={cert.id}
-              className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-xl font-bold text-gray-800">
-                      {cert.users?.full_name || 'Unknown Student'}
-                    </h3>
-                    <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                      Issued
-                    </span>
-                    {(!cert.users?.full_name || !cert.users?.email || !cert.courses?.title) && (
-                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                        Incomplete Data
-                      </span>
-                    )}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <span className="font-semibold text-blue-800">{certificates.length}</span> certificate{certificates.length !== 1 ? 's' : ''} issued for your managed course{courses.length !== 1 ? 's' : ''}
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {certificates.map(cert => {
+              const isCourseNotFound = !cert.courses || cert.courses.title === 'Course Not Found'
+              const isUserNotFound = !cert.users || cert.users.full_name === 'User Not Found'
+              
+              return (
+                <div
+                  key={cert.id}
+                  className={`bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow ${
+                    isCourseNotFound || isUserNotFound ? 'border-2 border-orange-200' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-xl font-bold text-gray-800">
+                          {cert.users?.full_name || 'Unknown Student'}
+                        </h3>
+                        <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                          Issued
+                        </span>
+                        {(isCourseNotFound || isUserNotFound) && (
+                          <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full flex items-center space-x-1">
+                            <span>⚠️</span>
+                            <span>Data Issue</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-gray-600">
+                          <span className="font-medium">Course:</span>{' '}
+                          <span className={isCourseNotFound ? 'text-orange-600 font-semibold' : ''}>
+                            {cert.courses?.title || 'Course Not Found'}
+                          </span>
+                        </p>
+                        {isCourseNotFound && (
+                          <p className="text-xs text-orange-600">
+                            ⚠️ Course ID: {cert.course_id} may have been deleted or doesn't exist
+                          </p>
+                        )}
+                        <p className="text-gray-600">
+                          <span className="font-medium">Email:</span> {cert.users?.email || 'Email Not Available'}
+                        </p>
+                        <p className="text-gray-600">
+                          <span className="font-medium">Certificate #:</span> {cert.certificate_number}
+                        </p>
+                        <p className="text-gray-600">
+                          <span className="font-medium">Domain:</span> {cert.domain || cert.courses?.domain || 'Web Development'}
+                        </p>
+                        <p className="text-gray-500 text-sm mt-2">
+                          Issued: {new Date(cert.issued_at).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <a
+                        href={cert.certificate_url || `/certificate/${cert.certificate_number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Download Certificate"
+                      >
+                        <FiDownload className="text-xl" />
+                      </a>
+                      <button
+                        onClick={() => handleRevoke(cert.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Revoke Certificate"
+                      >
+                        <FiTrash2 className="text-xl" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-gray-600">
-                    <span className="font-medium">Course:</span> {cert.courses?.title || 'Course Not Found'}
-                  </p>
-                  <p className="text-gray-600">
-                    <span className="font-medium">Email:</span> {cert.users?.email || 'Email Not Available'}
-                  </p>
-                  <p className="text-gray-600">
-                    <span className="font-medium">Certificate #:</span> {cert.certificate_number}
-                  </p>
-                  <p className="text-gray-600">
-                    <span className="font-medium">Domain:</span> {cert.domain || 'Web Development'}
-                  </p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    Issued: {new Date(cert.issued_at).toLocaleDateString()}
-                  </p>
                 </div>
-                <div className="flex space-x-2">
-                  <a
-                    href={cert.certificate_url || `/certificate/${cert.certificate_number}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Download Certificate"
-                  >
-                    <FiDownload className="text-xl" />
-                  </a>
-                  <button
-                    onClick={() => handleRevoke(cert.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Revoke Certificate"
-                  >
-                    <FiTrash2 className="text-xl" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

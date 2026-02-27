@@ -28,7 +28,13 @@ export const supabase = createClient(
 export const supabaseAdmin = supabaseServiceKey 
   ? createClient(
       supabaseUrl || 'https://placeholder.supabase.co',
-      supabaseServiceKey
+      supabaseServiceKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
   : supabase // Fallback to regular client if service key missing
 

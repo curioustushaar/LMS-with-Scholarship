@@ -16,12 +16,57 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority')
     const assigned_to = searchParams.get('assigned_to')
 
-    console.log('📥 Fetching tickets with filters:', { status, priority, assigned_to })
+    console.log('📥 Fetching tickets with filters:', { status, priority, assigned_to, role: authResult.role })
+
+    // For admins, filter by students from assigned courses
+    let allowedStudentIds: string[] = []
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+      
+      console.log(`📚 Admin has ${courseIds.length} assigned courses`)
+
+      if (courseIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          message: 'No courses assigned to you yet'
+        })
+      }
+
+      // Get students enrolled in these courses
+      const { data: enrollments } = await supabaseAdmin
+        .from('enrollments')
+        .select('user_id')
+        .in('course_id', courseIds)
+
+      allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+      
+      console.log(`👥 Admin can see tickets from ${allowedStudentIds.length} students`)
+
+      if (allowedStudentIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0
+        })
+      }
+    }
 
     let query = supabaseAdmin
       .from('tickets')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // Filter by admin's allowed students
+    if (authResult.role === 'admin' && allowedStudentIds.length > 0) {
+      query = query.in('user_id', allowedStudentIds)
+    }
 
     if (status) {
       query = query.eq('status', status)

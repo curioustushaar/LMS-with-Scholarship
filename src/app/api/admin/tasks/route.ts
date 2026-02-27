@@ -36,6 +36,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // If admin (not superadmin), verify access to this course
+    if (authResult.role === 'admin') {
+      const { data: assignment } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+        .eq('course_id', course_id)
+        .single()
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: 'Access denied. You can only create tasks for your assigned courses.', success: false },
+          { status: 403 }
+        )
+      }
+    }
+
     // Validate week_id if provided (must be valid UUID format, not "week-1" strings)
     const validWeekId = week_id && typeof week_id === 'string' && week_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? week_id : null
 
@@ -125,12 +142,39 @@ export async function GET(request: NextRequest) {
     const course_id = searchParams.get('course_id')
     const domain = searchParams.get('domain')
 
-    console.log('📥 Fetching tasks with filters:', { status, course_id, domain })
+    console.log('📥 Fetching tasks with filters:', { status, course_id, domain, role: authResult.role })
+
+    // For admins, filter by assigned courses
+    let allowedCourseIds: string[] = []
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      allowedCourseIds = assignments?.map(a => a.course_id) || []
+      
+      console.log(`📚 Admin has ${allowedCourseIds.length} assigned courses`)
+
+      if (allowedCourseIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          message: 'No courses assigned to you yet'
+        })
+      }
+    }
 
     let query = supabaseAdmin
       .from('tasks')
       .select('*, courses(title, domain)')
       .order('created_at', { ascending: false })
+
+    // Filter by admin's assigned courses
+    if (authResult.role === 'admin' && allowedCourseIds.length > 0) {
+      query = query.in('course_id', allowedCourseIds)
+    }
 
     if (status) {
       query = query.eq('status', status)

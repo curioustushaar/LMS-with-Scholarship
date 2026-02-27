@@ -13,13 +13,58 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const weekId = searchParams.get('week_id')
 
-    console.log('📥 Fetching videos:', { weekId })
+    console.log('📥 Fetching videos:', { weekId, role: authResult.role })
+
+    // For admins, filter by assigned courses
+    let allowedWeekIds: string[] = []
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+      
+      console.log(`📚 Admin has ${courseIds.length} assigned courses`)
+
+      if (courseIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0,
+          message: 'No courses assigned to you yet'
+        })
+      }
+
+      // Get weeks for these courses
+      const { data: weeks } = await supabaseAdmin
+        .from('weeks')
+        .select('id')
+        .in('course_id', courseIds)
+
+      allowedWeekIds = weeks?.map(w => w.id) || []
+      
+      console.log(`📝 Admin can access ${allowedWeekIds.length} weeks`)
+
+      if (allowedWeekIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0
+        })
+      }
+    }
 
     // Use supabaseAdmin to bypass RLS
     let query = supabaseAdmin
       .from('videos')
       .select('*')
       .order('order_index', { ascending: true })
+
+    // Filter by admin's allowed weeks
+    if (authResult.role === 'admin' && allowedWeekIds.length > 0) {
+      query = query.in('week_id', allowedWeekIds)
+    }
 
     if (weekId) {
       query = query.eq('week_id', weekId)
@@ -78,6 +123,36 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'week_id, title, and video_url are required' },
         { status: 400 }
       )
+    }
+
+    // If admin (not superadmin), verify week belongs to assigned course
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: week } = await supabaseAdmin
+          .from('weeks')
+          .select('course_id')
+          .eq('id', week_id)
+          .single()
+
+        if (!week || !courseIds.includes(week.course_id)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied. You can only add videos to weeks in your assigned courses.' },
+            { status: 403 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'No courses assigned to you' },
+          { status: 403 }
+        )
+      }
     }
 
     const videoData = {

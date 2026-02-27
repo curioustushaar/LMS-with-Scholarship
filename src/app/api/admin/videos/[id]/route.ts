@@ -32,6 +32,31 @@ export async function GET(
       )
     }
 
+    // If admin (not superadmin), verify video's week belongs to assigned course
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: week } = await supabaseAdmin
+          .from('weeks')
+          .select('course_id')
+          .eq('id', data.week_id)
+          .single()
+
+        if (!week || !courseIds.includes(week.course_id)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied to this video' },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
     console.log('✅ Video fetched successfully')
 
     return NextResponse.json({
@@ -65,6 +90,45 @@ export async function PUT(
     const { title, description, video_url, duration_minutes, order_index } = body
 
     console.log('📝 Updating video:', { id, title })
+
+    // First, get the video to check access
+    const { data: existingVideo } = await supabaseAdmin
+      .from('videos')
+      .select('week_id')
+      .eq('id', id)
+      .single()
+
+    if (!existingVideo) {
+      return NextResponse.json(
+        { success: false, error: 'Video not found' },
+        { status: 404 }
+      )
+    }
+
+    // If admin (not superadmin), verify video's week belongs to assigned course
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: week } = await supabaseAdmin
+          .from('weeks')
+          .select('course_id')
+          .eq('id', existingVideo.week_id)
+          .single()
+
+        if (!week || !courseIds.includes(week.course_id)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied. You can only update videos in your assigned courses.' },
+            { status: 403 }
+          )
+        }
+      }
+    }
 
     // Build update object with only provided fields
     const updateData: any = {
@@ -125,7 +189,7 @@ export async function DELETE(
 
     console.log('🗑️ Deleting video:', { id })
 
-    // First, get the video to extract storage path
+    // First, get the video to extract storage path and check access
     const { data: video, error: fetchError } = await supabaseAdmin
       .from('videos')
       .select('*')
@@ -138,6 +202,31 @@ export async function DELETE(
         { success: false, error: 'Video not found', details: fetchError?.message },
         { status: 404 }
       )
+    }
+
+    // If admin (not superadmin), verify video's week belongs to assigned course
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      const courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: week } = await supabaseAdmin
+          .from('weeks')
+          .select('course_id')
+          .eq('id', video.week_id)
+          .single()
+
+        if (!week || !courseIds.includes(week.course_id)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied. You can only delete videos from your assigned courses.' },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     console.log('📹 Video found:', { video_url: video.video_url })

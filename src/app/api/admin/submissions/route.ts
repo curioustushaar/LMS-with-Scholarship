@@ -14,6 +14,50 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const status = searchParams.get('status')
 
+        console.log('📥 Fetching submissions with filters:', { status, role: authResult.role })
+
+        // For admins, filter by tasks they created OR students they manage
+        let allowedTaskIds: string[] = []
+        let allowedStudentIds: string[] = []
+
+        if (authResult.role === 'admin') {
+            // Get tasks created by this admin
+            const { data: tasks } = await supabase
+                .from('tasks')
+                .select('id')
+                .eq('created_by', authResult.id)
+
+            allowedTaskIds = tasks?.map(t => t.id) || []
+
+            // Get students from assigned courses
+            const { data: assignments } = await supabase
+                .from('admin_course_assignments')
+                .select('course_id')
+                .eq('admin_id', authResult.id)
+
+            const courseIds = assignments?.map(a => a.course_id) || []
+
+            if (courseIds.length > 0) {
+                const { data: enrollments } = await supabase
+                    .from('enrollments')
+                    .select('user_id')
+                    .in('course_id', courseIds)
+
+                allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+            }
+
+            console.log(`🔍 Admin can see submissions: ${allowedTaskIds.length} tasks, ${allowedStudentIds.length} students`)
+
+            // If no tasks or students, return empty
+            if (allowedTaskIds.length === 0 && allowedStudentIds.length === 0) {
+                return NextResponse.json({
+                    success: true,
+                    data: [],
+                    count: 0
+                })
+            }
+        }
+
         let query = supabase
             .from('task_submissions')
             .select(`
@@ -36,6 +80,17 @@ export async function GET(request: NextRequest) {
         tasks(id, title, max_points)
       `)
             .order('submitted_at', { ascending: false })
+
+        // Filter by admin's tasks OR students
+        if (authResult.role === 'admin') {
+            if (allowedTaskIds.length > 0 && allowedStudentIds.length > 0) {
+                query = query.or(`task_id.in.(${allowedTaskIds.join(',')}),user_id.in.(${allowedStudentIds.join(',')})`)
+            } else if (allowedTaskIds.length > 0) {
+                query = query.in('task_id', allowedTaskIds)
+            } else if (allowedStudentIds.length > 0) {
+                query = query.in('user_id', allowedStudentIds)
+            }
+        }
 
         if (status && status !== 'all') {
             query = query.eq('status', status)

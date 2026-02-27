@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -14,7 +14,39 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
 
+    // Get admin's assigned courses and student IDs
+    let allowedStudentIds: string[] = []
+    let courseIds: string[] = []
+    
+    if (authResult.role === 'admin') {
+      const { data: assignments } = await supabaseAdmin
+        .from('admin_course_assignments')
+        .select('course_id')
+        .eq('admin_id', authResult.id)
+
+      courseIds = assignments?.map(a => a.course_id) || []
+
+      if (courseIds.length > 0) {
+        const { data: enrollments } = await supabaseAdmin
+          .from('enrollments')
+          .select('user_id')
+          .in('course_id', courseIds)
+
+        allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
+      }
+    }
+
     if (userId) {
+      // For admins, verify access to this student
+      if (authResult.role === 'admin') {
+        if (allowedStudentIds.length === 0 || !allowedStudentIds.includes(userId)) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied' },
+            { status: 403 }
+          )
+        }
+      }
+
       // Get specific student progress
       const [
         videoProgress,
@@ -23,27 +55,27 @@ export async function GET(request: NextRequest) {
         badges,
         certificates
       ] = await Promise.all([
-        supabase
+        supabaseAdmin
           .from('video_progress')
           .select('*, videos(title, duration_minutes)')
           .eq('user_id', userId),
 
-        supabase
+        supabaseAdmin
           .from('task_submissions')
           .select('*, tasks(title, max_points)')
           .eq('user_id', userId),
 
-        supabase
+        supabaseAdmin
           .from('projects')
           .select('*')
           .eq('user_id', userId),
 
-        supabase
+        supabaseAdmin
           .from('user_badges')
           .select('*, badges(*)')
           .eq('user_id', userId),
 
-        supabase
+        supabaseAdmin
           .from('certificates')
           .select('*, courses(title)')
           .eq('user_id', userId)
@@ -94,25 +126,40 @@ export async function GET(request: NextRequest) {
 
     } else {
       // Get all students progress summary from profiles
-      const { data: students } = await supabase
+      // For admins, only show students from their assigned courses
+      let studentsQuery = supabaseAdmin
         .from('profiles')
         .select('id, full_name, email')
+        .eq('role', 'student')
+
+      if (authResult.role === 'admin') {
+        if (allowedStudentIds.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            count: 0
+          })
+        }
+        studentsQuery = studentsQuery.in('id', allowedStudentIds)
+      }
+
+      const { data: students } = await studentsQuery
 
       const progressData = []
 
       for (const student of students || []) {
         const [tasks, projects, certificates] = await Promise.all([
-          supabase
+          supabaseAdmin
             .from('task_submissions')
             .select('status, points_awarded')
             .eq('user_id', student.id),
 
-          supabase
+          supabaseAdmin
             .from('projects')
             .select('status')
             .eq('user_id', student.id),
 
-          supabase
+          supabaseAdmin
             .from('certificates')
             .select('id')
             .eq('user_id', student.id)
