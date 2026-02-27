@@ -16,7 +16,7 @@ interface Certificate {
   certificate_url?: string
   domain?: string
   users?: { id: string; full_name: string; email: string }
-  courses?: { id: string; title: string; description?: string }
+  courses?: { id: string; title: string; description?: string; domain?: string }
   status?: string
 }
 
