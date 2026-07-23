@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -19,7 +19,7 @@ export async function GET(
     const status = searchParams.get('status')
 
     // First check if task exists
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await supabaseAdmin
       .from('tasks')
       .select('id, title')
       .eq('id', id)
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     // Get all submissions for this task
-    let query = supabase
+    let query = supabaseAdmin
       .from('task_submissions')
       .select('*')
       .eq('task_id', id)

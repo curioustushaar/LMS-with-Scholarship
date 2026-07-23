@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         courses(id, title, domain),
-        task_submissions!left(id, status, points_awarded, feedback, submitted_at, evaluated_at, user_id)
+        task_submissions!left(id, status, points_awarded, feedback, submitted_at, evaluated_at:reviewed_at, user_id)
       `)
       .eq('status', status)
       .in('course_id', enrolledCourseIds)

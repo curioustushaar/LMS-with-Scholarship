@@ -95,6 +95,21 @@ export default function CourseDetailPage() {
     }
   }
 
+  const handleToggleWeekLock = async (weekId: string, currentLocked: boolean) => {
+    try {
+      const targetState = !currentLocked
+      const result = await api.weeks.lock(weekId, targetState)
+      if (result.success) {
+        alert(`Week ${targetState ? 'locked' : 'unlocked'} successfully!`)
+        loadCourseData()
+      } else {
+        alert('Failed to update week lock status: ' + result.error)
+      }
+    } catch (error: any) {
+      alert('Error updating week lock status: ' + error.message)
+    }
+  }
+
   const loadCourseData = async () => {
     try {
       const result = await api.courses.getById(courseId)
@@ -237,6 +252,7 @@ export default function CourseDetailPage() {
               onOpenVideoModal={handleOpenVideoModal}
               onOpenAddWeekModal={handleOpenAddWeekModal}
               onDeleteWeek={handleDeleteWeek}
+              onToggleWeekLock={handleToggleWeekLock}
             />
           )}
           {activeTab === 'students' && <StudentsTab courseId={courseId} />}
@@ -300,7 +316,7 @@ function CourseInfoTab({ course }: any) {
   )
 }
 
-function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal, onDeleteWeek }: any) {
+function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal, onDeleteWeek, onToggleWeekLock }: any) {
   const [expandedWeekId, setExpandedWeekId] = useState<string | null>(null)
   const [weekVideos, setWeekVideos] = useState<{ [key: string]: Video[] }>({})
   const [loadingVideos, setLoadingVideos] = useState<{ [key: string]: boolean }>({})
@@ -400,6 +416,7 @@ function WeeksTab({ weeks, courseId, onOpenVideoModal, onOpenAddWeekModal, onDel
 
                 <div className="flex flex-wrap items-center gap-2">
                   <button
+                    onClick={() => onToggleWeekLock(week.id, week.locked)}
                     className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all ${week.locked
                       ? 'bg-green-500 text-white hover:bg-green-600'
                       : 'bg-red-500 text-white hover:bg-red-600'

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 import { checkAndAwardTaskBadges } from '@/lib/badges'
 
@@ -36,7 +36,7 @@ export async function PATCH(
     }
 
     // Check if submission exists
-    const { data: submission, error: fetchError } = await supabase
+    const { data: submission, error: fetchError } = await supabaseAdmin
       .from('task_submissions')
       .select('*, tasks(max_points)')
       .eq('id', id)
@@ -66,13 +66,13 @@ export async function PATCH(
       reviewed_by: authResult.id
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('task_submissions')
       .update(updateData)
       .eq('id', id)
       .select(`
         *,
-        users!task_submissions_user_id_fkey(id, full_name, email),
+        users:profiles!task_submissions_user_id_fkey(id, full_name, email),
         tasks(title, max_points)
       `)
       .single()
