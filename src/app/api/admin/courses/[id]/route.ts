@@ -18,7 +18,7 @@ export async function GET(
 
     console.log('📥 Fetching course:', { courseId: id })
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('courses')
       .select('*')
       .eq('id', id)
@@ -79,9 +79,24 @@ export async function PUT(
 
     console.log('📝 Updating course:', { courseId: id, updates: body })
 
+    // Normalize level and status if present to prevent constraint violations
+    const updates: any = { ...body }
+    if (updates.level) {
+      updates.level = updates.level.toLowerCase()
+    }
+    if (updates.status) {
+      if (typeof updates.status === 'string') {
+        updates.status = updates.status.toLowerCase()
+      } else if (updates.status === true) {
+        updates.status = 'active'
+      } else if (updates.status === false) {
+        updates.status = 'draft'
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('courses')
-      .update(body)
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

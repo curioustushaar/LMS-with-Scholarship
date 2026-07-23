@@ -1,29 +1,20 @@
 // Migration script to add created_by_admin_id column
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
 
 async function runMigration() {
   try {
-    // Read environment variables from .env file
-    const envContent = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
-    const envLines = envContent.split('\n');
-    const env = {};
-    
-    envLines.forEach(line => {
-      const match = line.match(/^([^#=]+)=(.+)$/);
-      if (match) {
-        const key = match[1].trim();
-        const value = match[2].trim();
-        env[key] = value;
-      }
-    });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Import Supabase
-    const { createClient } = require('@supabase/supabase-js');
-    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Missing Supabase credentials in .env file');
+      process.exit(1);
+    }
+
     const supabase = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY,
+      supabaseUrl,
+      supabaseServiceKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -51,8 +42,15 @@ async function runMigration() {
       console.error('❌ Migration failed:', error.message);
       console.log('\n📝 Please run this SQL manually in Supabase SQL Editor:');
       console.log('--------------------------------------------------');
-      const sqlContent = fs.readFileSync(path.join(__dirname, 'add-created-by-admin-column.sql'), 'utf8');
-      console.log(sqlContent);
+      console.log(`
+        -- Add created_by_admin_id column to profiles table
+        ALTER TABLE profiles 
+        ADD COLUMN IF NOT EXISTS created_by_admin_id UUID REFERENCES profiles(id);
+
+        -- Add index for better query performance
+        CREATE INDEX IF NOT EXISTS idx_profiles_created_by_admin 
+        ON profiles(created_by_admin_id);
+      `);
       console.log('--------------------------------------------------');
       process.exit(1);
     }
@@ -64,8 +62,15 @@ async function runMigration() {
     console.error('💥 Error:', error.message);
     console.log('\n📝 Please run this SQL manually in Supabase SQL Editor:');
     console.log('--------------------------------------------------');
-    const sqlContent = fs.readFileSync(path.join(__dirname, 'add-created-by-admin-column.sql'), 'utf8');
-    console.log(sqlContent);
+    console.log(`
+      -- Add created_by_admin_id column to profiles table
+      ALTER TABLE profiles 
+      ADD COLUMN IF NOT EXISTS created_by_admin_id UUID REFERENCES profiles(id);
+
+      -- Add index for better query performance
+      CREATE INDEX IF NOT EXISTS idx_profiles_created_by_admin 
+      ON profiles(created_by_admin_id);
+    `);
     console.log('--------------------------------------------------');
     process.exit(1);
   }

@@ -17,6 +17,7 @@ interface Badge {
   rule_value: number
   rule_duration?: number
   created_at: string
+  earned_count?: number
 }
 
 export default function BadgesPage() {
@@ -49,11 +50,13 @@ export default function BadgesPage() {
       if (result.success && result.data) {
         const badgesData = Array.isArray(result.data) ? result.data : []
         setBadges(badgesData)
+        
+        const backendStats = (result as any).stats
         setStats({
-          total: badgesData.length,
-          earned: 124, // Demo data
-          mostPopular: badgesData.length > 0 ? badgesData[0].name : '-',
-          avgPerStudent: 2.4
+          total: backendStats?.total ?? badgesData.length,
+          earned: backendStats?.earned ?? 0,
+          mostPopular: backendStats?.mostPopular ?? (badgesData.length > 0 ? badgesData[0].name : '-'),
+          avgPerStudent: backendStats?.avgPerStudent ?? 0
         })
       }
     } catch (error) {
@@ -264,7 +267,7 @@ export default function BadgesPage() {
                       <div className="flex items-center space-x-2 text-gray-400">
                         <FiAward className="text-lg" />
                         <div>
-                          <p className="text-xs font-bold text-gray-800">42</p>
+                          <p className="text-xs font-bold text-gray-800">{badge.earned_count ?? 0}</p>
                           <p className="text-[9px] uppercase font-bold tracking-tighter">Earned</p>
                         </div>
                       </div>

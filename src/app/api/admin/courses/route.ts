@@ -40,8 +40,12 @@ export async function POST(request: NextRequest) {
       description: description ? description.trim() : null,
       thumbnail_url: thumbnail_url || null,
       duration_weeks: duration_weeks || null,
-      level: level || 'beginner',
-      status: body.status || 'draft',
+      level: level ? level.toLowerCase() : 'beginner',
+      status: typeof body.status === 'string'
+        ? body.status.toLowerCase()
+        : body.status === true
+          ? 'active'
+          : 'draft',
       created_by: authResult.id
     }
 

@@ -165,7 +165,7 @@ export async function PUT(
       course_id,
       domain: courseData?.domain || null,
       max_points: max_points || 100,
-      status: status || 'active',
+      status: status ? status.toLowerCase() : 'active',
     }
 
     console.log('🔄 Updating task in database:', updateData)

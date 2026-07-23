@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       rule_duration: rule_duration ? parseInt(rule_duration) : null
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('badges')
       .insert(badgeData)
       .select()
@@ -60,29 +60,72 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/admin/badges
- * Get all badges
+ * Get all badges and calculate system stats
  */
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request)
   if (authResult instanceof Response) return authResult
 
   try {
-    const { data, error } = await supabase
+    // 1. Fetch all badges
+    const { data: badges, error: badgesError } = await supabaseAdmin
       .from('badges')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) {
+    if (badgesError) {
       return NextResponse.json(
-        { error: 'Failed to fetch badges', details: error.message },
+        { error: 'Failed to fetch badges', details: badgesError.message },
         { status: 500 }
       )
     }
 
+    // 2. Fetch user_badges to calculate statistics
+    const { data: userBadges, error: ubError } = await supabaseAdmin
+      .from('user_badges')
+      .select('badge_id')
+
+    // 3. Fetch count of active students
+    const { count: studentCount, error: studentError } = await supabaseAdmin
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'student')
+
+    const totalEarned = userBadges?.length || 0
+    const totalStudents = studentCount || 0
+    const avgPerStudent = totalStudents > 0 ? parseFloat((totalEarned / totalStudents).toFixed(1)) : 0
+
+    // 4. Compute badge counts and find the most popular badge
+    const badgeCounts: Record<string, number> = {}
+    let mostPopularId = null
+    let maxCount = 0
+    if (userBadges) {
+      for (const ub of userBadges) {
+        badgeCounts[ub.badge_id] = (badgeCounts[ub.badge_id] || 0) + 1
+        if (badgeCounts[ub.badge_id] > maxCount) {
+          maxCount = badgeCounts[ub.badge_id]
+          mostPopularId = ub.badge_id
+        }
+      }
+    }
+    const mostPopular = badges.find(b => b.id === mostPopularId)?.name || '-'
+
+    // 5. Map earned counts directly onto the badge data objects
+    const badgesWithCount = badges.map(badge => ({
+      ...badge,
+      earned_count: badgeCounts[badge.id] || 0
+    }))
+
     return NextResponse.json({
       success: true,
-      data,
-      count: data?.length || 0
+      data: badgesWithCount,
+      count: badges.length,
+      stats: {
+        total: badges.length,
+        earned: totalEarned,
+        mostPopular,
+        avgPerStudent
+      }
     })
 
   } catch (error: any) {
@@ -92,3 +135,4 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -27,7 +27,7 @@ export async function PATCH(
         if (rule_value !== undefined) updateData.rule_value = parseInt(rule_value)
         if (rule_duration !== undefined) updateData.rule_duration = rule_duration ? parseInt(rule_duration) : null
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('badges')
             .update(updateData)
             .eq('id', id)
@@ -69,7 +69,7 @@ export async function DELETE(
     try {
         const id = params.id
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('badges')
             .delete()
             .eq('id', id)

@@ -64,7 +64,7 @@ export async function checkAndAwardTaskBadges(userId: string, taskId: string) {
           .select('id')
           .eq('user_id', userId)
           .eq('badge_id', rule.id)
-          .single()
+          .maybeSingle()
 
         if (!existingBadge) {
           // Award the badge!
