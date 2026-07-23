@@ -56,17 +56,15 @@ export async function PATCH(
       }
     }
 
-    // Note: You'll need to add a 'locked' column to weeks table
-    // For now, we'll use a metadata approach or add it to the table
     const updateData = {
-      // locked: locked, // Add this column to weeks table first
+      locked: locked,
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('weeks')
       .update(updateData)
       .eq('id', id)
-      .select('id, course_id, week_number, title, description, created_at, updated_at')
+      .select('id, course_id, week_number, title, description, locked, created_at, updated_at')
       .single()
 
     if (error) {

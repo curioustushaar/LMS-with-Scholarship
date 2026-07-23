@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
         if (authResult.role === 'admin') {
             // Get tasks created by this admin
-            const { data: tasks } = await supabase
+            const { data: tasks } = await supabaseAdmin
                 .from('tasks')
                 .select('id')
                 .eq('created_by', authResult.id)
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
             allowedTaskIds = tasks?.map(t => t.id) || []
 
             // Get students from assigned courses
-            const { data: assignments } = await supabase
+            const { data: assignments } = await supabaseAdmin
                 .from('admin_course_assignments')
                 .select('course_id')
                 .eq('admin_id', authResult.id)
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
             const courseIds = assignments?.map(a => a.course_id) || []
 
             if (courseIds.length > 0) {
-                const { data: enrollments } = await supabase
+                const { data: enrollments } = await supabaseAdmin
                     .from('enrollments')
                     .select('user_id')
                     .in('course_id', courseIds)
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        let query = supabase
+        let query = supabaseAdmin
             .from('task_submissions')
             .select(`
         id,
@@ -66,17 +66,12 @@ export async function GET(request: NextRequest) {
         user_id,
         submission_url,
         submission_text,
-        github_url,
-        deploy_url,
-        project_name,
-        submission_file_url,
-        submission_description,
         status,
         submitted_at,
         points_awarded,
         feedback,
-        evaluated_at,
-        users!task_submissions_user_id_fkey(id, full_name, email),
+        evaluated_at:reviewed_at,
+        users:profiles!task_submissions_user_id_fkey(id, full_name, email),
         tasks(id, title, max_points)
       `)
             .order('submitted_at', { ascending: false })
