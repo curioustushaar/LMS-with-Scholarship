@@ -9,6 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        aagaj: {
+          pink: '#FF2D8D',
+          purple: '#9C27FF',
+          border: '#F2F2F2',
+          text: '#111827',
+          subtext: '#6B7280',
+          bgLight: '#FAF9FF',
+        },
         // Brand colors using CSS variables
         brand: {
           primary: 'var(--brand-primary)',
@@ -102,6 +110,19 @@ const config: Config = {
         'medium': 'var(--border-medium)',
         'dark': 'var(--border-dark)',
         'brand': 'var(--border-brand)',
+      },
+      fontFamily: {
+        sans: ['var(--font-inter)', 'sans-serif'],
+        heading: ['var(--font-plus-jakarta)', 'sans-serif'],
+      },
+      animation: {
+        marquee: 'marquee var(--marquee-duration, 30s) linear infinite',
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
       },
     },
   },
