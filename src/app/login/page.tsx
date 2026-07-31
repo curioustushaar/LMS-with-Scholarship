@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
@@ -93,29 +94,98 @@ export default function LoginPage() {
       <div className="max-w-6xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="grid md:grid-cols-2 gap-0">
           {/* Left Side - Branding */}
-          <div className="bg-gradient-to-br from-[#C81E4E] to-[#D91E5B] p-8 md:p-12 flex flex-col justify-center items-center text-white">
-            <div className="text-center mb-6 md:mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold mb-3 tracking-wider">LMS ADMIN</h1>
-              <p className="text-base md:text-lg opacity-90">LEARNING MANAGEMENT MADE SIMPLE</p>
+          <div className="bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF] p-8 md:p-12 flex flex-col justify-center items-center text-white relative">
+            {/* Top Backlighting bubble */}
+            <div className="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-white/5 blur-xl pointer-events-none" />
+            <div className="absolute -bottom-12 -right-12 w-48 h-48 rounded-full bg-black/10 blur-xl pointer-events-none" />
+
+            <div className="text-center mb-4 relative z-10">
+              <h1 className="text-2xl md:text-3xl font-heading font-extrabold mb-1 tracking-wider uppercase">
+                AAGAJ INFOTECH
+              </h1>
+              <p className="text-xs md:text-sm font-semibold tracking-wide text-pink-100 uppercase">
+                Next-Gen Education Ecosystem
+              </p>
             </div>
             
-            <div className="relative w-48 h-48 md:w-64 md:h-64 mb-6 md:mb-8">
-              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm rounded-full border-4 border-white/30 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-5xl md:text-6xl mb-4">🎓</div>
-                  <p className="text-sm font-medium">Admin Portal</p>
-                </div>
-              </div>
+            {/* Animated school boy illustration */}
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative w-48 h-48 md:w-56 md:h-56 mb-4 flex items-center justify-center z-10"
+            >
+              <svg className="w-full h-full" viewBox="0 0 200 200" fill="none">
+                {/* Background dashed orbit circle */}
+                <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeDasharray="6 4" />
+                <motion.circle 
+                  cx="100" 
+                  cy="100" 
+                  r="80" 
+                  fill="none" 
+                  stroke="rgba(255,255,255,0.3)" 
+                  strokeWidth="2.5" 
+                  strokeDasharray="20 180" 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                />
+                
+                {/* Backpack (backlayer) */}
+                <rect x="65" y="85" width="70" height="75" rx="20" fill="#9C27FF" />
+                <rect x="75" y="75" width="50" height="15" rx="7" fill="#FF2D8D" />
+                
+                {/* Straps */}
+                <path d="M 75 85 C 75 110, 85 130, 95 130" stroke="#FF2D8D" strokeWidth="6" strokeLinecap="round" />
+                <path d="M 125 85 C 125 110, 115 130, 105 130" stroke="#FF2D8D" strokeWidth="6" strokeLinecap="round" />
+
+                {/* Body/Shoulders */}
+                <path d="M 60 160 C 60 130, 140 130, 140 160 Z" fill="#F3F4F6" />
+                <path d="M 85 130 L 100 145 L 115 130 Z" fill="#E5E7EB" />
+
+                {/* Head */}
+                <circle cx="100" cy="90" r="30" fill="#FBCFE8" />
+
+                {/* Hair */}
+                <path d="M 70 90 C 70 55, 130 55, 130 90 C 122 75, 78 75, 70 90 Z" fill="#1F2937" />
+                
+                {/* Cap/Hair tuft */}
+                <path d="M 90 60 Q 100 50 110 60 Z" fill="#1F2937" />
+
+                {/* Face Features (Smiling boy) */}
+                <circle cx="90" cy="90" r="2.5" fill="#1F2937" />
+                <circle cx="110" cy="90" r="2.5" fill="#1F2937" />
+                <path d="M 92 102 Q 100 110 108 102" stroke="#1F2937" strokeWidth="3" strokeLinecap="round" fill="none" />
+                
+                {/* Cheek Blush */}
+                <circle cx="82" cy="96" r="3.5" fill="#F472B6" fillOpacity="0.8" />
+                <circle cx="118" cy="96" r="3.5" fill="#F472B6" fillOpacity="0.8" />
+
+                {/* Cute Floating shapes */}
+                <motion.path 
+                  d="M165,65 L173,65 L169,57 Z" 
+                  fill="#FF2D8D" 
+                  animate={{ rotate: 360, y: [0, -5, 0] }} 
+                  transition={{ duration: 4, repeat: Infinity }}
+                />
+                <motion.circle 
+                  cx="35" 
+                  cy="110" 
+                  r="4" 
+                  fill="#9C27FF" 
+                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                />
+              </svg>
+            </motion.div>
+
+            <div className="text-center space-y-2 relative z-10 max-w-xs">
+              <p className="text-xs text-white/90 leading-relaxed">
+                Manage academic courses, track real-time progress statistics, issue certifications, and schedule student internship workflows efficiently.
+              </p>
             </div>
 
-            <div className="text-center space-y-3">
-              <p className="text-sm opacity-90">Manage all your LMS operations efficiently</p>
-              <p className="text-sm opacity-90">Focus on growing your education platform with ease</p>
-            </div>
-
-            <div className="mt-8 flex items-center space-x-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium">Secure Login</span>
+            <div className="mt-6 flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-4 py-1.5 rounded-full relative z-10">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span className="text-xs font-semibold uppercase tracking-wider">Secure Access</span>
             </div>
           </div>
 
@@ -128,7 +198,7 @@ export default function LoginPage() {
               </div>
 
               {/* Admin Login Only */}
-              <div className="mb-6 md:mb-8 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-lg p-3">
+              <div className="mb-6 md:mb-8 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] rounded-xl p-3 shadow-md shadow-[#FF2D8D]/10">
                 <p className="text-white font-semibold text-sm text-center">🔐 Admin Access Only</p>
               </div>
 
@@ -153,7 +223,7 @@ export default function LoginPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF2D8D] focus:border-transparent"
                       placeholder="admin@lms.com"
                       required
                     />
@@ -173,7 +243,7 @@ export default function LoginPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF2D8D] focus:border-transparent"
                       placeholder="••••••••"
                       required
                     />
@@ -183,9 +253,9 @@ export default function LoginPage() {
                       className="absolute inset-y-0 right-0 pr-4 flex items-center"
                     >
                       {showPassword ? (
-                        <FiEyeOff className="text-gray-400 text-xl hover:text-[#C81E4E]" />
+                        <FiEyeOff className="text-gray-400 text-xl hover:text-[#FF2D8D]" />
                       ) : (
-                        <FiEye className="text-gray-400 text-xl hover:text-[#C81E4E]" />
+                        <FiEye className="text-gray-400 text-xl hover:text-[#FF2D8D]" />
                       )}
                     </button>
                   </div>
@@ -198,11 +268,11 @@ export default function LoginPage() {
                       type="checkbox"
                       checked={formData.rememberMe}
                       onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-                      className="w-4 h-4 text-[#C81E4E] border-gray-300 rounded focus:ring-[#C81E4E]"
+                      className="w-4 h-4 text-[#FF2D8D] border-gray-300 rounded focus:ring-[#FF2D8D]"
                     />
                     <span className="ml-2 text-gray-700 text-sm">Remember me</span>
                   </label>
-                  <a href="#" className="text-[#C81E4E] hover:text-[#D91E5B] text-sm font-medium">
+                  <a href="#" className="text-[#FF2D8D] hover:text-[#9C27FF] text-sm font-medium">
                     Forgot password?
                   </a>
                 </div>
@@ -211,7 +281,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-bold py-3 px-6 rounded-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-bold py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-[#FF2D8D]/15 transform hover:scale-[1.01] transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                   {!loading && <span className="ml-2">→</span>}
@@ -222,7 +292,7 @@ export default function LoginPage() {
                 <p className="text-sm text-gray-600">Protected by enterprise-grade security</p>
                 <a 
                   href="/superadmin/login" 
-                  className="text-xs text-gray-400 hover:text-purple-600 transition-colors inline-block"
+                  className="text-xs text-gray-400 hover:text-[#FF2D8D] transition-colors inline-block"
                 >
                   Superadmin Access →
                 </a>
