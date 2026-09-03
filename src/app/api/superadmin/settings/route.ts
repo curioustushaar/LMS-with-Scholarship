@@ -1,42 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
+import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 
 /**
  * GET /api/superadmin/settings
  * Get superadmin profile
  */
 export async function GET(request: NextRequest) {
+  const { authorized, userId } = await verifySuperadminAccess(request)
+  if (!authorized || !userId) {
+    return NextResponse.json({ success: false, error: 'Unauthorized superadmin access' }, { status: 401 })
+  }
+
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 })
-    }
-
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+      .eq('id', userId)
+      .single()
 
-    if (error) {
-      console.error('❌ Error fetching profile:', error.message)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-    }
-
-    if (data?.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
+    if (error || !data) {
+      return NextResponse.json({ success: false, error: 'Profile not found' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (err: any) {
-    console.error('💥 Unexpected error GET /superadmin/settings:', err)
+    console.error('Unexpected error GET /superadmin/settings:', err)
     return NextResponse.json({ success: false, error: err.message || 'Internal error' }, { status: 500 })
   }
 }
@@ -46,30 +35,12 @@ export async function GET(request: NextRequest) {
  * Update superadmin profile
  */
 export async function PATCH(request: NextRequest) {
+  const { authorized, userId } = await verifySuperadminAccess(request)
+  if (!authorized || !userId) {
+    return NextResponse.json({ success: false, error: 'Unauthorized superadmin access' }, { status: 401 })
+  }
+
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Verify superadmin
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
-    }
-
     const body = await request.json()
 
     // Validate input data
@@ -111,7 +82,6 @@ export async function PATCH(request: NextRequest) {
       }
     }
     
-    // If there are validation errors, return them
     if (errors.length > 0) {
       return NextResponse.json({ 
         success: false, 
@@ -129,7 +99,7 @@ export async function PATCH(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .update(allowed)
-      .eq('id', user.id)
+      .eq('id', userId)
       .select()
       .single()
 
@@ -139,7 +109,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (err: any) {
-    console.error('💥 Unexpected error PATCH /superadmin/settings:', err)
+    console.error('Unexpected error PATCH /superadmin/settings:', err)
     return NextResponse.json({ success: false, error: err.message || 'Internal error' }, { status: 500 })
   }
 }

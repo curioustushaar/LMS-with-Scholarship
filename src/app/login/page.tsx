@@ -83,7 +83,11 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('❌ Login error:', err)
-      setError(err.message || 'Login failed. Please check your credentials.')
+      if (err.message === 'Failed to fetch' || err?.name === 'TypeError' || err.message?.includes('fetch')) {
+        setError('Connection Error: Cannot reach Supabase server. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file.')
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.')
+      }
     } finally {
       setLoading(false)
     }
@@ -290,12 +294,21 @@ export default function LoginPage() {
 
               <div className="mt-8 text-center space-y-2">
                 <p className="text-sm text-gray-600">Protected by enterprise-grade security</p>
-                <a 
-                  href="/superadmin/login" 
-                  className="text-xs text-gray-400 hover:text-[#FF2D8D] transition-colors inline-block"
-                >
-                  Superadmin Access →
-                </a>
+                <div className="flex justify-center gap-4 text-xs text-gray-400">
+                  <a 
+                    href="/school-portal/login" 
+                    className="hover:text-emerald-600 font-semibold transition-colors"
+                  >
+                    School Partner Portal →
+                  </a>
+                  <span>•</span>
+                  <a 
+                    href="/superadmin/login" 
+                    className="hover:text-[#FF2D8D] transition-colors"
+                  >
+                    Superadmin Access →
+                  </a>
+                </div>
               </div>
             </div>
           </div>

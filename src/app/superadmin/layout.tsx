@@ -24,17 +24,15 @@ export default function SuperadminLayout({ children }: { children: ReactNode }) 
 
     const checkSuperadmin = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-        if (!session) {
-          console.warn('No session found, redirecting to superadmin login')
+        if (sessionError || !session) {
+          console.warn('No active session found, redirecting to superadmin login')
           router.push('/superadmin/login')
           return
         }
 
-        console.log('Superadmin layout: Checking role for user:', session.user.id)
-
-        // Verify superadmin role from database using regular client (RLS policies allow reading own profile)
+        // Verify superadmin role from database
         const { data: userData, error } = await supabase
           .from('profiles')
           .select('role, account_status')
@@ -49,11 +47,11 @@ export default function SuperadminLayout({ children }: { children: ReactNode }) 
 
         if (!userData || userData.role !== 'superadmin') {
           console.warn('Unauthorized access to superadmin portal. Role:', userData?.role)
+          await supabase.auth.signOut()
           router.push('/superadmin/login')
           return
         }
 
-        console.log('✅ Superadmin verified successfully')
         setIsLoading(false)
       } catch (err) {
         console.error('Exception in checkSuperadmin:', err)

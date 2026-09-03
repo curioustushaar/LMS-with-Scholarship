@@ -13,6 +13,17 @@ import {
   FiX,
   FiShield,
   FiBookOpen,
+  FiLayout,
+  FiFileText,
+  FiBriefcase,
+  FiDollarSign,
+  FiUsers,
+  FiMapPin,
+  FiTarget,
+  FiMail,
+  FiMenu,
+  FiUserPlus,
+  FiAward,
 } from 'react-icons/fi'
 
 interface SuperadminSidebarProps {
@@ -25,13 +36,41 @@ interface MenuItem {
   icon: any
   path: string
   subItems?: MenuItem[]
+  dividerBefore?: boolean
+  sectionLabel?: string
 }
 
 const menuItems: MenuItem[] = [
+  // ── Overview ──
   { name: 'Dashboard', icon: FiHome, path: '/superadmin' },
   { name: 'Manage Admins', icon: FiUserCheck, path: '/superadmin/admins' },
-  { name: 'Courses', icon: FiBookOpen, path: '/superadmin/courses' },
   { name: 'Analytics', icon: FiBarChart2, path: '/superadmin/analytics' },
+
+  // ── Website & Content ──
+  { name: 'Website CMS', icon: FiLayout, path: '/superadmin/website', dividerBefore: true, sectionLabel: 'Website & Content' },
+  { name: 'Navbar Control', icon: FiMenu, path: '/superadmin/navbar' },
+
+  // ── Modules Management ──
+  { name: 'Courses', icon: FiBookOpen, path: '/superadmin/courses', dividerBefore: true, sectionLabel: 'Modules' },
+  { name: 'Admissions', icon: FiUserPlus, path: '/superadmin/admissions' },
+  { name: 'Internships', icon: FiBriefcase, path: '/superadmin/internships' },
+  { name: 'Scholarships', icon: FiAward, path: '/superadmin/scholarships' },
+  {
+    name: 'School Tie-up',
+    icon: FiMapPin,
+    path: '/superadmin/schools',
+    subItems: [
+      { name: 'All Schools', icon: FiMapPin, path: '/superadmin/schools' },
+      { name: 'Incentives & Payouts', icon: FiDollarSign, path: '/superadmin/schools/incentives' },
+      { name: 'Tie-up Analytics', icon: FiBarChart2, path: '/superadmin/schools/analytics' },
+    ],
+  },
+  { name: 'Employers', icon: FiUsers, path: '/superadmin/employers' },
+  { name: 'Website Partners', icon: FiMapPin, path: '/superadmin/school-partners' },
+  { name: 'Training', icon: FiTarget, path: '/superadmin/training' },
+
+  // ── Platform Management ──
+  { name: 'Contact Messages', icon: FiMail, path: '/superadmin/contact-messages', dividerBefore: true, sectionLabel: 'Platform' },
   { name: 'Settings', icon: FiSettings, path: '/superadmin/settings' },
 ]
 
@@ -96,17 +135,28 @@ export default function SuperadminSidebar({ isOpen, onClose }: SuperadminSidebar
 
         {/* Navigation Menu */}
         <nav className="flex-1 overflow-y-auto py-4">
-          <ul className="space-y-1 px-3">
+          <ul className="space-y-0.5 px-3">
             {menuItems.map((item) => (
               <li key={item.name}>
+                {/* Section Divider & Label */}
+                {item.dividerBefore && (
+                  <div className="pt-4 pb-2 mt-2 border-t border-gray-700/50">
+                    {item.sectionLabel && (
+                      <span className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        {item.sectionLabel}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {item.subItems ? (
                   <>
                     <button
                       onClick={() => toggleExpand(item.name)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700/50 hover:text-white transition-all"
+                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-gray-300 hover:bg-gray-700/50 hover:text-white transition-all"
                     >
                       <div className="flex items-center space-x-3">
-                        <item.icon className="text-xl" />
+                        <item.icon className="text-lg" />
                         <span className="text-sm font-medium">{item.name}</span>
                       </div>
                       {expandedItems.includes(item.name) ? (
@@ -139,13 +189,13 @@ export default function SuperadminSidebar({ isOpen, onClose }: SuperadminSidebar
                   <Link
                     href={item.path}
                     onClick={onClose}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                    className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all ${
                       isActive(item.path)
                         ? 'bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white font-medium shadow-lg'
                         : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
                     }`}
                   >
-                    <item.icon className="text-xl" />
+                    <item.icon className="text-lg" />
                     <span className="text-sm font-medium">{item.name}</span>
                   </Link>
                 )}

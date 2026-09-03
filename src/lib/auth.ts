@@ -6,8 +6,9 @@ export interface AuthUser {
   id: string
   email: string
   full_name: string
-  role: 'admin' | 'student' | 'superadmin'
+  role: 'admin' | 'student' | 'superadmin' | 'school'
   account_status?: string
+  school_id?: string
 }
 
 /**

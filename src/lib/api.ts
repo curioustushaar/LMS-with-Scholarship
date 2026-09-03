@@ -39,26 +39,23 @@ async function apiRequest<T = any>(
 ): Promise<ApiResponse<T>> {
   try {
     // Get auth token from Supabase session
-    let token = null
+    let token: string | null = null
 
     if (typeof window !== 'undefined') {
-      // Try to get from Supabase session first
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.access_token) {
-        token = session.access_token
-        console.log('✅ Token retrieved from Supabase session')
-      } else {
-        // Fallback to localStorage
-        token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
-        if (token) {
-          console.log('⚠️ Token retrieved from localStorage (fallback)')
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          token = session.access_token
         } else {
-          console.error('❌ No token found in session or localStorage')
+          token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
         }
+      } catch (authErr) {
+        console.warn('⚠️ Supabase session retrieval error:', authErr)
+        token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
       }
     }
 
-    // Validate token before making request
+    // Validate token before making authenticated request
     if (!validateToken(token)) {
       console.warn('⚠️ Invalid or missing authentication token')
       return {

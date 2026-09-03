@@ -2,10 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ArrowRight, Shield, GraduationCap, Briefcase } from 'lucide-react'
 
-const navLinks = [
+interface NavLinkItem {
+  id?: string
+  name: string
+  href: string
+  is_visible?: boolean
+}
+
+const defaultNavLinks: NavLinkItem[] = [
   { name: 'Home', href: '#home' },
   { name: 'About', href: '#about' },
   { name: 'Courses', href: '#courses' },
@@ -19,6 +27,9 @@ const navLinks = [
 ]
 
 export default function Header() {
+  const pathname = usePathname()
+  const isHomePage = pathname === '/'
+  const [navLinks, setNavLinks] = useState<NavLinkItem[]>(defaultNavLinks)
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [activeSection, setActiveSection] = useState('home')
@@ -26,23 +37,53 @@ export default function Header() {
   const [showMobileLoginOpts, setShowMobileLoginOpts] = useState(false)
 
   useEffect(() => {
+    // Fetch dynamic navbar config
+    fetch('/api/public/navbar')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && data.data.length > 0) {
+          const links = data.data
+            .filter((item: any) => item.is_visible)
+            .map((item: any) => {
+              // Convert routes to hash anchors if on home page
+              const hash = item.href === '/' ? '#home' : item.href.startsWith('/') ? `#${item.href.substring(1)}` : item.href
+              return {
+                id: item.id,
+                name: item.name,
+                href: hash,
+              }
+            })
+          setNavLinks(links)
+        }
+      })
+      .catch((err) => console.error('Navbar fetch error:', err))
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20)
 
-      // Simple intersection observer logic for active section indicator
-      const sections = navLinks.map(link => link.href.substring(1))
-      for (const section of sections.reverse()) {
-        const el = document.getElementById(section)
-        if (el && window.scrollY >= el.offsetTop - 120) {
-          setActiveSection(section)
-          break
+      if (isHomePage) {
+        const sections = navLinks.map((link) => link.href.replace(/^#/, ''))
+        for (const section of sections.reverse()) {
+          const el = document.getElementById(section)
+          if (el && window.scrollY >= el.offsetTop - 140) {
+            setActiveSection(section)
+            break
+          }
         }
       }
     }
 
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [isHomePage])
+
+  const getLinkHref = (linkHref: string) => {
+    if (isHomePage) {
+      return linkHref.startsWith('#') ? linkHref : `#${linkHref.replace(/^\//, '')}`
+    }
+    // If on a subpage, navigate to root with anchor or dedicated route
+    return linkHref.startsWith('#') ? `/${linkHref}` : linkHref
+  }
 
   return (
     <>
@@ -51,9 +92,9 @@ export default function Header() {
         animate={{ y: 0 }}
         transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled 
-            ? 'bg-white/80 backdrop-blur-md border-b border-[#F2F2F2]/80 py-3 shadow-sm' 
-            : 'bg-transparent py-5 border-b border-transparent'
+          isScrolled
+            ? 'bg-white/85 backdrop-blur-md border-b border-[#F2F2F2]/80 py-3 shadow-sm'
+            : 'bg-white/40 backdrop-blur-sm py-4 border-b border-transparent'
         }`}
       >
         <div className="w-full px-4 sm:px-8 lg:px-12">
@@ -76,14 +117,16 @@ export default function Header() {
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden xl:flex items-center gap-1">
+            <nav className="hidden xl:flex items-center gap-0.5">
               {navLinks.map((link) => {
-                const isActive = activeSection === link.href.substring(1)
+                const sectionId = link.href.replace(/^#/, '').replace(/^\//, '')
+                const isActive = isHomePage && activeSection === sectionId
+
                 return (
                   <Link
                     key={link.name}
-                    href={link.href}
-                    className="relative px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200"
+                    href={getLinkHref(link.href)}
+                    className="relative px-2.5 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors duration-200"
                   >
                     {link.name}
                     {isActive && (
@@ -100,7 +143,7 @@ export default function Header() {
 
             {/* Desktop CTAs */}
             <div className="hidden lg:flex items-center gap-3 relative">
-              <Link href="#courses">
+              <Link href={getLinkHref('#courses')}>
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -127,7 +170,6 @@ export default function Header() {
                 <AnimatePresence>
                   {showLoginDropdown && (
                     <>
-                      {/* Transparent backdrop overlay */}
                       <div className="fixed inset-0 z-40 bg-transparent cursor-default" onClick={() => setShowLoginDropdown(false)} />
                       
                       <motion.div
@@ -146,8 +188,8 @@ export default function Header() {
                             <Shield size={16} />
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 group-hover:text-[#FF2D8D] transition-colors leading-tight">Login as a Admin</span>
-                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">LMS admin control dashboard</span>
+                            <span className="text-xs font-bold text-gray-800 group-hover:text-[#FF2D8D] transition-colors leading-tight">Login as an Admin</span>
+                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Teacher & staff dashboard</span>
                           </div>
                         </Link>
 
@@ -161,21 +203,35 @@ export default function Header() {
                           </div>
                           <div className="flex flex-col min-w-0">
                             <span className="text-xs font-bold text-gray-800 group-hover:text-[#9C27FF] transition-colors leading-tight">Login as a Student</span>
-                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Syllabus, courses & assignments</span>
+                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Courses, tasks & certificates</span>
                           </div>
                         </Link>
 
                         <Link 
-                          href="/login" 
+                          href="/school-portal/login" 
                           onClick={() => setShowLoginDropdown(false)}
-                          className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-blue-50 transition-colors group text-left"
+                          className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-emerald-50 transition-colors group text-left"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                             <Briefcase size={16} />
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors leading-tight">Login as a Employee</span>
-                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Recruiting & partner portals</span>
+                            <span className="text-xs font-bold text-gray-800 group-hover:text-emerald-700 transition-colors leading-tight">School Partner Portal</span>
+                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Enroll students & view results</span>
+                          </div>
+                        </Link>
+
+                        <Link 
+                          href="/superadmin/login" 
+                          onClick={() => setShowLoginDropdown(false)}
+                          className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-red-50 transition-colors group text-left"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-red-50 text-[#C81E4E] flex items-center justify-center shrink-0">
+                            <Shield size={16} />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-gray-800 group-hover:text-[#C81E4E] transition-colors leading-tight">Super Admin Panel</span>
+                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Full platform & CMS control</span>
                           </div>
                         </Link>
                       </motion.div>
@@ -204,7 +260,6 @@ export default function Header() {
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -212,15 +267,13 @@ export default function Header() {
               onClick={() => setIsOpen(false)}
               className="fixed inset-0 z-40 bg-gray-900/20 backdrop-blur-sm xl:hidden"
             />
-            {/* Drawer */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-sm bg-white shadow-2xl border-l border-gray-100 flex flex-col xl:hidden"
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl border-l border-gray-100 flex flex-col xl:hidden"
             >
-              {/* Header inside drawer */}
               <div className="p-6 flex justify-between items-center border-b border-gray-50">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF]">
@@ -236,94 +289,32 @@ export default function Header() {
                 </button>
               </div>
 
-              {/* Navigation links inside drawer */}
-              <div className="flex-1 overflow-y-auto py-6 px-6 space-y-2">
+              <div className="flex-1 overflow-y-auto py-6 px-6 space-y-1">
                 {navLinks.map((link) => (
                   <Link
                     key={link.name}
-                    href={link.href}
+                    href={getLinkHref(link.href)}
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gradient-to-r hover:from-[#FF2D8D]/5 hover:to-[#9C27FF]/5 hover:text-[#FF2D8D] transition-all"
+                    className="flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-pink-50/50 hover:text-[#FF2D8D] transition-all"
                   >
                     {link.name}
                   </Link>
                 ))}
               </div>
 
-              {/* Bottom Buttons inside drawer */}
               <div className="p-6 border-t border-gray-50 space-y-3">
-                <Link href="#courses" onClick={() => setIsOpen(false)} className="block w-full">
+                <Link href={getLinkHref('#courses')} onClick={() => setIsOpen(false)} className="block w-full">
                   <button className="w-full py-3 border border-[#FF2D8D]/30 hover:border-[#FF2D8D]/80 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 transition-all flex items-center justify-center gap-2">
                     Explore Platform
                   </button>
                 </Link>
                 
-                <div className="w-full">
-                  <button 
-                    onClick={() => setShowMobileLoginOpts(!showMobileLoginOpts)}
-                    className="w-full py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    Login
-                    <motion.span animate={{ rotate: showMobileLoginOpts ? 90 : 0 }}>
-                      <ArrowRight size={15} />
-                    </motion.span>
+                <Link href="/login" onClick={() => setIsOpen(false)} className="block w-full">
+                  <button className="w-full py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    Login to LMS
+                    <ArrowRight size={15} />
                   </button>
-                  
-                  {/* Mobile Accordion */}
-                  <AnimatePresence>
-                    {showMobileLoginOpts && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden flex flex-col gap-2 pt-2"
-                      >
-                        <Link 
-                          href="/login" 
-                          onClick={() => { setIsOpen(false); setShowMobileLoginOpts(false); }}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-[#FF2D8D]/5 text-left transition-colors"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-pink-50 text-[#FF2D8D] flex items-center justify-center shrink-0">
-                            <Shield size={14} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 leading-tight">Login as a Admin</span>
-                            <span className="text-[9px] text-gray-400 mt-0.5 leading-none">LMS admin control dashboard</span>
-                          </div>
-                        </Link>
-                        
-                        <Link 
-                          href="/login" 
-                          onClick={() => { setIsOpen(false); setShowMobileLoginOpts(false); }}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-[#9C27FF]/5 text-left transition-colors"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-purple-50 text-[#9C27FF] flex items-center justify-center shrink-0">
-                            <GraduationCap size={14} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 leading-tight">Login as a Student</span>
-                            <span className="text-[9px] text-gray-400 mt-0.5 leading-none">Syllabus, courses & assignments</span>
-                          </div>
-                        </Link>
-                        
-                        <Link 
-                          href="/login" 
-                          onClick={() => { setIsOpen(false); setShowMobileLoginOpts(false); }}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-blue-50 text-left transition-colors"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <Briefcase size={14} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 leading-tight">Login as a Employee</span>
-                            <span className="text-[9px] text-gray-400 mt-0.5 leading-none">Recruiting & partner portals</span>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                </Link>
               </div>
             </motion.div>
           </>

@@ -11,29 +11,32 @@ import { supabase, supabaseAdmin } from '@/lib/supabase'
 // Verify if user is superadmin
 async function verifySuperadmin(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  
+
   if (!token) {
     return { error: 'Unauthorized', status: 401 }
   }
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  
-  if (authError || !user) {
-    return { error: 'Invalid token', status: 401 }
+  try {
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (authError || !user) {
+      return { error: 'Invalid or expired token', status: 401 }
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || profile?.role !== 'superadmin') {
+      return { error: 'Access denied. Superadmin privileges required.', status: 403 }
+    }
+
+    return { user, profile }
+  } catch (err: any) {
+    return { error: err.message || 'Authentication error', status: 500 }
   }
-
-  // Check if user is superadmin
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profileError || profile?.role !== 'superadmin') {
-    return { error: 'Access denied. Superadmin only.', status: 403 }
-  }
-
-  return { user, profile }
 }
 
 /**

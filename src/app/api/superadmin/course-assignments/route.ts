@@ -17,23 +17,27 @@ async function verifySuperadmin(req: NextRequest) {
     return { error: 'Unauthorized', status: 401 }
   }
 
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-  
-  if (authError || !user) {
-    return { error: 'Invalid token', status: 401 }
+  try {
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (authError || !user) {
+      return { error: 'Invalid or expired token', status: 401 }
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role !== 'superadmin') {
+      return { error: 'Access denied. Superadmin privileges required.', status: 403 }
+    }
+
+    return { user, profile }
+  } catch (err: any) {
+    return { error: err.message || 'Authentication error', status: 500 }
   }
-
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'superadmin') {
-    return { error: 'Access denied. Superadmin only.', status: 403 }
-  }
-
-  return { user, profile }
 }
 
 /**

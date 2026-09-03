@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -27,6 +28,30 @@ const floatAnimation = (delay: number) => ({
 })
 
 export default function Hero() {
+  const [heroContent, setHeroContent] = useState({
+    badge_text: '#1 Intelligent LMS Platform',
+    heading_line1: 'Empowering Education.',
+    heading_line2: 'Elevating Careers.',
+    heading_line3: 'Transforming Futures.',
+    description:
+      'AAGAJ INFOTECH LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
+    cta_primary_text: 'Explore Courses',
+    cta_primary_link: '#courses',
+    cta_secondary_text: 'Apply Admission',
+    cta_secondary_link: '#admissions',
+    social_proof_text: 'Trusted by 1000+ Students across 25+ Institutions',
+  })
+
+  useEffect(() => {
+    fetch('/api/public/site-content?section=home_hero')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && Object.keys(data.data).length > 0) {
+          setHeroContent((prev) => ({ ...prev, ...data.data }))
+        }
+      })
+      .catch((err) => console.error(err))
+  }, [])
   return (
     <section id="home" className="relative pt-32 pb-24 md:pt-40 md:pb-32 overflow-hidden bg-white">
       {/* Background Soft Glow Blobs */}
@@ -101,7 +126,7 @@ export default function Hero() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D8D]/8 border border-[#FF2D8D]/10 text-xs font-semibold text-[#FF2D8D] tracking-wide"
             >
               <Zap size={12} className="fill-[#FF2D8D]" />
-              #1 Intelligent LMS Platform
+              {heroContent.badge_text || '#1 Intelligent LMS Platform'}
             </motion.div>
 
             {/* Main Heading */}
@@ -111,9 +136,9 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-4xl sm:text-5xl lg:text-[44px] xl:text-[52px] font-heading font-extrabold text-gray-900 tracking-tight leading-[1.1]"
             >
-              Empowering <span className="text-[#FF2D8D]">Education.</span><br />
-              Elevating <span className="text-[#9C27FF]">Careers.</span><br />
-              Transforming <span className="text-gradient">Futures.</span>
+              {heroContent.heading_line1 || 'Empowering Education.'}<br />
+              <span className="text-[#FF2D8D]">{heroContent.heading_line2 || 'Elevating Careers.'}</span><br />
+              <span className="text-gradient">{heroContent.heading_line3 || 'Transforming Futures.'}</span>
             </motion.h1>
 
             {/* Description */}
@@ -123,7 +148,7 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-sm sm:text-base text-gray-500 max-w-xl font-normal leading-relaxed"
             >
-              AAGAJ INFOTECH LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.
+              {heroContent.description}
             </motion.p>
 
             {/* CTA Buttons */}
@@ -133,23 +158,23 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-wrap gap-4 w-full sm:w-auto"
             >
-              <Link href="#courses" className="w-full sm:w-auto">
+              <Link href={heroContent.cta_primary_link || '#courses'} className="w-full sm:w-auto">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-semibold text-sm rounded-full shadow-md shadow-[#FF2D8D]/15 hover:shadow-lg hover:shadow-[#FF2D8D]/25 transition-all flex items-center justify-center gap-2"
                 >
-                  Explore Courses
+                  {heroContent.cta_primary_text || 'Explore Courses'}
                   <ArrowRight size={16} />
                 </motion.button>
               </Link>
-              <Link href="#admissions" className="w-full sm:w-auto">
+              <Link href={heroContent.cta_secondary_link || '#admissions'} className="w-full sm:w-auto">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full sm:w-auto px-6 py-3 border border-[#FF2D8D]/30 hover:border-[#FF2D8D] text-[#FF2D8D] font-semibold text-sm rounded-full bg-white/40 hover:bg-[#FF2D8D]/5 transition-all flex items-center justify-center gap-2"
                 >
-                  Apply Admission
+                  {heroContent.cta_secondary_text || 'Apply Admission'}
                   <ArrowRight size={16} />
                 </motion.button>
               </Link>
