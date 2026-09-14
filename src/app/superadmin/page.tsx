@@ -133,24 +133,24 @@ export default function SuperadminDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-lg shadow-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Superadmin Dashboard</h1>
-        <p className="text-white/90">Complete system overview and admin management</p>
+      <div className="bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-xl shadow-lg p-4 sm:p-6 text-white">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Superadmin Dashboard</h1>
+        <p className="text-white/90 text-xs sm:text-sm">Complete system overview and admin management</p>
       </div>
 
       {/* Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6">
         {stats.map((stat) => {
           const StatIcon = stat.icon
           const content = (
-            <div className={`bg-white rounded-lg shadow-md p-6 border-l-4 border-transparent hover:border-[#C81E4E] transition-all ${stat.link ? 'cursor-pointer hover:shadow-lg' : ''}`}>
+            <div className={`bg-white rounded-xl shadow-sm hover:shadow-md p-4 sm:p-6 border-l-4 border-transparent hover:border-[#C81E4E] transition-all ${stat.link ? 'cursor-pointer' : ''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
                 </div>
-                <div className={`p-4 rounded-lg bg-gradient-to-br ${stat.color}`}>
-                  <StatIcon className="text-2xl text-white" />
+                <div className={`p-3 sm:p-4 rounded-xl bg-gradient-to-br ${stat.color}`}>
+                  <StatIcon className="text-xl sm:text-2xl text-white" />
                 </div>
               </div>
             </div>
@@ -167,12 +167,12 @@ export default function SuperadminDashboard() {
       </div>
 
       {/* Top Performing Admins */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Top Performing Admins</h2>
+      <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Top Performing Admins</h2>
           <Link
             href="/superadmin/admins"
-            className="text-sm text-[#C81E4E] hover:text-[#D91E5B] font-medium"
+            className="text-xs sm:text-sm text-[#C81E4E] hover:text-[#D91E5B] font-medium"
           >
             View All →
           </Link>
@@ -248,39 +248,39 @@ export default function SuperadminDashboard() {
       </div>
 
       {/* Recent Activity Chart */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Recent System Activity (Last 7 Days)</h2>
+      <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Recent System Activity (Last 7 Days)</h2>
         
         <div className="space-y-4">
           {analytics?.recent_activity.slice(0, 7).map((activity) => (
-            <div key={activity.date} className="border-l-4 border-[#C81E4E] pl-4 py-2">
-              <p className="font-semibold text-gray-900 mb-2">
+            <div key={activity.date} className="border-l-4 border-[#C81E4E] pl-3 sm:pl-4 py-2">
+              <p className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
                 {new Date(activity.date).toLocaleDateString('en-US', { 
                   weekday: 'short', 
                   month: 'short', 
                   day: 'numeric' 
                 })}
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                <div className="bg-green-50 px-3 py-2 rounded">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 text-xs sm:text-sm">
+                <div className="bg-green-50 px-2.5 sm:px-3 py-2 rounded-lg">
                   <p className="text-gray-600">Courses</p>
-                  <p className="font-bold text-green-700">{activity.courses_added}</p>
+                  <p className="font-bold text-green-700 text-sm sm:text-base">{activity.courses_added}</p>
                 </div>
-                <div className="bg-blue-50 px-3 py-2 rounded">
+                <div className="bg-blue-50 px-2.5 sm:px-3 py-2 rounded-lg">
                   <p className="text-gray-600">Students</p>
-                  <p className="font-bold text-blue-700">{activity.students_added}</p>
+                  <p className="font-bold text-blue-700 text-sm sm:text-base">{activity.students_added}</p>
                 </div>
-                <div className="bg-purple-50 px-3 py-2 rounded">
+                <div className="bg-purple-50 px-2.5 sm:px-3 py-2 rounded-lg">
                   <p className="text-gray-600">Projects</p>
-                  <p className="font-bold text-purple-700">{activity.projects_evaluated}</p>
+                  <p className="font-bold text-purple-700 text-sm sm:text-base">{activity.projects_evaluated}</p>
                 </div>
-                <div className="bg-yellow-50 px-3 py-2 rounded">
+                <div className="bg-yellow-50 px-2.5 sm:px-3 py-2 rounded-lg">
                   <p className="text-gray-600">Tasks</p>
-                  <p className="font-bold text-yellow-700">{activity.tasks_created}</p>
+                  <p className="font-bold text-yellow-700 text-sm sm:text-base">{activity.tasks_created}</p>
                 </div>
-                <div className="bg-red-50 px-3 py-2 rounded">
+                <div className="bg-red-50 px-2.5 sm:px-3 py-2 rounded-lg col-span-2 sm:col-span-1">
                   <p className="text-gray-600">Tickets</p>
-                  <p className="font-bold text-red-700">{activity.tickets_resolved}</p>
+                  <p className="font-bold text-red-700 text-sm sm:text-base">{activity.tickets_resolved}</p>
                 </div>
               </div>
             </div>

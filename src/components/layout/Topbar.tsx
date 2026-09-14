@@ -70,37 +70,38 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4">
-      <div className="flex items-center justify-between gap-4">
+    <div className="bg-white border-b border-gray-200 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-4">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
         {/* Mobile Menu Button */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+          className="lg:hidden p-1.5 sm:p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+          aria-label="Toggle Navigation Menu"
         >
-          <FiMenu className="text-2xl" />
+          <FiMenu className="text-xl sm:text-2xl" />
         </button>
 
         {/* Search Bar */}
         <div className="flex-1 max-w-2xl">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiSearch className="text-gray-400 text-xl" />
+              <FiSearch className="text-gray-400 text-base sm:text-xl" />
             </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
-              placeholder="Search student, ticket, certificate ID..."
+              className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+              placeholder="Search students, tickets..."
             />
           </div>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center space-x-2 lg:space-x-4">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-4">
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:text-[#C81E4E] hover:bg-gray-100 rounded-lg transition-all">
-            <FiBell className="text-xl lg:text-2xl" />
+          <button className="relative p-1.5 sm:p-2 text-gray-600 hover:text-[#C81E4E] hover:bg-gray-100 rounded-lg transition-all" aria-label="Notifications">
+            <FiBell className="text-lg sm:text-xl lg:text-2xl" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
@@ -108,21 +109,21 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center space-x-2 lg:space-x-3 px-2 lg:px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
+              className="flex items-center space-x-1.5 sm:space-x-2 lg:space-x-3 px-1.5 sm:px-2 lg:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-gray-100 transition-all"
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden flex items-center justify-center shrink-0">
                 {profile?.profile_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-10 h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold">{(profile?.full_name || 'A').charAt(0)}</div>
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-base">{(profile?.full_name || 'A').charAt(0)}</div>
                 )}
               </div>
               <div className="text-left hidden md:block">
                 <p className="text-sm font-semibold text-gray-800">{profile?.full_name || 'Admin User'}</p>
                 <p className="text-xs text-gray-500 capitalize">{profile?.role || 'Admin'}</p>
               </div>
-              <FiChevronDown className="text-gray-600" />
+              <FiChevronDown className="text-gray-600 text-sm sm:text-base" />
             </button>
 
             {showDropdown && (

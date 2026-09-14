@@ -70,12 +70,22 @@ export async function POST(request: Request) {
     const { action } = body
 
     if (action === 'submit_marks') {
-      const { applicant_id, marks, total_marks } = body
+      const { applicant_id, marks, total_marks, merit_status: customStatus, remarks } = body
       if (!applicant_id) return NextResponse.json({ success: false, error: 'Applicant ID required' }, { status: 400 })
 
-      const numMarks = parseFloat(marks)
+      const isAbsent = Boolean(
+        String(marks || '').toUpperCase() === 'ABSENT' ||
+        String(marks || '').toUpperCase() === 'AB'
+      )
+      const numMarks = isAbsent ? 0 : parseFloat(marks)
       const maxMarks = total_marks ? parseFloat(total_marks) : 100
-      const pass = numMarks >= maxMarks * 0.5
+      
+      let computedStatus: 'qualified' | 'waiting' | 'not_qualified' = 'not_qualified'
+      if (customStatus && ['qualified', 'waiting', 'not_qualified'].includes(customStatus)) {
+        computedStatus = customStatus
+      } else if (!isAbsent) {
+        computedStatus = numMarks >= maxMarks * 0.5 ? 'qualified' : 'not_qualified'
+      }
 
       // 1. Fetch current target applicant to get scholarship_id
       const { data: targetApplicant, error: fetchErr } = await supabaseAdmin
@@ -91,15 +101,17 @@ export async function POST(request: Request) {
       const updatedDocs = {
         ...(targetApplicant.documents || {}),
         result_status: targetApplicant.documents?.result_status || 'draft',
+        attendance: isAbsent ? 'ABSENT' : 'PRESENT',
+        examiner_remarks: remarks || targetApplicant.documents?.examiner_remarks || '',
       }
 
       // 2. Update target marks & status
       const { error: updateErr } = await supabaseAdmin
         .from('scholarship_applications')
         .update({
-          exam_marks: numMarks,
+          exam_marks: isAbsent ? 0 : numMarks,
           total_marks: maxMarks,
-          merit_status: pass ? 'qualified' : 'not_qualified',
+          merit_status: computedStatus,
           documents: updatedDocs,
           updated_at: new Date().toISOString(),
         })
@@ -116,16 +128,31 @@ export async function POST(request: Request) {
         .select('*')
         .eq('scholarship_id', targetApplicant.scholarship_id)
         .not('exam_marks', 'is', null)
-        .order('exam_marks', { ascending: false })
 
       if (schemeApplicants && schemeApplicants.length > 0) {
-        const rankUpdates = schemeApplicants.map((app, idx) =>
+        const presentApps = schemeApplicants.filter((a) => a.documents?.attendance !== 'ABSENT')
+        const absentApps = schemeApplicants.filter((a) => a.documents?.attendance === 'ABSENT')
+
+        presentApps.sort((a, b) => {
+          if ((b.exam_marks || 0) !== (a.exam_marks || 0)) {
+            return (b.exam_marks || 0) - (a.exam_marks || 0)
+          }
+          return (b.percentage || 0) - (a.percentage || 0)
+        })
+
+        const rankUpdates = presentApps.map((app, idx) =>
           supabaseAdmin
             .from('scholarship_applications')
             .update({ rank: idx + 1, updated_at: new Date().toISOString() })
             .eq('id', app.id)
         )
-        await Promise.all(rankUpdates)
+        const unrankUpdates = absentApps.map((app) =>
+          supabaseAdmin
+            .from('scholarship_applications')
+            .update({ rank: null, updated_at: new Date().toISOString() })
+            .eq('id', app.id)
+        )
+        await Promise.all([...rankUpdates, ...unrankUpdates])
       }
 
       // 4. Fetch refreshed list
@@ -143,7 +170,357 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: 'Marks updated and merit ranks recomputed successfully!',
+        message: 'Marks and merit status updated successfully!',
+        applicants: normalized,
+      })
+    } else if (action === 'apply_cutoff_rules') {
+      const {
+        scheme_id = 'all',
+        mode = 'marks_range',
+        qualified_min = 60,
+        top_qualified_count = 50,
+      } = body
+
+      let query = supabaseAdmin
+        .from('scholarship_applications')
+        .select('*')
+        .not('exam_marks', 'is', null)
+
+      if (scheme_id && scheme_id !== 'all') {
+        query = query.eq('scholarship_id', scheme_id)
+      }
+
+      const { data: targetApps, error: fetchErr } = await query
+
+      if (fetchErr || !targetApps) {
+        return NextResponse.json({ success: false, error: 'Failed to fetch applicants: ' + fetchErr?.message }, { status: 500 })
+      }
+
+      if (targetApps.length === 0) {
+        return NextResponse.json({ success: false, error: 'No scored candidates found in the selected scheme to apply cut-off.' }, { status: 400 })
+      }
+
+      let qualCount = 0
+      let notQualCount = 0
+      let absentCount = 0
+
+      const updates: Array<{ id: string; merit_status: 'qualified' | 'not_qualified'; scholarship_id: string }> = []
+      const affectedSchemeIds = new Set<string>()
+
+      if (mode === 'top_ranks') {
+        // Group by scholarship_id and assign based on rank
+        const groupedByScheme: Record<string, any[]> = {}
+        targetApps.forEach((app) => {
+          if (!groupedByScheme[app.scholarship_id]) groupedByScheme[app.scholarship_id] = []
+          groupedByScheme[app.scholarship_id].push(app)
+        })
+
+        for (const [sId, apps] of Object.entries(groupedByScheme)) {
+          affectedSchemeIds.add(sId)
+          const present = apps.filter((a) => a.documents?.attendance !== 'ABSENT')
+          const absent = apps.filter((a) => a.documents?.attendance === 'ABSENT')
+
+          present.sort((a, b) => (b.exam_marks || 0) - (a.exam_marks || 0))
+
+          present.forEach((app, idx) => {
+            const rankIndex = idx + 1
+            let st: 'qualified' | 'not_qualified' = 'not_qualified'
+            if (rankIndex <= top_qualified_count) {
+              st = 'qualified'
+              qualCount++
+            } else {
+              st = 'not_qualified'
+              notQualCount++
+            }
+            updates.push({ id: app.id, merit_status: st, scholarship_id: sId })
+          })
+
+          absent.forEach((app) => {
+            absentCount++
+            updates.push({ id: app.id, merit_status: 'not_qualified', scholarship_id: sId })
+          })
+        }
+      } else {
+        // Marks range mode: qualified_min (e.g. 60)
+        const qMin = parseFloat(qualified_min)
+
+        targetApps.forEach((app) => {
+          affectedSchemeIds.add(app.scholarship_id)
+          const isAbsent = app.documents?.attendance === 'ABSENT'
+          const marks = app.exam_marks != null ? Number(app.exam_marks) : 0
+
+          let st: 'qualified' | 'not_qualified' = 'not_qualified'
+          if (isAbsent) {
+            absentCount++
+            st = 'not_qualified'
+          } else if (marks >= qMin) {
+            st = 'qualified'
+            qualCount++
+          } else {
+            st = 'not_qualified'
+            notQualCount++
+          }
+          updates.push({ id: app.id, merit_status: st, scholarship_id: app.scholarship_id })
+        })
+      }
+
+      // Batch update in parallel chunks
+      const CHUNK_SIZE = 50
+      for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+        const chunk = updates.slice(i, i + CHUNK_SIZE)
+        await Promise.all(
+          chunk.map((item) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update({ merit_status: item.merit_status, updated_at: new Date().toISOString() })
+              .eq('id', item.id)
+          )
+        )
+      }
+
+      // Recompute ranks
+      for (const schemeId of Array.from(affectedSchemeIds)) {
+        const { data: schemeApps } = await supabaseAdmin
+          .from('scholarship_applications')
+          .select('id, exam_marks, percentage, documents')
+          .eq('scholarship_id', schemeId)
+          .not('exam_marks', 'is', null)
+
+        if (schemeApps && schemeApps.length > 0) {
+          const presentApps = schemeApps.filter((a) => a.documents?.attendance !== 'ABSENT')
+          const absentApps = schemeApps.filter((a) => a.documents?.attendance === 'ABSENT')
+
+          presentApps.sort((a, b) => {
+            if ((b.exam_marks || 0) !== (a.exam_marks || 0)) {
+              return (b.exam_marks || 0) - (a.exam_marks || 0)
+            }
+            return (b.percentage || 0) - (a.percentage || 0)
+          })
+
+          const rankPromises = presentApps.map((app, idx) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update({ rank: idx + 1, updated_at: new Date().toISOString() })
+              .eq('id', app.id)
+          )
+          const unrankPromises = absentApps.map((app) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update({ rank: null, updated_at: new Date().toISOString() })
+              .eq('id', app.id)
+          )
+          await Promise.all([...rankPromises, ...unrankPromises])
+        }
+      }
+
+      // Refreshed response
+      const [allAppsRes, allSchemesRes] = await Promise.all([
+        supabaseAdmin.from('scholarship_applications').select('*').order('created_at', { ascending: false }),
+        supabaseAdmin.from('scholarships').select('*').order('created_at', { ascending: false }),
+      ])
+
+      const schemesMap = (allSchemesRes.data || []).reduce((acc: Record<string, any>, s: any) => {
+        acc[s.id] = s
+        return acc
+      }, {})
+
+      const normalized = (allAppsRes.data || []).map((app) => normalizeApplicant(app, schemesMap))
+
+      return NextResponse.json({
+        success: true,
+        message: `Cut-off rules successfully applied to ${updates.length} candidates: ${qualCount} Qualified, ${notQualCount} Not Qualified.`,
+        summary: {
+          total: updates.length,
+          qualified: qualCount,
+          not_qualified: notQualCount,
+          absent: absentCount,
+        },
+        applicants: normalized,
+      })
+    } else if (action === 'bulk_upload_marks') {
+      const { scholarship_id, total_marks = 100, records = [] } = body
+      if (!Array.isArray(records) || records.length === 0) {
+        return NextResponse.json({ success: false, error: 'No marks records provided.' }, { status: 400 })
+      }
+
+      const defaultMax = Number(total_marks) > 0 ? Number(total_marks) : 100
+
+      // 1. Fetch relevant scholarship applicants to match against
+      let query = supabaseAdmin.from('scholarship_applications').select('*')
+      if (scholarship_id && scholarship_id !== 'all') {
+        query = query.eq('scholarship_id', scholarship_id)
+      }
+      const { data: dbApplicants, error: fetchErr } = await query
+
+      if (fetchErr || !dbApplicants) {
+        return NextResponse.json({ success: false, error: 'Failed to fetch applicants: ' + fetchErr?.message }, { status: 500 })
+      }
+
+      // Build resilient lookup maps
+      const normalizeKey = (val: any) => String(val || '').trim().toLowerCase().replace(/[\s\-_]/g, '')
+      const byId = new Map<string, any>()
+      const byRoll = new Map<string, any>()
+      const byAppNo = new Map<string, any>()
+
+      dbApplicants.forEach((app) => {
+        byId.set(app.id, app)
+        if (app.roll_number) byRoll.set(normalizeKey(app.roll_number), app)
+        if (app.application_no) byAppNo.set(normalizeKey(app.application_no), app)
+      })
+
+      const updates: Array<{ id: string; payload: any; scholarship_id: string }> = []
+      const errors: Array<{ row: number; identifier: string; reason: string }> = []
+      let absentCount = 0
+      const affectedSchemeIds = new Set<string>()
+
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i]
+        const rowNum = i + 1
+        const rawRoll = row.roll_number ? String(row.roll_number).trim() : ''
+        const rawAppNo = row.application_no ? String(row.application_no).trim() : ''
+        const rawId = row.applicant_id ? String(row.applicant_id).trim() : ''
+
+        // Find candidate
+        let matched: any = null
+        if (rawId && byId.has(rawId)) {
+          matched = byId.get(rawId)
+        } else if (rawRoll && byRoll.has(normalizeKey(rawRoll))) {
+          matched = byRoll.get(normalizeKey(rawRoll))
+        } else if (rawAppNo && byAppNo.has(normalizeKey(rawAppNo))) {
+          matched = byAppNo.get(normalizeKey(rawAppNo))
+        }
+
+        const identifier = rawRoll || rawAppNo || rawId || row.applicant_name || `Row ${rowNum}`
+
+        if (!matched) {
+          errors.push({ row: rowNum, identifier, reason: 'Student not found in this scholarship scheme' })
+          continue
+        }
+
+        const isAbsent = Boolean(
+          row.is_absent ||
+          String(row.attendance || '').toUpperCase() === 'ABSENT' ||
+          String(row.marks || '').toUpperCase() === 'ABSENT' ||
+          String(row.marks || '').toUpperCase() === 'AB'
+        )
+
+        let numMarks = 0
+        let isPass = false
+        const maxMarks = row.total_marks ? Number(row.total_marks) : defaultMax
+
+        if (isAbsent) {
+          absentCount++
+          numMarks = 0
+          isPass = false
+        } else {
+          numMarks = parseFloat(row.marks)
+          if (isNaN(numMarks) || numMarks < 0) {
+            errors.push({ row: rowNum, identifier, reason: `Invalid marks value: "${row.marks}". Must be a number >= 0.` })
+            continue
+          }
+          if (numMarks > maxMarks) {
+            errors.push({ row: rowNum, identifier, reason: `Marks (${numMarks}) exceed maximum marks (${maxMarks}).` })
+            continue
+          }
+          isPass = numMarks >= maxMarks * 0.5
+        }
+
+        const updatedDocs = {
+          ...(matched.documents || {}),
+          result_status: 'draft',
+          attendance: isAbsent ? 'ABSENT' : 'PRESENT',
+          evaluated_via: 'BULK_IMPORT',
+          evaluated_at: new Date().toISOString(),
+        }
+
+        updates.push({
+          id: matched.id,
+          scholarship_id: matched.scholarship_id,
+          payload: {
+            exam_marks: isAbsent ? 0 : numMarks,
+            total_marks: maxMarks,
+            merit_status: isAbsent ? 'not_qualified' : (isPass ? 'qualified' : 'not_qualified'),
+            documents: updatedDocs,
+            updated_at: new Date().toISOString(),
+          },
+        })
+
+        affectedSchemeIds.add(matched.scholarship_id)
+      }
+
+      // 2. Batch update matching records in parallel chunks of 50
+      const CHUNK_SIZE = 50
+      for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+        const chunk = updates.slice(i, i + CHUNK_SIZE)
+        await Promise.all(
+          chunk.map((item) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update(item.payload)
+              .eq('id', item.id)
+          )
+        )
+      }
+
+      // 3. Recompute Scheme Ranks for each affected scholarship
+      for (const schemeId of Array.from(affectedSchemeIds)) {
+        const { data: schemeApps } = await supabaseAdmin
+          .from('scholarship_applications')
+          .select('id, exam_marks, percentage, documents')
+          .eq('scholarship_id', schemeId)
+          .not('exam_marks', 'is', null)
+
+        if (schemeApps && schemeApps.length > 0) {
+          // Filter out absent candidates from ranking or put them at the bottom
+          const presentApps = schemeApps.filter((a) => a.documents?.attendance !== 'ABSENT')
+          const absentApps = schemeApps.filter((a) => a.documents?.attendance === 'ABSENT')
+
+          // Sort present candidates by marks DESC, tie-break with percentage DESC
+          presentApps.sort((a, b) => {
+            if ((b.exam_marks || 0) !== (a.exam_marks || 0)) {
+              return (b.exam_marks || 0) - (a.exam_marks || 0)
+            }
+            return (b.percentage || 0) - (a.percentage || 0)
+          })
+
+          const rankPromises = presentApps.map((app, idx) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update({ rank: idx + 1, updated_at: new Date().toISOString() })
+              .eq('id', app.id)
+          )
+
+          const unrankPromises = absentApps.map((app) =>
+            supabaseAdmin
+              .from('scholarship_applications')
+              .update({ rank: null, updated_at: new Date().toISOString() })
+              .eq('id', app.id)
+          )
+
+          await Promise.all([...rankPromises, ...unrankPromises])
+        }
+      }
+
+      // 4. Fetch refreshed list
+      const [allAppsRes, allSchemesRes] = await Promise.all([
+        supabaseAdmin.from('scholarship_applications').select('*').order('created_at', { ascending: false }),
+        supabaseAdmin.from('scholarships').select('*').order('created_at', { ascending: false }),
+      ])
+
+      const schemesMap = (allSchemesRes.data || []).reduce((acc: Record<string, any>, s: any) => {
+        acc[s.id] = s
+        return acc
+      }, {})
+
+      const normalized = (allAppsRes.data || []).map((app) => normalizeApplicant(app, schemesMap))
+
+      return NextResponse.json({
+        success: true,
+        message: `Bulk evaluation completed! Successfully scored ${updates.length} candidates (${absentCount} marked absent), generated ranks instantly.`,
+        processed_count: updates.length,
+        absent_count: absentCount,
+        failed_count: errors.length,
+        errors,
         applicants: normalized,
       })
     } else if (action === 'bulk_release_results') {

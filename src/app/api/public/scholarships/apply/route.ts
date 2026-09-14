@@ -30,11 +30,15 @@ export async function POST(request: Request) {
       dob,
       address,
       state,
+      district,
       city,
       pincode,
+      preference_state,
+      preference_district_1,
+      preference_district_2,
+      exam_city_preference,
       school_college_name,
       passing_year,
-      exam_city_preference,
       photo_url,
       signature_url,
       aadhaar_url,
@@ -99,6 +103,10 @@ export async function POST(request: Request) {
     const regCode = generateRegistrationCode()
     const applicantId = `app-${Date.now()}`
 
+    const selectedPrefState = preference_state || state || 'Bihar'
+    const selectedPrefDist1 = preference_district_1 || district || city || 'Patna'
+    const selectedPrefDist2 = preference_district_2 || 'Gaya'
+
     const newApplicant = {
       id: applicantId,
       application_no: applicationNo,
@@ -117,16 +125,20 @@ export async function POST(request: Request) {
       gender: gender || 'Not Specified',
       dob: dob || '2006-05-15',
       address: address?.trim() || '',
-      state: state?.trim() || '',
-      city: city?.trim() || '',
+      state: state?.trim() || selectedPrefState,
+      district: district?.trim() || selectedPrefDist1,
+      city: city?.trim() || selectedPrefDist1,
       pincode: pincode?.trim() || '',
+      preference_state: selectedPrefState,
+      preference_district_1: selectedPrefDist1,
+      preference_district_2: selectedPrefDist2,
+      exam_city_preference: `${selectedPrefDist1} (Pref 1) / ${selectedPrefDist2} (Pref 2)`,
       school_college_name: inputSchoolName?.trim() || school_college_name?.trim() || '',
       school_name: inputSchoolName?.trim() || school_college_name?.trim() || '',
       school_roll_number: school_roll_no?.trim() || '',
       school_class: school_class?.trim() || qualification || '',
       school_section: school_section?.trim() || '',
       passing_year: passing_year?.trim() || '2026',
-      exam_city_preference: exam_city_preference || 'National Online Center',
       photo_url: photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face',
       signature_url: signature_url || '',
       aadhaar_url: aadhaar_url || '',
@@ -162,20 +174,61 @@ export async function POST(request: Request) {
     }
 
     // 2. Insert into Supabase database
-    const { data: insertedData, error: insertErr } = await supabaseAdmin
+    let insertedData: any = null
+    const { data: firstTry, error: insertErr } = await supabaseAdmin
       .from('scholarship_applications')
       .insert(newApplicant)
       .select()
       .single()
 
     if (insertErr) {
-      console.error('Error inserting scholarship application:', insertErr)
-      return NextResponse.json({ success: false, error: insertErr.message }, { status: 500 })
+      console.warn('Initial insert notice (possible missing column in DB schema):', insertErr.message)
+      
+      // Fallback: If DB schema doesn't have district/preference columns yet, embed them into documents JSONB and retry
+      const safeDocuments = {
+        ...(newApplicant.documents || {}),
+        district: newApplicant.district,
+        state: newApplicant.state,
+        city: newApplicant.city,
+        pincode: newApplicant.pincode,
+        preference_state: newApplicant.preference_state,
+        preference_district_1: newApplicant.preference_district_1,
+        preference_district_2: newApplicant.preference_district_2,
+      }
+
+      const fallbackApplicant: any = { ...newApplicant }
+      delete fallbackApplicant.district
+      delete fallbackApplicant.preference_state
+      delete fallbackApplicant.preference_district_1
+      delete fallbackApplicant.preference_district_2
+      delete fallbackApplicant.assigned_center_id
+      delete fallbackApplicant.assigned_center_code
+      delete fallbackApplicant.assigned_center_name
+      delete fallbackApplicant.assigned_center_address
+      delete fallbackApplicant.assigned_center_landmark
+      delete fallbackApplicant.assigned_center_maps_url
+      delete fallbackApplicant.exam_shift
+      delete fallbackApplicant.reporting_time
+      fallbackApplicant.documents = safeDocuments
+
+      const { data: retryData, error: retryErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .insert(fallbackApplicant)
+        .select()
+        .single()
+
+      if (retryErr) {
+        console.error('Error inserting scholarship application retry:', retryErr)
+        return NextResponse.json({ success: false, error: retryErr.message }, { status: 500 })
+      }
+      insertedData = retryData
+    } else {
+      insertedData = firstTry
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Application confirmed! Your Provisional Admit Card and Registration Code have been generated.',
+      message: 'Application registered successfully! Your District Exam Preferences have been recorded.',
       data: insertedData,
       provisional_admit_card: {
         application_no: insertedData.application_no,
@@ -183,13 +236,16 @@ export async function POST(request: Request) {
         applicant_name: insertedData.applicant_name,
         scholarship_title: insertedData.scholarship_title,
         photo_url: insertedData.photo_url,
+        preference_district_1: selectedPrefDist1,
+        preference_district_2: selectedPrefDist2,
+        preference_state: selectedPrefState,
         exam_mode: targetScheme?.exam_mode || 'online',
         exam_date: targetScheme?.exam_date || '2026-09-20',
         exam_time: targetScheme?.exam_time || '10:00 AM - 12:30 PM',
-        exam_venue: targetScheme?.exam_venue || 'National Proctored Online Platform',
+        exam_venue: 'To be designated across approved centers in your preferred district upon Official Admit Card Release',
         admit_card_release_date: targetScheme?.admit_card_release_date || '2026-09-10',
-        status: 'PROVISIONAL - PENDING SUPERADMIN OFFICIAL RELEASE',
-        note: 'Keep your Registration Code safe. Once approved by Superadmin, use your Registration Code to download the Official Main Hall Ticket.',
+        status: 'PROVISIONAL REGISTRATION ACKNOWLEDGMENT - VENUE ALLOCATION PENDING',
+        note: 'Keep your Registration Code and Application Number safe. Your Official Hall Ticket containing your exact Center Address and Roll Number will be available for download once Superadmin publishes Admit Cards.',
       },
     })
   } catch (error: any) {

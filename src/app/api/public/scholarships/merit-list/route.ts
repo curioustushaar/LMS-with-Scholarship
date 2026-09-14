@@ -48,16 +48,25 @@ export async function GET(request: Request) {
       const scheme = candidate.scholarships
       const docResultStatus = candidate.documents?.result_status
       const isReleased = docResultStatus === 'released' || scheme?.status === 'results_declared'
+      const meritStatus = candidate.merit_status || (candidate.exam_marks != null && candidate.exam_marks >= 60 ? 'qualified' : 'not_qualified')
+      const isQualified = meritStatus === 'qualified'
 
       const prizeDist = scheme?.prize_distribution || {}
-      let defaultAwardAmount = 'Merit Certificate & 50% Fee Waiver'
-      if (candidate.rank === 1) defaultAwardAmount = prizeDist.first_prize || '🥇 1st Prize Winner: ₹50,000 Cash + 100% Fee Waiver'
-      else if (candidate.rank === 2) defaultAwardAmount = prizeDist.second_prize || '🥈 2nd Prize Winner: ₹25,000 Cash + 75% Fee Waiver'
-      else if (candidate.rank === 3) defaultAwardAmount = prizeDist.third_prize || '🥉 3rd Prize Winner: ₹10,000 Cash + 50% Fee Waiver'
+      let defaultAwardAmount: string | null = null
+      let voucherCode: string | null = null
 
-      const voucherCode = candidate.documents?.award_voucher_code || `AAGAJ-SCH-100-${candidate.application_no ? candidate.application_no.slice(-4) : '2026'}`
-      const bankDetails = candidate.documents?.bank_details || null
-      const payoutDetails = candidate.documents?.payout_details || null
+      if (isQualified) {
+        if (candidate.rank === 1) defaultAwardAmount = prizeDist.first_prize || '🥇 1st Prize Winner: ₹50,000 Cash + 100% Fee Waiver'
+        else if (candidate.rank === 2) defaultAwardAmount = prizeDist.second_prize || '🥈 2nd Prize Winner: ₹25,000 Cash + 75% Fee Waiver'
+        else if (candidate.rank === 3) defaultAwardAmount = prizeDist.third_prize || '🥉 3rd Prize Winner: ₹10,000 Cash + 50% Fee Waiver'
+        else defaultAwardAmount = prizeDist.consolation || 'Merit Certificate & 50% Fee Waiver'
+        voucherCode = candidate.documents?.award_voucher_code || `AAGAJ-SCH-100-${candidate.application_no ? candidate.application_no.slice(-4) : '2026'}`
+      } else {
+        defaultAwardAmount = null
+      }
+
+      const bankDetails = isQualified ? (candidate.documents?.bank_details || null) : null
+      const payoutDetails = isQualified ? (candidate.documents?.payout_details || null) : null
 
       return NextResponse.json({
         success: true,
@@ -86,14 +95,14 @@ export async function GET(request: Request) {
           exam_marks: candidate.exam_marks,
           total_marks: candidate.total_marks || 100,
           percentage_score: candidate.exam_marks != null ? `${((candidate.exam_marks / (candidate.total_marks || 100)) * 100).toFixed(1)}%` : 'N/A',
-          rank: candidate.rank,
-          merit_status: candidate.merit_status || 'waiting',
+          rank: isQualified ? candidate.rank : null,
+          merit_status: meritStatus,
           document_status: candidate.document_status || 'pending',
           document_remarks: candidate.documents?.document_remarks || null,
-          award_status: candidate.award_status || 'none',
-          award_type: candidate.award_type || 'both',
-          award_amount: candidate.award_amount || defaultAwardAmount,
-          award_disbursement_ref: candidate.award_disbursement_ref || `AWARD-AAGAJ-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`,
+          award_status: isQualified ? (candidate.award_status || 'awarded') : 'none',
+          award_type: isQualified ? (candidate.award_type || 'both') : 'none',
+          award_amount: isQualified ? (candidate.award_amount || defaultAwardAmount) : defaultAwardAmount,
+          award_disbursement_ref: isQualified ? (candidate.award_disbursement_ref || `AWARD-AAGAJ-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`) : `REF-AAGAJ-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`,
           award_voucher_code: voucherCode,
           bank_details: bankDetails,
           payout_details: payoutDetails,

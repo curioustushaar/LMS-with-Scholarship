@@ -93,12 +93,12 @@ export default function Header() {
         transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
-            ? 'bg-white/85 backdrop-blur-md border-b border-[#F2F2F2]/80 py-3 shadow-sm'
-            : 'bg-white/40 backdrop-blur-sm py-4 border-b border-transparent'
+            ? 'bg-white/95 backdrop-blur-md border-b border-[#F2F2F2]/80 py-2 shadow-sm'
+            : 'bg-white/70 backdrop-blur-md py-2.5 border-b border-transparent'
         }`}
       >
         <div className="w-full px-4 sm:px-8 lg:px-12">
-          <div className="flex justify-between items-center h-14">
+          <div className="flex justify-between items-center h-12">
             
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">

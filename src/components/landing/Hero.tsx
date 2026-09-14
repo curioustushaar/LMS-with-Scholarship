@@ -53,7 +53,7 @@ export default function Hero() {
       .catch((err) => console.error(err))
   }, [])
   return (
-    <section id="home" className="relative pt-32 pb-24 md:pt-40 md:pb-32 overflow-hidden bg-white">
+    <section id="home" className="relative pt-20 pb-12 sm:pt-24 sm:pb-16 lg:pt-24 lg:pb-20 overflow-hidden bg-white">
       {/* Background Soft Glow Blobs */}
       <div className="absolute top-1/4 -left-36 w-96 h-96 rounded-full bg-[#FF2D8D]/5 blur-[120px] pointer-events-none" />
       <div className="absolute top-10 right-0 w-[500px] h-[500px] rounded-full bg-[#9C27FF]/5 blur-[150px] pointer-events-none" />
@@ -76,10 +76,10 @@ export default function Hero() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
           
           {/* Left Column: Text Content */}
-          <div className="lg:col-span-5 flex flex-col items-start space-y-6 relative">
+          <div className="lg:col-span-5 flex flex-col items-start space-y-4 sm:space-y-5 lg:space-y-6 relative">
             
             {/* 3D Animated Background behind the Left text / Badge */}
             <div className="absolute -left-16 -top-20 w-80 h-80 pointer-events-none select-none overflow-visible hidden sm:block opacity-65 z-0">
@@ -134,7 +134,7 @@ export default function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-4xl sm:text-5xl lg:text-[44px] xl:text-[52px] font-heading font-extrabold text-gray-900 tracking-tight leading-[1.1]"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-[42px] xl:text-[50px] font-heading font-extrabold text-gray-900 tracking-tight leading-[1.12]"
             >
               {heroContent.heading_line1 || 'Empowering Education.'}<br />
               <span className="text-[#FF2D8D]">{heroContent.heading_line2 || 'Elevating Careers.'}</span><br />
@@ -363,25 +363,25 @@ export default function Hero() {
             {/* FLOATING CARD 1: Scholarship Available (Top Right) */}
             <motion.div
               animate={floatAnimation(0.2)}
-              className="absolute -top-6 -right-2 sm:right-6 z-20 max-w-[170px] bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2.5"
+              className="absolute -top-4 right-0 sm:right-4 z-20 max-w-[150px] sm:max-w-[170px] bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
             >
-              <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0 shadow-sm border border-amber-100">
-                <Trophy size={16} className="fill-amber-500" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0 shadow-sm border border-amber-100">
+                <Trophy size={15} className="fill-amber-500" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-gray-900 leading-tight truncate">Scholarship Available</span>
-                <span className="text-[9px] text-[#FF2D8D] font-semibold mt-0.5">3 schemes eligible</span>
+                <span className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight truncate">Scholarship Available</span>
+                <span className="text-[8px] sm:text-[9px] text-[#FF2D8D] font-semibold mt-0.5">3 schemes eligible</span>
               </div>
             </motion.div>
 
             {/* FLOATING CARD 2: Internship Opportunity (Right side) */}
             <motion.div
               animate={floatAnimation(1.2)}
-              className="absolute top-1/4 -right-10 sm:-right-6 z-20 max-w-[160px] bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex flex-col gap-2"
+              className="absolute top-1/3 -right-2 sm:-right-4 z-20 max-w-[150px] bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 hidden sm:flex flex-col gap-1.5"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
-                  <Briefcase size={14} />
+                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                  <Briefcase size={13} />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[10px] font-bold text-gray-900 truncate">Frontend Developer</span>
@@ -396,9 +396,9 @@ export default function Hero() {
             {/* FLOATING CARD 3: Top Performer (Bottom Left) */}
             <motion.div
               animate={floatAnimation(2.2)}
-              className="absolute -bottom-8 -left-6 sm:left-4 z-20 max-w-[180px] bg-white/95 backdrop-blur-md rounded-2xl p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
+              className="absolute -bottom-4 left-0 sm:left-2 z-20 max-w-[150px] sm:max-w-[180px] bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
             >
-              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-100 shrink-0">
+              <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0">
                 <img
                   src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80"
                   alt="Aanya profile photo"
@@ -406,37 +406,37 @@ export default function Hero() {
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[9px] text-[#9C27FF] font-bold tracking-wider uppercase leading-none">Top Performer</span>
-                <span className="text-xs font-bold text-gray-900 mt-1 truncate">Aanya Sharma</span>
-                <span className="text-[8px] text-gray-400 mt-0.5">B.Tech CSE • SGPA 9.8</span>
+                <span className="text-[8px] sm:text-[9px] text-[#9C27FF] font-bold tracking-wider uppercase leading-none">Top Performer</span>
+                <span className="text-[11px] sm:text-xs font-bold text-gray-900 mt-0.5 truncate">Aanya Sharma</span>
+                <span className="text-[8px] text-gray-400">B.Tech • 9.8 GPA</span>
               </div>
             </motion.div>
 
             {/* FLOATING CARD 4: Learning Streak (Bottom Middle) */}
             <motion.div
               animate={floatAnimation(0.8)}
-              className="absolute -bottom-14 left-1/3 sm:left-1/2 -translate-x-1/2 z-20 max-w-[120px] bg-white/95 backdrop-blur-md rounded-2xl p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
+              className="absolute -bottom-6 left-1/2 -translate-x-1/2 z-20 max-w-[120px] bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 hidden xs:flex sm:flex items-center gap-2"
             >
-              <div className="w-7 h-7 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
-                <Flame size={15} className="fill-orange-500" />
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                <Flame size={14} className="fill-orange-500" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-extrabold text-gray-900 leading-none">12 Days</span>
-                <span className="text-[8px] text-gray-400 mt-1 whitespace-nowrap">Streak Active</span>
+                <span className="text-[11px] sm:text-xs font-extrabold text-gray-900 leading-none">12 Days</span>
+                <span className="text-[8px] text-gray-400 mt-0.5 whitespace-nowrap">Streak Active</span>
               </div>
             </motion.div>
 
             {/* FLOATING CARD 5: Certificates Earned (Bottom Right) */}
             <motion.div
               animate={floatAnimation(1.7)}
-              className="absolute -bottom-10 -right-8 sm:-right-2 z-20 max-w-[140px] bg-white/95 backdrop-blur-md rounded-2xl p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
+              className="absolute -bottom-4 right-0 sm:right-0 z-20 max-w-[130px] sm:max-w-[140px] bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-[#F2F2F2] shadow-xl shadow-gray-100/50 flex items-center gap-2"
             >
-              <div className="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500 shrink-0">
-                <Award size={15} />
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500 shrink-0">
+                <Award size={14} />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-extrabold text-gray-900 leading-none">05</span>
-                <span className="text-[8px] text-gray-400 mt-1 whitespace-nowrap">Certificates Earned</span>
+                <span className="text-[11px] sm:text-xs font-extrabold text-gray-900 leading-none">05</span>
+                <span className="text-[8px] text-gray-400 mt-0.5 whitespace-nowrap">Certificates</span>
               </div>
             </motion.div>
 

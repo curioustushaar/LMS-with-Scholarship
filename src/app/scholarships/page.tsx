@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getIndianStates, getDistrictsForState } from '@/lib/india-locations'
 import {
   GraduationCap,
   Award,
@@ -35,6 +36,7 @@ import {
   Image as ImageIcon,
   User,
   Edit3,
+  BookOpen,
 } from 'lucide-react'
 
 interface ScholarshipScheme {
@@ -62,7 +64,9 @@ interface ScholarshipScheme {
     second_prize?: string
     third_prize?: string
     consolation?: string
+    winner_description?: string
   }
+  winner_description?: string
   number_of_winners?: number
   exam_date?: string
   exam_time?: string
@@ -156,9 +160,13 @@ export default function ScholarshipsPage() {
     father_name: '',
     mother_name: '',
     address: '',
-    city: '',
-    state: '',
+    state: 'Bihar',
+    district: 'Patna',
+    city: 'Patna',
     pincode: '',
+    preference_state: 'Bihar',
+    preference_district_1: 'Patna',
+    preference_district_2: 'Gaya',
 
     // Academic Details
     school_college_name: '',
@@ -174,8 +182,8 @@ export default function ScholarshipsPage() {
     photo_url: '',
     signature_url: '',
 
-    // Exam Center & Declaration
-    exam_city_preference: '',
+    // Exam Preferences & Declaration
+    exam_city_preference: 'Patna (Pref 1) / Gaya (Pref 2)',
     declaration_agreed: false,
   })
 
@@ -227,6 +235,7 @@ export default function ScholarshipsPage() {
   })
   const [bankSubmitting, setBankSubmitting] = useState(false)
   const [bankSuccessMsg, setBankSuccessMsg] = useState<string | null>(null)
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   // Fetch Scholarships Catalog
   const fetchScholarships = async () => {
@@ -357,20 +366,21 @@ export default function ScholarshipsPage() {
     // Initialize required qualification records based on Superadmin eligibility
     const quals = scheme.eligible_qualifications && scheme.eligible_qualifications.length > 0
       ? scheme.eligible_qualifications
-      : ['10th', '12th (PCM)']
+      : ['Class 10th', 'Class 12th (PCM)']
+    const defaultQual = quals[0] || 'Class 10th'
 
-    const initialRecords: AcademicQualificationDetail[] = quals.map((q, idx) => ({
-      id: `qual-${idx}-${Date.now()}`,
-      qualification: q,
+    const initialRecords: AcademicQualificationDetail[] = [{
+      id: `qual-0-${Date.now()}`,
+      qualification: defaultQual,
       institution: '',
-      board_university: q.toLowerCase().includes('10th') ? 'CBSE' : q.toLowerCase().includes('12th') ? 'CBSE' : 'State / Central University',
+      board_university: 'CBSE',
       roll_no: '',
-      passing_year: q.toLowerCase().includes('10th') ? '2022' : q.toLowerCase().includes('12th') ? '2024' : '2026',
+      passing_year: new Date().getFullYear().toString(),
       percentage: '',
       marks_obtained: '',
       total_marks: '500',
       is_custom: false,
-    }))
+    }]
     setAcademicRecords(initialRecords)
 
     setApplicantForm({
@@ -383,11 +393,15 @@ export default function ScholarshipsPage() {
       father_name: '',
       mother_name: '',
       address: '',
-      city: '',
-      state: '',
+      state: 'Bihar',
+      district: 'Patna',
+      city: 'Patna',
       pincode: '',
+      preference_state: 'Bihar',
+      preference_district_1: 'Patna',
+      preference_district_2: 'Gaya',
       school_college_name: '',
-      qualification: quals[0] || '12th (PCM)',
+      qualification: defaultQual,
       passing_year: new Date().getFullYear().toString(),
       percentage: '',
       annual_family_income: '',
@@ -396,9 +410,91 @@ export default function ScholarshipsPage() {
       college_id_url: '',
       photo_url: '',
       signature_url: '',
-      exam_city_preference: availableCenters[0] || 'National Proctored Online Assessment Hub',
+      exam_city_preference: 'Patna (Pref 1) / Gaya (Pref 2)',
       declaration_agreed: false,
     })
+  }
+
+  // Handle student selecting their specific class / standard from the eligible scheme options
+  const handleSelectStudentClass = (chosenClass: string) => {
+    setApplicantForm((prev) => ({
+      ...prev,
+      qualification: chosenClass,
+    }))
+    setAcademicRecords((prev) => {
+      if (!prev || prev.length === 0) {
+        return [{
+          id: `qual-0-${Date.now()}`,
+          qualification: chosenClass,
+          institution: applicantForm.school_college_name || '',
+          board_university: 'CBSE',
+          roll_no: '',
+          passing_year: new Date().getFullYear().toString(),
+          percentage: '',
+          marks_obtained: '',
+          total_marks: '500',
+          is_custom: false,
+        }]
+      }
+      return prev.map((rec, idx) => {
+        if (idx === 0) {
+          return { ...rec, qualification: chosenClass }
+        }
+        return rec
+      })
+    })
+  }
+
+  // Determine tailored required documents based on student's selected class
+  const getApplicableDocumentList = (scheme: ScholarshipScheme | null, currentClass: string): string[] => {
+    const customSchemeDocs = (scheme?.required_documents || []).filter((d) => {
+      const l = d.toLowerCase()
+      return (
+        !l.includes('photo') &&
+        !l.includes('photograph') &&
+        !l.includes('signature') &&
+        !l.includes('sign') &&
+        !l.includes('marksheet') &&
+        !l.includes('aadhaar') &&
+        !l.includes('id card') &&
+        !l.includes('college id') &&
+        !l.includes('school id')
+      )
+    })
+
+    const q = (currentClass || '').toLowerCase()
+    const isSeniorSecondary = q.includes('11th') || q.includes('12th')
+    const isSchool =
+      q.includes('6th') ||
+      q.includes('7th') ||
+      q.includes('8th') ||
+      q.includes('9th') ||
+      q.includes('10th') ||
+      q.includes('school') ||
+      q.includes('class')
+
+    let baseDocs: string[] = []
+    if (isSchool && !isSeniorSecondary) {
+      baseDocs = [
+        'Previous Standard Marksheet / Annual Report Card',
+        'School ID Card / Principal Bonafide Certificate',
+        'Student Aadhaar Card / Birth Certificate',
+      ]
+    } else if (isSeniorSecondary) {
+      baseDocs = [
+        'Class 10th Board Passing Marksheet',
+        'School / Junior College ID Card',
+        'Student Aadhaar Card',
+      ]
+    } else {
+      baseDocs = [
+        '12th / Diploma / Degree Marksheet',
+        'College / University ID Card',
+        'Government Photo ID (Aadhaar/PAN)',
+      ]
+    }
+
+    return [...baseDocs, ...customSchemeDocs]
   }
 
   // Update specific field in an academic record
@@ -757,24 +853,26 @@ export default function ScholarshipsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 text-gray-900 font-sans">
-      <Header />
+      <div className="no-print">
+        <Header />
+      </div>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-14 bg-gradient-to-b from-pink-50/70 via-purple-50/30 to-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
+      <section className="no-print pt-24 sm:pt-28 lg:pt-32 pb-8 sm:pb-14 bg-gradient-to-b from-pink-50/70 via-purple-50/30 to-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 text-center space-y-3 sm:space-y-4">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#FF2D8D] uppercase tracking-widest px-4 py-1.5 bg-pink-50 rounded-full border border-pink-100 shadow-sm"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-[#FF2D8D] uppercase tracking-widest px-3 sm:px-4 py-1 sm:py-1.5 bg-pink-50 rounded-full border border-pink-100 shadow-xs"
           >
-            <Sparkles size={14} /> National Scholarship & Financial Aid Gateway
+            <Sparkles size={13} className="shrink-0" /> National Scholarship & Financial Aid Gateway
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-6xl font-heading font-black text-gray-900 tracking-tight"
+            className="text-2xl sm:text-4xl lg:text-6xl font-heading font-black text-gray-900 tracking-tight leading-tight px-1"
           >
             Empowering Talent with <span className="text-gradient">Merit Grants & Full Rides</span>
           </motion.h1>
@@ -783,66 +881,66 @@ export default function ScholarshipsPage() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed"
+            className="text-xs sm:text-sm md:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed px-2"
           >
             Check your eligibility instantly, apply with photo verification, receive your provisional admit card, and unlock official examination hall tickets upon Superadmin board approval.
           </motion.p>
 
-          {/* Tab Navigation Pill Bar */}
-          <div className="pt-8 flex flex-wrap justify-center gap-3">
+          {/* Touch-Friendly Responsive Tab Navigation Pill Bar */}
+          <div className="pt-4 sm:pt-8 -mx-3 px-3 sm:mx-0 sm:px-0 flex items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar scroll-smooth py-2">
             <button
               onClick={() => setActiveTab('explore')}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`px-3.5 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'explore'
-                  ? 'bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white shadow-pink-500/25 shadow-lg scale-105'
+                  ? 'bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white shadow-pink-500/25 shadow-md scale-[1.02]'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <Award size={16} /> Explore Scholarships ({scholarships.length})
+              <Award size={15} /> Explore Scholarships ({scholarships.length})
             </button>
 
             <button
               onClick={() => setActiveTab('checker')}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`px-3.5 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'checker'
-                  ? 'bg-gradient-to-r from-[#9C27FF] to-[#673AB7] text-white shadow-purple-500/25 shadow-lg scale-105'
+                  ? 'bg-gradient-to-r from-[#9C27FF] to-[#673AB7] text-white shadow-purple-500/25 shadow-md scale-[1.02]'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <Percent size={16} /> Eligibility Checker
+              <Percent size={15} /> Eligibility Checker
             </button>
 
             <button
               onClick={() => setActiveTab('admit_card')}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`px-3.5 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'admit_card'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25 shadow-lg scale-105'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25 shadow-md scale-[1.02]'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <QrCode size={16} /> Download Admit Card
+              <QrCode size={15} /> Download Admit Card
             </button>
 
             <button
               onClick={() => setActiveTab('results')}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`px-3.5 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'results'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/25 shadow-lg scale-105'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/25 shadow-md scale-[1.02]'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <FileText size={16} /> Check Result & Scorecard
+              <FileText size={15} /> Check Result & Scorecard
             </button>
 
             <button
               onClick={() => setActiveTab('merit_list')}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`px-3.5 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                 activeTab === 'merit_list'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/25 shadow-lg scale-105'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/25 shadow-md scale-[1.02]'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <TrendingUp size={16} /> Top 3 & Merit List
+              <TrendingUp size={15} /> Top 3 & Merit List
             </button>
           </div>
         </div>
@@ -850,16 +948,16 @@ export default function ScholarshipsPage() {
 
       {/* TAB 1: EXPLORE SCHOLARSHIPS */}
       {activeTab === 'explore' && (
-        <section className="py-12 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
+        <section className="py-6 sm:py-12 pb-20 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1">
               {['all', ...Array.from(new Set(scholarships.map((s) => s.category).filter(Boolean)))].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
                     categoryFilter === cat
-                      ? 'bg-gray-900 text-white shadow-md'
+                      ? 'bg-gray-900 text-white shadow-xs'
                       : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
@@ -868,7 +966,7 @@ export default function ScholarshipsPage() {
               ))}
             </div>
 
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-gray-400 font-medium">
               Showing <strong className="text-gray-700">{filteredSchemes.length}</strong> active programs
             </div>
           </div>
@@ -884,110 +982,199 @@ export default function ScholarshipsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="space-y-4 sm:space-y-6">
               {filteredSchemes.map((scheme) => (
                 <motion.div
                   key={scheme.id}
-                  whileHover={{ y: -4 }}
-                  className="rounded-3xl p-8 border border-gray-100 bg-white shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group"
+                  whileHover={{ y: -3 }}
+                  className="rounded-2xl sm:rounded-3xl border border-gray-200/90 bg-white p-4 sm:p-7 lg:p-8 shadow-sm hover:shadow-xl hover:border-pink-200 transition-all duration-300 flex flex-col lg:flex-row items-stretch justify-between gap-4 sm:gap-8 group relative overflow-hidden"
                 >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm ${
-                          scheme.color_theme === 'pink'
-                            ? 'bg-pink-50 text-[#FF2D8D]'
-                            : scheme.color_theme === 'purple'
-                            ? 'bg-purple-50 text-[#9C27FF]'
-                            : 'bg-blue-50 text-blue-600'
-                        }`}
-                      >
-                        <GraduationCap size={28} />
+                  {/* Accent Left Gradient Bar */}
+                  <div className="absolute left-0 top-0 bottom-0 w-2 sm:w-2.5 bg-gradient-to-b from-[#FF2D8D] via-[#9C27FF] to-blue-600 rounded-l-2xl sm:rounded-l-3xl" />
+
+                  {/* Left & Center Main Content Area */}
+                  <div className="flex-1 space-y-3.5 sm:space-y-5 pl-1.5 sm:pl-2">
+                    {/* Header: Emblem Icon, Badges, Title, Max Value Callout */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex items-start gap-2.5 sm:gap-3.5">
+                        <div
+                          className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-xs transition-transform group-hover:scale-105 ${
+                            scheme.color_theme === 'pink'
+                              ? 'bg-pink-50 text-[#FF2D8D] border border-pink-200/70'
+                              : scheme.color_theme === 'purple'
+                              ? 'bg-purple-50 text-[#9C27FF] border border-purple-200/70'
+                              : 'bg-blue-50 text-blue-600 border border-blue-200/70'
+                          }`}
+                        >
+                          <GraduationCap className="w-5 h-5 sm:w-7 sm:h-7" />
+                        </div>
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 sm:px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 tracking-wider">
+                              {scheme.category || 'National Merit'}
+                            </span>
+                            <span className="text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Applications Open
+                            </span>
+                            <span className="text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                              Govt Recognized
+                            </span>
+                          </div>
+                          <h3 className="font-heading font-black text-lg sm:text-2xl lg:text-3xl text-gray-900 group-hover:text-[#FF2D8D] transition-colors leading-tight">
+                            {scheme.title}
+                          </h3>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-bold uppercase px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {scheme.application_fee === 0 ? 'FREE Application' : `Fee: ₹${scheme.application_fee}`}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-bold mt-1 uppercase">{scheme.category}</span>
+                      {/* Max Scholarship Grant Value */}
+                      <div className="bg-gradient-to-r from-pink-50/80 to-purple-50/50 sm:bg-none p-2.5 sm:p-0 rounded-xl sm:rounded-none border border-pink-100/80 sm:border-0 shrink-0 flex items-center justify-between sm:block">
+                        <span className="text-[9px] sm:text-xs text-gray-500 sm:text-gray-400 font-extrabold uppercase tracking-wider block">Max Grant Value</span>
+                        <div className="text-lg sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] bg-clip-text text-transparent">
+                          {scheme.scholarship_value}
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <h3 className="font-heading font-extrabold text-xl text-gray-900 group-hover:text-[#FF2D8D] transition-colors leading-snug">
-                        {scheme.title}
-                      </h3>
-                      <div className="text-[#FF2D8D] font-black text-sm mt-1">{scheme.scholarship_value}</div>
+                    {/* Scheme Description */}
+                    <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
+                      {scheme.description}
+                    </p>
+
+                    {/* Two Column Visual Cards: Tiered Cash Prizes + Winner Benefits Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 pt-1">
+                      {/* 1. Tiered Cash Prize Pool */}
+                      {scheme.prize_distribution ? (
+                        <div className="p-3 sm:p-4 bg-gradient-to-br from-pink-50/70 via-purple-50/40 to-white rounded-xl sm:rounded-2xl border border-pink-100/90 space-y-2 sm:space-y-2.5 shadow-xs">
+                          <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                            <span className="flex items-center gap-1.5 text-[11px] sm:text-xs">
+                              <Sparkles size={13} className="text-[#FF2D8D]" />
+                              Tiered Prize Pool
+                            </span>
+                            <span className="text-purple-700 font-extrabold bg-white px-2 py-0.5 rounded-md border border-purple-100 text-[9px] sm:text-[10px] shadow-2xs">
+                              {scheme.number_of_winners || 50} Winners
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-[9px] sm:text-[10px]">
+                            <div className="bg-white p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-pink-100/90 shadow-2xs">
+                              <div className="text-gray-400 font-semibold text-[9px] sm:text-[10px]">🥇 1st Rank</div>
+                              <div className="font-black text-[#FF2D8D] text-xs sm:text-sm mt-0.5">{scheme.prize_distribution.first_prize || '₹50,000'}</div>
+                            </div>
+                            <div className="bg-white p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-pink-100/90 shadow-2xs">
+                              <div className="text-gray-400 font-semibold text-[9px] sm:text-[10px]">🥈 2nd Rank</div>
+                              <div className="font-black text-purple-700 text-xs sm:text-sm mt-0.5">{scheme.prize_distribution.second_prize || '₹25,000'}</div>
+                            </div>
+                            <div className="bg-white p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-pink-100/90 shadow-2xs">
+                              <div className="text-gray-400 font-semibold text-[9px] sm:text-[10px]">🥉 3rd Rank</div>
+                              <div className="font-black text-blue-600 text-xs sm:text-sm mt-0.5">{scheme.prize_distribution.third_prize || '₹10,000'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 sm:p-4 bg-pink-50/40 rounded-xl sm:rounded-2xl border border-pink-100 text-xs flex items-center gap-2 text-gray-600">
+                          <Award size={18} className="text-[#FF2D8D] shrink-0" />
+                          <span>Official merit grant and institutional scholarship awards.</span>
+                        </div>
+                      )}
+
+                      {/* 2. Winner Benefits & Rewards Detailed Box */}
+                      <div className="p-3 sm:p-4 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-white rounded-xl sm:rounded-2xl border border-amber-200/90 space-y-1.5 sm:space-y-2 flex flex-col justify-between shadow-xs">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-950 text-[11px] sm:text-xs uppercase tracking-wide">
+                          <span className="text-xs sm:text-sm">🏆</span>
+                          <span>Winner Benefits & Rewards</span>
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed font-medium whitespace-pre-line line-clamp-3">
+                          {scheme.winner_description || scheme.prize_distribution?.winner_description || 'Direct bank cash awards, merit medals, 100% course scholarships, and certified achievement badges.'}
+                        </p>
+                        <div className="text-[10px] font-bold text-amber-900 flex items-center gap-1 pt-1 border-t border-amber-100/80">
+                          <span>🎖️ Perks:</span>
+                          <span className="truncate">{scheme.prize_distribution?.consolation || 'Certificate & 50% Fee Waiver'}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <p className="text-xs text-gray-500 leading-relaxed">{scheme.description}</p>
-
-                    {/* Tiered Prizes Breakdown */}
-                    {scheme.prize_distribution && (
-                      <div className="p-3 bg-gradient-to-r from-pink-50/70 to-purple-50/70 rounded-2xl border border-pink-100/60 space-y-1.5">
-                        <div className="text-[11px] font-bold text-gray-700 flex justify-between">
-                          <span>🏆 Prize Pool</span>
-                          <span className="text-purple-700 font-extrabold">{scheme.number_of_winners || 50} Winners</span>
+                    {/* Key Eligibility & Schedule Chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 text-[11px] sm:text-xs">
+                      <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        <span>Min: <strong className="text-gray-900 font-bold">≥ {scheme.min_percentage}%</strong></span>
+                      </div>
+                      <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center gap-1.5">
+                        <User size={13} className="text-[#9C27FF] shrink-0" />
+                        <span>Age: <strong className="text-gray-900 font-bold">{scheme.age_limit || '10 - 28 Yrs'}</strong></span>
+                      </div>
+                      <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center gap-1.5">
+                        <Calendar size={13} className="text-red-600 shrink-0" />
+                        <span>Deadline: <strong className="text-red-600 font-bold">{scheme.application_end_date || 'Open'}</strong></span>
+                      </div>
+                      <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center gap-1.5">
+                        <Clock size={13} className="text-blue-600 shrink-0" />
+                        <span>{scheme.exam_mode?.toUpperCase()} • {scheme.exam_duration || '120 Mins'}</span>
+                      </div>
+                      {scheme.eligible_qualifications && scheme.eligible_qualifications.length > 0 && (
+                        <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-pink-50 text-[#FF2D8D] font-bold text-[10px] sm:text-[11px] border border-pink-100 flex items-center gap-1">
+                          <BookOpen size={12} className="shrink-0" />
+                          <span>Classes: {scheme.eligible_qualifications.slice(0, 3).join(', ')}{scheme.eligible_qualifications.length > 3 ? ` +${scheme.eligible_qualifications.length - 3}` : ''}</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
-                          <div className="bg-white/80 p-1.5 rounded-xl border border-pink-100">
-                            <div className="text-gray-400 font-semibold">🥇 1st</div>
-                            <div className="font-black text-[#FF2D8D]">{scheme.prize_distribution.first_prize || '₹50,000'}</div>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded-xl border border-pink-100">
-                            <div className="text-gray-400 font-semibold">🥈 2nd</div>
-                            <div className="font-black text-purple-700">{scheme.prize_distribution.second_prize || '₹25,000'}</div>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded-xl border border-pink-100">
-                            <div className="text-gray-400 font-semibold">🥉 3rd</div>
-                            <div className="font-black text-blue-600">{scheme.prize_distribution.third_prize || '₹10,000'}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-2 text-xs">
-                      <div className="flex items-center justify-between text-gray-700">
-                        <span className="flex items-center gap-1.5 text-gray-500">
-                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                          Eligibility:
-                        </span>
-                        <strong className="text-emerald-700">≥ {scheme.min_percentage}% • {scheme.age_limit || '16-28 Yrs'}</strong>
-                      </div>
-                      <div className="flex items-center justify-between text-gray-700">
-                        <span className="flex items-center gap-1.5 text-gray-500">
-                          <Calendar size={13} className="text-[#9C27FF] shrink-0" />
-                          Apply Deadline:
-                        </span>
-                        <strong className="text-red-600">{scheme.application_end_date || 'Open'}</strong>
-                      </div>
-                      <div className="flex items-center justify-between text-gray-700">
-                        <span className="flex items-center gap-1.5 text-gray-500">
-                          <Clock size={13} className="text-blue-600 shrink-0" />
-                          Exam Format:
-                        </span>
-                        <strong>{scheme.exam_mode?.toUpperCase()} • {scheme.exam_duration || '120 Mins'} ({scheme.total_questions || 100} Qs)</strong>
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                    <div className="pt-6 mt-4 border-t border-gray-50 space-y-2.5">
+                  {/* Right Side Action Sidebar Hub */}
+                  <div className="lg:w-80 lg:border-l lg:border-gray-100 lg:pl-8 flex flex-col justify-between space-y-3 sm:space-y-4 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100 shrink-0">
+                    <div className="space-y-2 sm:space-y-3">
+                      {/* Price / Fee Box */}
+                      <div className="p-3 sm:p-4 bg-gradient-to-br from-gray-50 via-purple-50/20 to-pink-50/20 rounded-xl sm:rounded-2xl border border-gray-200/80 text-center space-y-1">
+                        <span className="text-[9px] sm:text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Application Fee</span>
+                        <div className="text-xl sm:text-3xl font-black text-gray-900 font-mono">
+                          {scheme.application_fee === 0 ? (
+                            <span className="text-emerald-600">FREE</span>
+                          ) : (
+                            `₹${scheme.application_fee}`
+                          )}
+                        </div>
+                        <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 sm:px-2.5 py-0.5 rounded-md border border-emerald-100 inline-block">
+                          {scheme.application_fee === 0 ? '✓ No Fee Required' : '✓ Direct Bank DBT Eligible'}
+                        </span>
+                      </div>
+
+                      {/* Benefits Bullets */}
+                      <div className="space-y-1 text-xs text-gray-600 px-1 hidden sm:block">
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                          <span>Instant Provisional Admit Card</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                          <span>District Exam Center Allocation</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                          <span>Direct Bank Grant Payout</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="space-y-2 pt-1 sm:pt-2">
                       <button
                         onClick={() => handleOpenApply(scheme)}
-                        className="w-full py-3.5 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white text-xs font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                        className="w-full py-3 sm:py-3.5 px-4 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white text-xs font-black uppercase tracking-wider rounded-xl sm:rounded-2xl shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                       >
-                        Apply Now ({scheme.application_fee === 0 ? 'Free' : `₹${scheme.application_fee}`})
-                        <ArrowRight size={14} />
+                        <span>Apply Online Now</span>
+                        <ArrowRight size={15} />
                       </button>
+
                       <button
                         onClick={() => setInspectingSchemeDoc(scheme)}
-                        className="w-full py-2.5 px-3 text-xs font-bold text-gray-700 hover:text-[#C81E4E] hover:bg-pink-50/70 rounded-xl transition-all text-center flex items-center justify-center gap-1.5 border border-dashed border-gray-300 hover:border-[#C81E4E]/40"
+                        className="w-full py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl border border-gray-200 transition-all flex items-center justify-center gap-1.5 shadow-2xs hover:text-[#C81E4E]"
                       >
                         <FileText size={13} className="text-[#C81E4E]" />
-                        Check Eligibility & Official Notification
+                        <span>Full Notification & Rules</span>
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -996,27 +1183,27 @@ export default function ScholarshipsPage() {
 
       {/* TAB 2: INTERACTIVE ELIGIBILITY CHECKER */}
       {activeTab === 'checker' && (
-        <section className="py-12 pb-24 max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-8 shadow-xl space-y-8">
-            <div className="text-center space-y-2">
+        <section className="py-6 sm:py-12 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-4 sm:p-8 shadow-xl space-y-6 sm:space-y-8">
+            <div className="text-center space-y-1.5 sm:space-y-2">
               <span className="text-[10px] font-bold text-[#9C27FF] uppercase tracking-widest px-3 py-1 bg-purple-50 rounded-full">
                 Instant Qualification Engine
               </span>
-              <h2 className="text-2xl sm:text-3xl font-heading font-black text-gray-900">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-heading font-black text-gray-900">
                 Check Which Scholarships You Qualify For
               </h2>
-              <p className="text-xs text-gray-500 max-w-lg mx-auto">
+              <p className="text-xs text-gray-500 max-w-lg mx-auto px-2">
                 Input your academic score and family income to see immediate matched grant schemes.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-6 bg-gray-50/80 rounded-2xl border border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 p-3.5 sm:p-6 bg-gray-50/80 rounded-xl sm:rounded-2xl border border-gray-100">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Your Academic Stream</label>
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-700 uppercase mb-1">Your Academic Stream</label>
                 <select
                   value={checkerData.qualification}
                   onChange={(e) => setCheckerData({ ...checkerData, qualification: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold bg-white"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border border-gray-200 text-xs font-semibold bg-white"
                 >
                   <option value="10th">10th Standard Matric</option>
                   <option value="12th (PCM)">12th Standard (Science / PCM)</option>
@@ -1027,7 +1214,7 @@ export default function ScholarshipsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-700 uppercase mb-1">
                   Marks / Percentage ({checkerData.percentage}%)
                 </label>
                 <input
@@ -1036,7 +1223,7 @@ export default function ScholarshipsPage() {
                   max={100}
                   value={checkerData.percentage}
                   onChange={(e) => setCheckerData({ ...checkerData, percentage: Number(e.target.value) })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#FF2D8D] mt-3"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#FF2D8D] mt-2 sm:mt-3"
                 />
                 <div className="flex justify-between text-[10px] text-gray-400 mt-1">
                   <span>40%</span>
@@ -1046,7 +1233,7 @@ export default function ScholarshipsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-700 uppercase mb-1">
                   Annual Family Income (₹{checkerData.annual_income} LPA)
                 </label>
                 <input
@@ -1056,7 +1243,7 @@ export default function ScholarshipsPage() {
                   step={0.5}
                   value={checkerData.annual_income}
                   onChange={(e) => setCheckerData({ ...checkerData, annual_income: Number(e.target.value) })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#9C27FF] mt-3"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#9C27FF] mt-2 sm:mt-3"
                 />
                 <div className="flex justify-between text-[10px] text-gray-400 mt-1">
                   <span>₹1 LPA</span>
@@ -1066,26 +1253,26 @@ export default function ScholarshipsPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-gray-900 text-sm">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 sm:pb-3">
+                <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
                   Matched Scholarships for You ({eligibleSchemes.length} Found)
                 </h3>
-                <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                <span className="text-[11px] sm:text-xs text-emerald-600 font-bold bg-emerald-50 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-emerald-100">
                   🎉 {eligibleSchemes.length} Eligible
                 </span>
               </div>
 
               {eligibleSchemes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {eligibleSchemes.map((scheme) => (
                     <div
                       key={scheme.id}
-                      className="p-5 rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-sm space-y-3 hover:border-emerald-300 transition-all flex flex-col justify-between"
+                      className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-xs space-y-2.5 sm:space-y-3 hover:border-emerald-300 transition-all flex flex-col justify-between"
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-1.5 sm:space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                             ✓ 100% Eligible
                           </span>
                           <span className="text-xs font-bold text-gray-800">
@@ -1093,36 +1280,36 @@ export default function ScholarshipsPage() {
                           </span>
                         </div>
 
-                        <h4 className="font-bold text-gray-900 text-base">{scheme.title}</h4>
+                        <h4 className="font-bold text-gray-900 text-sm sm:text-base">{scheme.title}</h4>
                         <div className="text-xs font-bold text-[#FF2D8D]">{scheme.scholarship_value}</div>
                         <p className="text-xs text-gray-600 line-clamp-2">{scheme.description}</p>
                       </div>
 
-                        <div className="flex items-center gap-2 pt-2">
-                          <button
-                            onClick={() => setInspectingSchemeDoc(scheme)}
-                            className="px-3.5 py-2.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 shadow-xs"
-                            title="View Sarkari Result Style Notification"
-                          >
-                            <FileText size={13} className="text-[#C81E4E]" />
-                            Full Notification
-                          </button>
-                          <button
-                            onClick={() => handleOpenApply(scheme)}
-                            className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5"
-                          >
-                            Apply Online
-                            <ArrowRight size={13} />
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          onClick={() => setInspectingSchemeDoc(scheme)}
+                          className="px-3 sm:px-3.5 py-2 sm:py-2.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 shadow-xs"
+                          title="View Sarkari Result Style Notification"
+                        >
+                          <FileText size={13} className="text-[#C81E4E]" />
+                          Full Notification
+                        </button>
+                        <button
+                          onClick={() => handleOpenApply(scheme)}
+                          className="flex-1 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-[11px] sm:text-xs rounded-lg sm:rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1.5"
+                        >
+                          Apply Online
+                          <ArrowRight size={13} />
+                        </button>
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="p-8 text-center bg-gray-50 rounded-2xl text-gray-500 space-y-2">
-                  <AlertCircle size={32} className="text-amber-500 mx-auto" />
-                  <p className="text-sm font-semibold">No direct matches for the selected criteria.</p>
-                  <p className="text-xs">Try adjusting your percentage or exploring our open grant programs.</p>
+                <div className="p-6 sm:p-8 text-center bg-gray-50 rounded-xl sm:rounded-2xl text-gray-500 space-y-2">
+                  <AlertCircle size={28} className="text-amber-500 mx-auto" />
+                  <p className="text-xs sm:text-sm font-semibold">No direct matches for the selected criteria.</p>
+                  <p className="text-[11px] sm:text-xs">Try adjusting your percentage or exploring our open grant programs.</p>
                 </div>
               )}
             </div>
@@ -1132,24 +1319,24 @@ export default function ScholarshipsPage() {
 
       {/* TAB 3: DOWNLOAD OFFICIAL ADMIT CARD */}
       {activeTab === 'admit_card' && (
-        <section className="py-12 pb-24 max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-8 shadow-xl space-y-8">
-            <div className="text-center space-y-2">
+        <section className="py-6 sm:py-12 pb-20 max-w-3xl mx-auto px-3 sm:px-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-4 sm:p-8 shadow-xl space-y-6 sm:space-y-8">
+            <div className="text-center space-y-1.5 sm:space-y-2">
               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
                 Official Hall Ticket Verification
               </span>
-              <h2 className="text-2xl sm:text-3xl font-heading font-black text-gray-900">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-heading font-black text-gray-900">
                 Download Official Examination Admit Card
               </h2>
-              <p className="text-xs text-gray-500 max-w-md mx-auto">
+              <p className="text-xs text-gray-500 max-w-md mx-auto px-2">
                 Enter your <strong>Application Number</strong> and the <strong>Security Registration Code</strong> from your Provisional Admit Card.
               </p>
             </div>
 
-            <form onSubmit={handleFetchAdmitCard} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleFetchAdmitCard} className="space-y-3.5 sm:space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  <label className="block text-[11px] sm:text-xs font-bold text-gray-700 uppercase mb-1">
                     Application Number / Registered Email *
                   </label>
                   <input
@@ -1319,14 +1506,38 @@ export default function ScholarshipsPage() {
                         </div>
                       </div>
 
-                      <div className="p-4 bg-gray-100/90 rounded-2xl border border-gray-200 space-y-1.5 text-xs">
+                      <div className="p-4 bg-gray-100/90 rounded-2xl border border-gray-200 space-y-2 text-xs">
                         <div>
-                          <span className="text-gray-500 font-bold">Allocated Center / Platform: </span>
-                          <span className="text-gray-900 font-semibold">{admitResult.admit_card.exam_center}</span>
+                          <span className="text-gray-500 font-bold">Allocated Examination Center: </span>
+                          <span className="text-gray-900 font-extrabold text-sm block sm:inline">{admitResult.admit_card.exam_center}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-500 font-bold">Exam Date & Time Slot: </span>
-                          <span className="text-gray-900 font-semibold">{admitResult.admit_card.exam_slot}</span>
+                        {admitResult.admit_card.exam_center_address && (
+                          <div className="text-gray-700">
+                            <span className="text-gray-500 font-bold">Venue Address: </span>
+                            <span>{admitResult.admit_card.exam_center_address}</span>
+                          </div>
+                        )}
+                        {admitResult.admit_card.center_landmark && (
+                          <div className="text-gray-700">
+                            <span className="text-gray-500 font-bold">Landmark: </span>
+                            <span>{admitResult.admit_card.center_landmark}</span>
+                          </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-1 border-t border-gray-200">
+                          <div>
+                            <span className="text-gray-500 font-bold">Exam Date & Time Slot: </span>
+                            <span className="text-gray-900 font-semibold">{admitResult.admit_card.exam_slot}</span>
+                          </div>
+                          {admitResult.admit_card.google_maps_url && (
+                            <a
+                              href={admitResult.admit_card.google_maps_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 shrink-0"
+                            >
+                              📍 Open in Google Maps
+                            </a>
+                          )}
                         </div>
                       </div>
 
@@ -1418,24 +1629,24 @@ export default function ScholarshipsPage() {
 
       {/* TAB 4: DIRECT STUDENT CHECK RESULT & OFFICIAL SCORECARD */}
       {activeTab === 'results' && (
-        <section className="py-12 pb-24 max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
-          {/* Result Search Card */}
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-8 shadow-xl space-y-6">
-            <div className="text-center space-y-2">
+        <section className="scorecard-active-section py-6 sm:py-12 pb-20 max-w-4xl mx-auto px-3 sm:px-6 space-y-6 sm:space-y-8">
+          {/* Result Search Card (Hidden when Printing) */}
+          <div className="no-print bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 p-4 sm:p-8 shadow-xl space-y-4 sm:space-y-6">
+            <div className="text-center space-y-1.5 sm:space-y-2">
               <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest px-3 py-1 bg-blue-50 rounded-full border border-blue-100">
                 Official Examination Results Desk
               </span>
-              <h2 className="text-2xl sm:text-3xl font-heading font-black text-gray-900">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-heading font-black text-gray-900">
                 Check Examination Result & Scorecard
               </h2>
-              <p className="text-xs text-gray-500 max-w-md mx-auto">
+              <p className="text-xs text-gray-500 max-w-md mx-auto px-2">
                 Enter your <strong>Admit Card Roll Number</strong> or <strong>Application Number</strong> to fetch your official marksheet, merit rank, and scholarship grant entitlement.
               </p>
             </div>
 
-            <form onSubmit={handleCheckStudentScorecard} className="space-y-4 max-w-xl mx-auto">
+            <form onSubmit={handleCheckStudentScorecard} className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-700 uppercase mb-1">
                   Roll Number / Application Number / Registered Email *
                 </label>
                 <div className="relative">
@@ -1445,13 +1656,13 @@ export default function ScholarshipsPage() {
                     placeholder="e.g. AAGAJ-26-5467 or SCH-2026-2378"
                     value={resultLookupInput}
                     onChange={(e) => setResultLookupInput(e.target.value)}
-                    className="w-full px-5 py-3.5 rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 border-2 border-gray-200 text-sm font-mono font-bold focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 border-2 border-gray-200 text-xs sm:text-sm font-mono font-bold focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
                   />
                   {resultLookupInput && (
                     <button
                       type="button"
                       onClick={() => setResultLookupInput('')}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       <X size={16} />
                     </button>
@@ -1462,15 +1673,15 @@ export default function ScholarshipsPage() {
               <button
                 type="submit"
                 disabled={resultLookupLoading}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <Search size={18} />
+                <Search size={16} />
                 {resultLookupLoading ? 'Verifying Examination Records...' : 'Search & Fetch Official Scorecard'}
               </button>
             </form>
 
             {resultLookupError && (
-              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5 max-w-xl mx-auto">
+              <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5 max-w-xl mx-auto">
                 <AlertCircle size={18} className="text-red-500 shrink-0" />
                 <div>
                   <div className="font-bold">Record Not Found</div>
@@ -1487,50 +1698,86 @@ export default function ScholarshipsPage() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
             >
-              {/* Embedded Print Stylesheet for Official Scorecard */}
+              {/* Embedded Print Stylesheet for STRICT 1-PAGE A4 Output */}
               <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
+                  @page {
+                    size: A4 portrait;
+                    margin: 4mm 6mm;
+                  }
                   html, body {
                     background: #fff !important;
                     color: #000 !important;
                     margin: 0 !important;
                     padding: 0 !important;
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: 297mm !important;
+                    overflow: hidden !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                   }
-                  body * {
+                  header, footer, nav, aside, section:not(.scorecard-active-section), .no-print, .no-print * {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                     visibility: hidden !important;
                   }
-                  #official-scorecard-certificate, #official-scorecard-certificate * {
-                    visibility: visible !important;
+                  .scorecard-active-section {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    max-width: 100% !important;
                   }
                   #official-scorecard-certificate {
-                    position: fixed !important;
-                    left: 0 !important;
-                    top: 0 !important;
+                    display: block !important;
+                    position: static !important;
                     width: 100% !important;
                     max-width: 100% !important;
-                    margin: 0 !important;
-                    padding: 24px !important;
-                    border: 3px double #1e3a8a !important;
+                    margin: 0 auto !important;
+                    padding: 14px 18px !important;
+                    border: 2px solid #1e3a8a !important;
+                    border-radius: 10px !important;
                     background: #fff !important;
+                    box-shadow: none !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    page-break-after: avoid !important;
+                    break-after: avoid !important;
+                    page-break-before: avoid !important;
+                    break-before: avoid !important;
+                    box-sizing: border-box !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                   }
                 }
               `}} />
 
-              {/* Action Bar */}
-              <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+              {/* Action Bar (Hidden in Print) */}
+              <div className="no-print flex justify-between items-center bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="font-bold text-gray-700">Official Institutional Scorecard Loaded</span>
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    studentScorecard.merit_status === 'qualified'
+                      ? 'bg-emerald-500 animate-pulse'
+                      : 'bg-rose-500'
+                  }`}></span>
+                  <span className="font-bold text-gray-800">
+                    {studentScorecard.merit_status === 'qualified'
+                      ? 'Official Scorecard: QUALIFIED CANDIDATE'
+                      : 'Official Scorecard: NOT QUALIFIED'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => window.print()}
                     className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
                   >
                     <Download size={14} />
-                    Print Scorecard (PDF)
+                    Print Scorecard (1-Page PDF)
                   </button>
                   <button
+                    type="button"
                     onClick={() => setStudentScorecard(null)}
                     className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-1"
                   >
@@ -1540,203 +1787,225 @@ export default function ScholarshipsPage() {
                 </div>
               </div>
 
-              {/* Official Certificate Card */}
+              {/* Official Certificate Card (Single-Page Optimized) */}
               <div
                 id="official-scorecard-certificate"
-                className="bg-white rounded-3xl border-4 border-double border-indigo-900/40 p-8 sm:p-10 shadow-2xl space-y-6 relative overflow-hidden"
+                className="bg-white rounded-3xl border-4 border-double border-indigo-900/40 p-5 sm:p-7 shadow-2xl space-y-4 relative overflow-hidden"
               >
                 {/* Background Watermark */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none font-black text-8xl text-indigo-950 rotate-[-25deg]">
-                  AAGAJ MERIT
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.025] pointer-events-none select-none font-black text-7xl text-indigo-950 rotate-[-22deg]">
+                  AAGAJ MERIT 2026
                 </div>
 
                 {/* Scorecard Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b-2 border-indigo-900/20">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-900 text-amber-400 flex items-center justify-center font-bold text-2xl shadow-md shrink-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b-2 border-indigo-900/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-900 to-indigo-900 text-amber-400 flex items-center justify-center font-bold text-xl shadow-md shrink-0">
                       🏆
                     </div>
                     <div>
-                      <span className="text-[11px] font-black tracking-widest text-indigo-900 uppercase">
+                      <span className="text-[10px] font-black tracking-widest text-indigo-900 uppercase">
                         AAGAJ NATIONAL SCHOLARSHIP & MERIT COUNCIL
                       </span>
-                      <h3 className="text-xl sm:text-2xl font-heading font-black text-gray-900">
-                        Candidate Examination Scorecard & Merit Certificate
+                      <h3 className="text-lg sm:text-xl font-heading font-black text-gray-900">
+                        Candidate Examination Scorecard & Result Dossier
                       </h3>
-                      <p className="text-[11px] text-gray-500 font-medium">
+                      <p className="text-[10px] text-gray-500 font-medium">
                         National Assessment & Academic Evaluation Directorate • Session 2026-27
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right sm:self-center shrink-0">
-                    <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                      studentScorecard.is_released
-                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm'
-                        : 'bg-amber-100 text-amber-900 border border-amber-300 shadow-sm'
+                    <span className={`inline-block px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border ${
+                      studentScorecard.merit_status === 'qualified'
+                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                        : 'bg-rose-100 text-rose-900 border-rose-300'
                     }`}>
-                      ● {studentScorecard.result_status}
+                      {studentScorecard.merit_status === 'qualified'
+                        ? '● QUALIFIED'
+                        : '● NOT QUALIFIED'}
                     </span>
-                    <div className="text-[10px] text-gray-400 font-mono mt-1">
-                      Issue Ref: {studentScorecard.award_disbursement_ref}
+                    <div className="text-[9px] text-gray-400 font-mono mt-0.5">
+                      Ref: {studentScorecard.award_disbursement_ref || `REF-${studentScorecard.application_no || '001'}`}
                     </div>
                   </div>
                 </div>
 
                 {/* Candidate Bio & Examination Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start bg-gray-50/80 p-6 rounded-2xl border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center bg-gray-50/90 p-4 rounded-xl border border-gray-200 text-xs">
                   {/* Photo with Verified Badge */}
-                  <div className="flex flex-col items-center space-y-2 text-center">
-                    <div className="w-28 h-32 rounded-2xl overflow-hidden bg-white border-2 border-indigo-900/30 shadow-md relative">
+                  <div className="flex flex-col items-center space-y-1.5 text-center">
+                    <div className="w-20 h-24 rounded-xl overflow-hidden bg-white border-2 border-indigo-900/30 shadow-sm relative">
                       <img
                         src={studentScorecard.photo_url}
                         alt={studentScorecard.applicant_name}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      <ShieldCheck size={11} /> Verified Candidate
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <ShieldCheck size={10} /> Verified
                     </span>
                   </div>
 
                   {/* Candidate Bio Information */}
-                  <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-xs">
+                  <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 text-xs">
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Candidate Name</span>
-                      <strong className="text-gray-900 text-base font-heading font-black">{studentScorecard.applicant_name}</strong>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Candidate Name</span>
+                      <strong className="text-gray-950 text-sm font-heading font-black">{studentScorecard.applicant_name}</strong>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Examination Roll Number</span>
-                      <strong className="font-mono text-indigo-900 text-sm font-black">{studentScorecard.roll_number}</strong>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Examination Roll Number</span>
+                      <strong className="font-mono text-indigo-900 text-xs font-black">{studentScorecard.roll_number}</strong>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Application Reference No</span>
-                      <span className="font-mono font-bold text-gray-700">{studentScorecard.application_no}</span>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Application Reference No</span>
+                      <span className="font-mono font-bold text-gray-700 text-[11px]">{studentScorecard.application_no}</span>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Security Registration Code</span>
-                      <span className="font-mono font-bold text-purple-700">{studentScorecard.registration_code}</span>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Security Registration Code</span>
+                      <span className="font-mono font-bold text-purple-700 text-[11px]">{studentScorecard.registration_code}</span>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Father&apos;s Name / DOB</span>
-                      <span className="text-gray-800 font-bold">{studentScorecard.father_name || 'N/A'} • {studentScorecard.dob || '2006-05-15'}</span>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Father&apos;s Name / DOB</span>
+                      <span className="text-gray-800 font-bold text-[11px]">{studentScorecard.father_name || 'N/A'} • {studentScorecard.dob || '2006-05-15'}</span>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Academic Stream & Institution</span>
-                      <span className="text-gray-800 font-bold">{studentScorecard.qualification} • {studentScorecard.school_college_name || 'Affiliated Institution'}</span>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Class & Stream</span>
+                      <span className="text-gray-800 font-bold text-[11px]">{studentScorecard.qualification} • {studentScorecard.school_college_name || 'Affiliated School'}</span>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Scholarship Program</span>
-                      <strong className="text-[#FF2D8D] font-bold">{studentScorecard.scholarship_title}</strong>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Scholarship Scheme</span>
+                      <strong className="text-[#FF2D8D] font-bold text-[11px]">{studentScorecard.scholarship_title}</strong>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Exam Center & Date</span>
-                      <span className="text-gray-800 font-bold">{studentScorecard.exam_center} ({studentScorecard.exam_date})</span>
+                      <span className="text-gray-400 font-semibold block text-[9px] uppercase">Examination Venue & Date</span>
+                      <span className="text-gray-800 font-bold text-[11px]">{studentScorecard.exam_center} ({studentScorecard.exam_date})</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Performance & Marks Breakdown Table */}
-                <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white text-[11px] uppercase font-bold tracking-wider">
+                    <thead className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white text-[10px] uppercase font-bold tracking-wider">
                       <tr>
-                        <th className="px-6 py-3.5">Assessment Section</th>
-                        <th className="px-6 py-3.5 text-center">Maximum Marks</th>
-                        <th className="px-6 py-3.5 text-center">Marks Scored</th>
-                        <th className="px-6 py-3.5 text-center">Percentage</th>
-                        <th className="px-6 py-3.5 text-right">All-India Merit Rank</th>
+                        <th className="px-4 py-2.5">Assessment Section</th>
+                        <th className="px-4 py-2.5 text-center">Maximum Marks</th>
+                        <th className="px-4 py-2.5 text-center">Marks Scored</th>
+                        <th className="px-4 py-2.5 text-center">Percentage</th>
+                        <th className="px-4 py-2.5 text-right">Result & Merit Standing</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white font-medium">
                       <tr>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 text-sm">National Scholarship Assessment Test (Online/Offline)</div>
-                          <div className="text-[11px] text-gray-400">Section A: General Aptitude • Section B: Technical Core Stream</div>
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-gray-900 text-xs">National Scholarship Assessment Test</div>
+                          <div className="text-[10px] text-gray-400">Section A: General Aptitude • Section B: Technical Core</div>
                         </td>
-                        <td className="px-6 py-4 text-center font-bold text-gray-600 font-mono text-sm">
+                        <td className="px-4 py-3 text-center font-bold text-gray-600 font-mono text-xs">
                           {studentScorecard.total_marks || 100}.00
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="font-black text-emerald-600 text-lg font-mono">
+                        <td className="px-4 py-3 text-center">
+                          <span className={`font-black text-base font-mono ${
+                            studentScorecard.merit_status === 'qualified'
+                              ? 'text-emerald-600'
+                              : 'text-rose-600'
+                          }`}>
                             {studentScorecard.exam_marks != null ? Number(studentScorecard.exam_marks).toFixed(2) : '0.00'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center font-black text-indigo-900 text-base font-mono">
+                        <td className="px-4 py-3 text-center font-black text-indigo-900 text-xs font-mono">
                           {studentScorecard.percentage_score}
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-black text-xs shadow-sm ${
-                            studentScorecard.rank === 1
-                              ? 'bg-amber-500 text-white shadow-amber-500/30'
-                              : studentScorecard.rank === 2
-                              ? 'bg-gray-400 text-white'
-                              : studentScorecard.rank === 3
-                              ? 'bg-amber-700 text-white'
-                              : 'bg-indigo-900 text-white'
-                          }`}>
-                            🏆 Rank #{studentScorecard.rank || '1'}
-                          </span>
+                        <td className="px-4 py-3 text-right">
+                          {studentScorecard.merit_status === 'qualified' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-black text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🟢 QUALIFIED {studentScorecard.rank ? `(Rank #${studentScorecard.rank})` : ''}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-black text-[11px] bg-rose-100 text-rose-800 border border-rose-300">
+                              🔴 NOT QUALIFIED
+                            </span>
+                          )}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                {/* Award Entitlement & Status Banner */}
-                <div className="p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-2xl border-2 border-emerald-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white">
-                        ✓ QUALIFIED & AWARDED
-                      </span>
-                      <span className="text-xs font-bold text-gray-500">Official Institutional Benefit</span>
+                {/* CONDITIONAL ENTITLEMENT & STATUS BANNER */}
+                {studentScorecard.merit_status === 'qualified' ? (
+                  /* CASE 1: QUALIFIED CANDIDATE */
+                  <div className="p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-xl border-2 border-emerald-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                          ✓ QUALIFIED & AWARDED
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-500">Official Institutional Scholarship Benefit</span>
+                      </div>
+                      <div className="text-base font-heading font-black text-emerald-950">
+                        {studentScorecard.award_amount || '100% Tuition Fee Waiver + Merit Living Allowance'}
+                      </div>
                     </div>
-                    <div className="text-lg font-heading font-black text-emerald-950">
-                      {studentScorecard.award_amount || '100% Tuition Fee Waiver + Merit Living Allowance'}
+
+                    <div className="flex flex-col sm:items-end gap-1 shrink-0">
+                      <div className="text-right font-mono text-[11px] text-gray-600">
+                        <div>Ref: <strong className="text-indigo-900">{studentScorecard.award_disbursement_ref}</strong></div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowChequeModal(true)}
+                        className="no-print px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[11px] font-black rounded-lg shadow-sm hover:shadow-md transition-all flex items-center gap-1"
+                      >
+                        🏆 View Official Award Cheque
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                    <div className="text-right font-mono text-xs text-gray-600">
-                      <div>Disbursement Ref: <strong className="text-indigo-900">{studentScorecard.award_disbursement_ref}</strong></div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">Declared: {new Date(studentScorecard.released_at).toLocaleDateString()}</div>
+                ) : (
+                  /* CASE 2: NOT QUALIFIED CANDIDATE */
+                  <div className="p-4 bg-rose-50 rounded-xl border-2 border-rose-200 flex items-start gap-3 text-xs">
+                    <span className="text-2xl shrink-0">🔴</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                          NOT QUALIFIED (BELOW CUT-OFF)
+                        </span>
+                        <span className="text-[11px] font-bold text-rose-900">Minimum Qualifying Benchmark Not Met</span>
+                      </div>
+                      <p className="text-[11px] text-rose-800 leading-relaxed">
+                        Thank you for appearing in the National Scholarship Assessment Test. Your obtained score ({studentScorecard.exam_marks != null ? Number(studentScorecard.exam_marks).toFixed(2) : '0'}/{studentScorecard.total_marks || 100}) is below the minimum qualifying cut-off score. No scholarship grant or fee waiver is allocated for this cycle. We encourage you to participate in upcoming assessment rounds!
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowChequeModal(true)}
-                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-black rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
-                    >
-                      🏆 View Official Award Cheque & Certificate
-                    </button>
                   </div>
-                </div>
+                )}
 
-                {/* 1. LMS 100% Course Fee Waiver Key & Claim Box */}
-                {studentScorecard.award_voucher_code && (
-                  <div className="p-5 bg-purple-50 rounded-2xl border-2 border-purple-200 space-y-3">
+                {/* 1. LMS 100% Course Fee Waiver Key (ONLY for QUALIFIED) */}
+                {studentScorecard.merit_status === 'qualified' && studentScorecard.award_voucher_code && (
+                  <div className="p-3.5 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <div>
-                        <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded bg-purple-200 text-purple-900">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-purple-200 text-purple-900">
                           🎓 100% FREE COURSE ENROLLMENT KEY
                         </span>
-                        <h4 className="font-heading font-black text-purple-950 text-base mt-1">
+                        <h4 className="font-heading font-black text-purple-950 text-sm mt-0.5">
                           Your Exclusive Scholarship Course Voucher
                         </h4>
-                        <p className="text-xs text-purple-700">
-                          Use this scholarship voucher code during LMS checkout to enroll in any certified program for ₹0.
+                        <p className="text-[10px] text-purple-700">
+                          Use this voucher during LMS checkout to enroll in any certified program for ₹0.
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-purple-300 shadow-sm shrink-0">
-                        <span className="font-mono font-black text-purple-950 text-sm tracking-wider">
+                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-purple-300 shadow-xs shrink-0">
+                        <span className="font-mono font-black text-purple-950 text-xs tracking-wider">
                           {studentScorecard.award_voucher_code}
                         </span>
                         <button
@@ -1746,9 +2015,9 @@ export default function ScholarshipsPage() {
                             setCopiedCourseVoucher(true)
                             setTimeout(() => setCopiedCourseVoucher(false), 2000)
                           }}
-                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1"
+                          className="no-print px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold rounded transition-all flex items-center gap-1"
                         >
-                          {copiedCourseVoucher ? <Check size={12} /> : <Copy size={12} />}
+                          {copiedCourseVoucher ? <Check size={11} /> : <Copy size={11} />}
                           {copiedCourseVoucher ? 'Copied' : 'Copy'}
                         </button>
                       </div>
@@ -1756,24 +2025,24 @@ export default function ScholarshipsPage() {
                   </div>
                 )}
 
-                {/* 2. Cash Grant Payout Receipt or Bank Claim Form (For Rank #1, #2, #3) */}
-                {studentScorecard.rank && studentScorecard.rank <= 3 && (
-                  <div className="p-5 bg-emerald-50/80 rounded-2xl border-2 border-emerald-200 space-y-3">
+                {/* 2. Cash Grant Payout Receipt or Bank Claim Form (ONLY FOR QUALIFIED TOP 3 WINNERS) */}
+                {studentScorecard.merit_status === 'qualified' && studentScorecard.rank && studentScorecard.rank <= 3 && (
+                  <div className="p-4 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded bg-emerald-200 text-emerald-950">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-200 text-emerald-950">
                         💰 CASH PRIZE DISBURSEMENT DESK
                       </span>
                       {studentScorecard.payout_details && (
-                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-md">
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
                           ● Payout Processed (UTR: {studentScorecard.payout_details.bank_utr})
                         </span>
                       )}
                     </div>
 
                     {studentScorecard.bank_details ? (
-                      <div className="bg-white p-4 rounded-xl border border-emerald-200 text-xs space-y-1">
-                        <div className="font-bold text-gray-800">Your Registered Beneficiary Account for Cash Grant:</div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-gray-600 text-[11px] pt-1">
+                      <div className="bg-white p-3 rounded-lg border border-emerald-200 text-xs space-y-1">
+                        <div className="font-bold text-gray-800 text-[11px]">Registered Account for Cash Grant Payout:</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-gray-600 text-[10px] pt-0.5">
                           <div>Bank: <strong>{studentScorecard.bank_details.bank_name || 'N/A'}</strong></div>
                           <div>A/C: <strong className="font-mono">{studentScorecard.bank_details.account_number}</strong></div>
                           <div>IFSC: <strong className="font-mono">{studentScorecard.bank_details.ifsc_code}</strong></div>
@@ -1781,67 +2050,67 @@ export default function ScholarshipsPage() {
                         </div>
                       </div>
                     ) : (
-                      <form onSubmit={handleSubmitBankClaim} className="bg-white p-4 rounded-2xl border border-emerald-200 space-y-3">
+                      <form onSubmit={handleSubmitBankClaim} className="no-print bg-white p-3.5 rounded-xl border border-emerald-200 space-y-2.5">
                         <div className="space-y-0.5">
-                          <div className="font-bold text-emerald-950 text-sm">
+                          <div className="font-bold text-emerald-950 text-xs">
                             🏆 Claim Your Cash Prize Transfer:
                           </div>
-                          <p className="text-xs text-gray-500">
-                            Please provide your Bank Account or UPI ID. The finance council will transfer your cash prize directly.
+                          <p className="text-[10px] text-gray-500">
+                            Please provide your Bank Account or UPI ID. The finance council will disburse your cash prize directly.
                           </p>
                         </div>
 
                         {bankSuccessMsg && (
-                          <div className="p-3 bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
-                            <CheckCircle2 size={16} /> {bankSuccessMsg}
+                          <div className="p-2.5 bg-emerald-100 text-emerald-900 rounded-lg text-[11px] font-bold flex items-center gap-1.5">
+                            <CheckCircle2 size={14} /> {bankSuccessMsg}
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">Bank Name *</label>
+                            <label className="block text-[9px] font-bold text-gray-700 uppercase mb-0.5">Bank Name *</label>
                             <input
                               type="text"
                               required
                               value={bankClaimForm.bank_name}
                               onChange={(e) => setBankClaimForm({ ...bankClaimForm, bank_name: e.target.value })}
-                              placeholder="e.g. State Bank of India / HDFC"
-                              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs bg-gray-50/50"
+                              placeholder="e.g. State Bank of India"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs bg-gray-50/50"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">Account Number *</label>
+                            <label className="block text-[9px] font-bold text-gray-700 uppercase mb-0.5">Account Number *</label>
                             <input
                               type="text"
                               required
                               value={bankClaimForm.account_number}
                               onChange={(e) => setBankClaimForm({ ...bankClaimForm, account_number: e.target.value })}
                               placeholder="e.g. 102938475610"
-                              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono bg-gray-50/50"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-mono bg-gray-50/50"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">IFSC Code *</label>
+                            <label className="block text-[9px] font-bold text-gray-700 uppercase mb-0.5">IFSC Code *</label>
                             <input
                               type="text"
                               required
                               value={bankClaimForm.ifsc_code}
                               onChange={(e) => setBankClaimForm({ ...bankClaimForm, ifsc_code: e.target.value.toUpperCase() })}
                               placeholder="e.g. SBIN0001234"
-                              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono uppercase bg-gray-50/50"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-mono uppercase bg-gray-50/50"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">UPI ID (Optional)</label>
+                            <label className="block text-[9px] font-bold text-gray-700 uppercase mb-0.5">UPI ID (Optional)</label>
                             <input
                               type="text"
                               value={bankClaimForm.upi_id}
                               onChange={(e) => setBankClaimForm({ ...bankClaimForm, upi_id: e.target.value })}
                               placeholder="e.g. username@okhdfcbank"
-                              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono bg-gray-50/50"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-mono bg-gray-50/50"
                             />
                           </div>
                         </div>
@@ -1849,9 +2118,9 @@ export default function ScholarshipsPage() {
                         <button
                           type="submit"
                           disabled={bankSubmitting}
-                          className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow transition-all"
                         >
-                          {bankSubmitting ? 'Saving Bank Details...' : '✓ Submit Bank Details for Cash Grant'}
+                          {bankSubmitting ? 'Saving...' : '✓ Submit Bank Details for Prize'}
                         </button>
                       </form>
                     )}
@@ -1859,21 +2128,21 @@ export default function ScholarshipsPage() {
                 )}
 
                 {/* Footer Signatures & QR Code */}
-                <div className="pt-6 border-t-2 border-indigo-900/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-3">
-                    <div className="w-16 h-16 bg-gray-100 border border-gray-300 rounded-xl p-1 shadow-inner flex items-center justify-center">
-                      <QrCode size={48} className="text-indigo-950" />
+                <div className="pt-3 border-t-2 border-indigo-900/10 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-500">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-12 h-12 bg-gray-100 border border-gray-300 rounded-lg p-0.5 shadow-inner flex items-center justify-center shrink-0">
+                      <QrCode size={36} className="text-indigo-950" />
                     </div>
-                    <div className="space-y-0.5 text-[10px]">
+                    <div className="space-y-0.5 text-[9px]">
                       <div className="font-bold text-gray-800">Tamper-Proof Digital Verification</div>
                       <div>Scan QR code on official portal to verify document authenticity.</div>
                       <div className="font-mono text-gray-400">UID: {studentScorecard.id}</div>
                     </div>
                   </div>
 
-                  <div className="text-center sm:text-right space-y-1">
-                    <div className="font-serif italic text-base font-bold text-indigo-950">Dr. Rajeshwari Sen</div>
-                    <div className="text-[10px] font-bold uppercase text-gray-600 border-t border-gray-300 pt-1">
+                  <div className="text-center sm:text-right space-y-0.5">
+                    <div className="font-serif italic text-sm font-bold text-indigo-950">Dr. Rajeshwari Sen</div>
+                    <div className="text-[9px] font-bold uppercase text-gray-600 border-t border-gray-300 pt-0.5">
                       Controller of Examinations • National Evaluation Board
                     </div>
                   </div>
@@ -1886,23 +2155,23 @@ export default function ScholarshipsPage() {
 
       {/* TAB 5: TOP 3 WINNERS PODIUM & COMPLETE MERIT RANKINGS TABLE */}
       {activeTab === 'merit_list' && (
-        <section className="py-12 pb-24 max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
+        <section className="py-6 sm:py-12 pb-20 max-w-5xl mx-auto px-3 sm:px-6 space-y-6 sm:space-y-8">
           {/* 1. AUTOMATIC TOP 3 WINNERS PODIUM (VISIBLE ONCE RESULTS ARE RELEASED) */}
           {topThreeWinners.length > 0 && (
-            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-xl space-y-6">
-              <div className="text-center space-y-1">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 p-4 sm:p-8 shadow-xl space-y-4 sm:space-y-6">
+              <div className="text-center space-y-1 sm:space-y-1.5">
                 <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest px-3 py-1 bg-amber-50 rounded-full border border-amber-200">
                   🏆 National Honor Roll
                 </span>
-                <h3 className="text-2xl sm:text-3xl font-heading font-black text-gray-900">
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-heading font-black text-gray-900">
                   All-India Top 3 Scholarship Champions
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
                   Congratulations to our top merit scorers receiving highest honors and cash grants!
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-2 sm:pt-4 items-end">
                 {/* 2nd Place (Silver) */}
                 {topThreeWinners.find((w) => w.rank === 2) && (() => {
                   const silver = topThreeWinners.find((w) => w.rank === 2)!
@@ -1911,22 +2180,22 @@ export default function ScholarshipsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 }}
-                      className="bg-gradient-to-b from-gray-50 to-slate-100 p-6 rounded-3xl border-2 border-gray-200 text-center space-y-3 shadow-md relative"
+                      className="bg-gradient-to-b from-gray-50 to-slate-100 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-gray-200 text-center space-y-2.5 sm:space-y-3 shadow-md relative"
                     >
-                      <div className="w-10 h-10 rounded-full bg-gray-400 text-white font-black text-sm flex items-center justify-center mx-auto shadow-sm">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-400 text-white font-black text-xs sm:text-sm flex items-center justify-center mx-auto shadow-xs">
                         🥈 #2
                       </div>
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto border-2 border-gray-300 shadow-sm">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden mx-auto border-2 border-gray-300 shadow-xs">
                         <img src={silver.photo_url} alt={silver.applicant_name} className="w-full h-full object-cover" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 text-base">{silver.applicant_name}</h4>
-                        <p className="text-[11px] text-gray-500 font-mono">Roll: {silver.roll_number}</p>
-                        <p className="text-xs text-[#FF2D8D] font-bold mt-1">{silver.scholarship_title}</p>
+                        <h4 className="font-bold text-gray-900 text-sm sm:text-base">{silver.applicant_name}</h4>
+                        <p className="text-[10px] sm:text-[11px] text-gray-500 font-mono">Roll: {silver.roll_number}</p>
+                        <p className="text-xs text-[#FF2D8D] font-bold mt-0.5 sm:mt-1">{silver.scholarship_title}</p>
                       </div>
-                      <div className="p-2.5 bg-white rounded-2xl border border-gray-200 space-y-0.5">
-                        <div className="text-base font-black text-emerald-600">{silver.exam_marks} / 100</div>
-                        <div className="text-[11px] font-extrabold text-purple-700">{silver.prize_amount}</div>
+                      <div className="p-2 sm:p-2.5 bg-white rounded-xl sm:rounded-2xl border border-gray-200 space-y-0.5">
+                        <div className="text-sm sm:text-base font-black text-emerald-600">{silver.exam_marks} / 100</div>
+                        <div className="text-[10px] sm:text-[11px] font-extrabold text-purple-700">{silver.prize_amount}</div>
                       </div>
                     </motion.div>
                   )
@@ -1939,22 +2208,22 @@ export default function ScholarshipsPage() {
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="bg-gradient-to-b from-amber-50 via-yellow-50 to-orange-50 p-8 rounded-3xl border-2 border-amber-300 text-center space-y-4 shadow-xl relative -mt-4"
+                      className="bg-gradient-to-b from-amber-50 via-yellow-50 to-orange-50 p-5 sm:p-8 rounded-2xl sm:rounded-3xl border-2 border-amber-300 text-center space-y-3 sm:space-y-4 shadow-xl relative mt-0 md:-mt-4"
                     >
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-amber-500 text-white font-black text-xs uppercase tracking-wider shadow-md">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 sm:px-4 py-0.5 sm:py-1 rounded-full bg-amber-500 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-md whitespace-nowrap">
                         🥇 1st Prize Champion
                       </div>
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden mx-auto border-4 border-amber-400 shadow-lg mt-2">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden mx-auto border-4 border-amber-400 shadow-md mt-2">
                         <img src={gold.photo_url} alt={gold.applicant_name} className="w-full h-full object-cover" />
                       </div>
                       <div>
-                        <h4 className="font-heading font-black text-gray-900 text-lg">{gold.applicant_name}</h4>
-                        <p className="text-xs text-gray-600 font-mono">Roll: {gold.roll_number}</p>
-                        <p className="text-xs text-[#FF2D8D] font-black mt-1">{gold.scholarship_title}</p>
+                        <h4 className="font-heading font-black text-gray-900 text-base sm:text-lg">{gold.applicant_name}</h4>
+                        <p className="text-[11px] sm:text-xs text-gray-600 font-mono">Roll: {gold.roll_number}</p>
+                        <p className="text-xs text-[#FF2D8D] font-black mt-0.5 sm:mt-1">{gold.scholarship_title}</p>
                       </div>
-                      <div className="p-3.5 bg-white/90 rounded-2xl border border-amber-200 space-y-1 shadow-sm">
-                        <div className="text-2xl font-black text-emerald-600">{gold.exam_marks} / 100</div>
-                        <div className="text-xs font-black text-amber-700">{gold.prize_amount}</div>
+                      <div className="p-2.5 sm:p-3.5 bg-white/90 rounded-xl sm:rounded-2xl border border-amber-200 space-y-0.5 sm:space-y-1 shadow-xs">
+                        <div className="text-xl sm:text-2xl font-black text-emerald-600">{gold.exam_marks} / 100</div>
+                        <div className="text-[11px] sm:text-xs font-black text-amber-700">{gold.prize_amount}</div>
                       </div>
                     </motion.div>
                   )
@@ -1968,22 +2237,22 @@ export default function ScholarshipsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="bg-gradient-to-b from-amber-50/50 to-orange-100/40 p-6 rounded-3xl border-2 border-amber-200 text-center space-y-3 shadow-md relative"
+                      className="bg-gradient-to-b from-amber-50/50 to-orange-100/40 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-amber-200 text-center space-y-2.5 sm:space-y-3 shadow-md relative"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-700 text-white font-black text-sm flex items-center justify-center mx-auto shadow-sm">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-700 text-white font-black text-xs sm:text-sm flex items-center justify-center mx-auto shadow-xs">
                         🥉 #3
                       </div>
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto border-2 border-amber-300 shadow-sm">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden mx-auto border-2 border-amber-300 shadow-xs">
                         <img src={bronze.photo_url} alt={bronze.applicant_name} className="w-full h-full object-cover" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 text-base">{bronze.applicant_name}</h4>
-                        <p className="text-[11px] text-gray-500 font-mono">Roll: {bronze.roll_number}</p>
-                        <p className="text-xs text-[#FF2D8D] font-bold mt-1">{bronze.scholarship_title}</p>
+                        <h4 className="font-bold text-gray-900 text-sm sm:text-base">{bronze.applicant_name}</h4>
+                        <p className="text-[10px] sm:text-[11px] text-gray-500 font-mono">Roll: {bronze.roll_number}</p>
+                        <p className="text-xs text-[#FF2D8D] font-bold mt-0.5 sm:mt-1">{bronze.scholarship_title}</p>
                       </div>
-                      <div className="p-2.5 bg-white rounded-2xl border border-amber-100 space-y-0.5">
-                        <div className="text-base font-black text-emerald-600">{bronze.exam_marks} / 100</div>
-                        <div className="text-[11px] font-extrabold text-amber-800">{bronze.prize_amount}</div>
+                      <div className="p-2 sm:p-2.5 bg-white rounded-xl sm:rounded-2xl border border-amber-100 space-y-0.5">
+                        <div className="text-sm sm:text-base font-black text-emerald-600">{bronze.exam_marks} / 100</div>
+                        <div className="text-[10px] sm:text-[11px] font-extrabold text-amber-800">{bronze.prize_amount}</div>
                       </div>
                     </motion.div>
                   )
@@ -1993,31 +2262,31 @@ export default function ScholarshipsPage() {
           )}
 
           {/* 2. COMPLETE MERIT RANKINGS TABLE */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-xl space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 p-4 sm:p-8 shadow-xl space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
               <div>
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest px-3 py-1 bg-blue-50 rounded-full">
                   Categorized Examination Results Desk
                 </span>
-                <h2 className="text-2xl font-bold text-gray-900 mt-1">Official Scholarship Merit Rankings</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">Official Scholarship Merit Rankings</h2>
                 <p className="text-xs text-gray-500">Select any scholarship exam scheme below to view its specific merit ranks & awards.</p>
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-64">
-                  <Search className="absolute left-3.5 top-3 text-gray-400" size={15} />
+                  <Search className="absolute left-3 top-2.5 text-gray-400" size={14} />
                   <input
                     type="text"
                     placeholder="Search candidate, Roll..."
                     value={meritQuery}
                     onChange={(e) => setMeritQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && fetchMeritList()}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 text-xs"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-xs"
                   />
                 </div>
                 <button
                   onClick={fetchMeritList}
-                  className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-sm"
+                  className="px-3.5 sm:px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-xs shrink-0"
                 >
                   Search
                 </button>
@@ -2025,12 +2294,12 @@ export default function ScholarshipsPage() {
             </div>
 
             {/* SCHOLARSHIP SCHEME TABS */}
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1 pt-2 border-t border-gray-100 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setMeritSchemeFilter('all')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-3.5 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   meritSchemeFilter === 'all'
-                    ? 'bg-gray-900 text-white shadow-md'
+                    ? 'bg-gray-900 text-white shadow-xs'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
@@ -2041,13 +2310,13 @@ export default function ScholarshipsPage() {
                 <button
                   key={s.id}
                   onClick={() => setMeritSchemeFilter(s.id)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap ${
                     meritSchemeFilter === s.id
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
                       : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 uppercase font-semibold">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/20 uppercase font-semibold">
                     {s.category}
                   </span>
                   <span>{s.title}</span>
@@ -2057,31 +2326,45 @@ export default function ScholarshipsPage() {
 
             {/* Active Selected Scheme Detail Banner */}
             {meritSchemeFilter !== 'all' && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-pink-50/40 border border-blue-100 space-y-2.5">
                 {(() => {
                   const activeScheme = scholarships.find((s) => s.id === meritSchemeFilter)
                   if (!activeScheme) return null
                   const isReleased = activeScheme.status === 'results_declared'
+                  const winnerDesc = activeScheme.winner_description || activeScheme.prize_distribution?.winner_description
+
                   return (
                     <>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-blue-600 text-white">
-                            {activeScheme.category}
-                          </span>
-                          <h4 className="font-bold text-gray-900 text-sm">{activeScheme.title}</h4>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                            isReleased ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {isReleased ? '● Official Results Declared' : '● Evaluation In Progress'}
-                          </span>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-blue-100/80 pb-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-blue-600 text-white">
+                              {activeScheme.category}
+                            </span>
+                            <h4 className="font-bold text-gray-900 text-sm">{activeScheme.title}</h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              isReleased ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {isReleased ? '● Official Results Declared' : '● Evaluation In Progress'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#FF2D8D] font-bold">{activeScheme.scholarship_value}</p>
                         </div>
-                        <p className="text-xs text-[#FF2D8D] font-bold">{activeScheme.scholarship_value}</p>
+                        <div className="flex items-center gap-3 text-xs shrink-0">
+                          <span className="text-gray-500">Qualifying Cutoff: <strong className="text-emerald-700">≥ 50%</strong></span>
+                          <span className="text-gray-500">Ranked: <strong className="text-gray-900">{meritList.length} Scholars</strong></span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs shrink-0">
-                        <span className="text-gray-500">Qualifying Cutoff: <strong className="text-emerald-700">≥ 50%</strong></span>
-                        <span className="text-gray-500">Ranked: <strong className="text-gray-900">{meritList.length} Scholars</strong></span>
-                      </div>
+
+                      {winnerDesc && (
+                        <div className="p-2.5 bg-white/90 rounded-xl border border-amber-200 text-xs flex items-start gap-2">
+                          <span className="text-sm">🏆</span>
+                          <div>
+                            <span className="font-bold text-amber-950 uppercase text-[10px] block">Winner Reward Structure:</span>
+                            <p className="text-gray-700 whitespace-pre-line text-[11px] font-medium leading-relaxed">{winnerDesc}</p>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )
                 })()}
@@ -2213,44 +2496,47 @@ export default function ScholarshipsPage() {
                 <button
                   type="button"
                   onClick={() => setFormSection('personal')}
-                  className={`pb-3 transition-all border-b-2 flex items-center justify-center gap-2 ${
+                  className={`pb-2.5 sm:pb-3 transition-all border-b-2 flex items-center justify-center gap-1.5 sm:gap-2 ${
                     formSection === 'personal'
                       ? 'border-[#FF2D8D] text-[#FF2D8D]'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                  <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] shrink-0 ${
                     formSection === 'personal' ? 'bg-[#FF2D8D] text-white' : 'bg-gray-100 text-gray-600'
                   }`}>1</span>
-                  <span>Personal Details</span>
+                  <span className="hidden sm:inline">Personal Details</span>
+                  <span className="sm:hidden text-[11px]">Personal</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormSection('academic')}
-                  className={`pb-3 transition-all border-b-2 flex items-center justify-center gap-2 ${
+                  className={`pb-2.5 sm:pb-3 transition-all border-b-2 flex items-center justify-center gap-1.5 sm:gap-2 ${
                     formSection === 'academic'
                       ? 'border-[#FF2D8D] text-[#FF2D8D]'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                  <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] shrink-0 ${
                     formSection === 'academic' ? 'bg-[#FF2D8D] text-white' : 'bg-gray-100 text-gray-600'
                   }`}>2</span>
-                  <span>Academic Details</span>
+                  <span className="hidden sm:inline">Academic Details</span>
+                  <span className="sm:hidden text-[11px]">Academic</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormSection('documents')}
-                  className={`pb-3 transition-all border-b-2 flex items-center justify-center gap-2 ${
+                  className={`pb-2.5 sm:pb-3 transition-all border-b-2 flex items-center justify-center gap-1.5 sm:gap-2 ${
                     formSection === 'documents'
                       ? 'border-[#FF2D8D] text-[#FF2D8D]'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                  <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] shrink-0 ${
                     formSection === 'documents' ? 'bg-[#FF2D8D] text-white' : 'bg-gray-100 text-gray-600'
                   }`}>3</span>
-                  <span>Uploads & Centers</span>
+                  <span className="hidden sm:inline">Uploads & Centers</span>
+                  <span className="sm:hidden text-[11px]">Docs & Center</span>
                 </button>
               </div>
             )}
@@ -2547,27 +2833,66 @@ export default function ScholarshipsPage() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                          <div>
-                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">City *</label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="e.g. New Delhi"
-                              value={applicantForm.city}
-                              onChange={(e) => setApplicantForm({ ...applicantForm, city: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                            />
-                          </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
                           <div>
                             <label className="block text-xs font-bold text-gray-700 uppercase mb-1">State *</label>
+                            <select
+                              required
+                              value={applicantForm.state || 'Bihar'}
+                              onChange={(e) => {
+                                const newState = e.target.value
+                                const dists = getDistrictsForState(newState)
+                                const d1 = dists[0] || ''
+                                const d2 = dists[1] || d1
+                                setApplicantForm({
+                                  ...applicantForm,
+                                  state: newState,
+                                  district: d1,
+                                  city: d1,
+                                  preference_state: newState,
+                                  preference_district_1: d1,
+                                  preference_district_2: d2,
+                                  exam_city_preference: `${d1} (Pref 1) / ${d2} (Pref 2)`,
+                                })
+                              }}
+                              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs bg-white font-medium"
+                            >
+                              {getIndianStates().map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">District *</label>
+                            <select
+                              required
+                              value={applicantForm.district || getDistrictsForState(applicantForm.state || 'Bihar')[0] || ''}
+                              onChange={(e) => {
+                                const newDist = e.target.value
+                                setApplicantForm({
+                                  ...applicantForm,
+                                  district: newDist,
+                                  city: newDist,
+                                  preference_district_1: newDist,
+                                  exam_city_preference: `${newDist} (Pref 1) / ${applicantForm.preference_district_2 || 'Backup'} (Pref 2)`,
+                                })
+                              }}
+                              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs bg-white font-medium"
+                            >
+                              {getDistrictsForState(applicantForm.state || 'Bihar').map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">City / Town / Village *</label>
                             <input
                               type="text"
                               required
-                              placeholder="e.g. Delhi"
-                              value={applicantForm.state}
-                              onChange={(e) => setApplicantForm({ ...applicantForm, state: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
+                              placeholder="e.g. Boring Road / Mohalla"
+                              value={applicantForm.city}
+                              onChange={(e) => setApplicantForm({ ...applicantForm, city: e.target.value })}
+                              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
                             />
                           </div>
                           <div>
@@ -2575,10 +2900,10 @@ export default function ScholarshipsPage() {
                             <input
                               type="text"
                               required
-                              placeholder="e.g. 110001"
+                              placeholder="e.g. 800001"
                               value={applicantForm.pincode}
                               onChange={(e) => setApplicantForm({ ...applicantForm, pincode: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
+                              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
                             />
                           </div>
                         </div>
@@ -2605,168 +2930,237 @@ export default function ScholarshipsPage() {
                               2. Educational & Academic Record Verification
                             </span>
                             <p className="text-[11px] text-gray-500 mt-0.5">
-                              Please provide complete institutional, board, and marks percentage details for each standard required by this scholarship.
+                              Select your current standard/class and provide institutional, board, and marks percentage details.
                             </p>
                           </div>
                           <span className="text-xs font-extrabold text-[#FF2D8D] bg-pink-50 border border-pink-200 px-3 py-1 rounded-full shrink-0">
-                            {academicRecords.length} Qualification Standards Required
+                            Class: {applicantForm.qualification || 'Not Selected'}
                           </span>
+                        </div>
+
+                        {/* STUDENT CURRENT CLASS / STANDARD SELECTOR */}
+                        <div className="p-4 bg-gradient-to-r from-pink-50/70 via-purple-50/50 to-white rounded-2xl border border-pink-100 space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <label className="text-xs font-black text-gray-900 uppercase flex items-center gap-1.5">
+                              <GraduationCap size={15} className="text-[#FF2D8D]" />
+                              Select Your Current Class / Standard *
+                            </label>
+                            <span className="text-[11px] font-bold text-purple-700">
+                              Choose from eligible criteria
+                            </span>
+                          </div>
+
+                          {/* Quick Badges for Eligible Scheme Qualifications */}
+                          {selectedScheme?.eligible_qualifications && selectedScheme.eligible_qualifications.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {selectedScheme.eligible_qualifications.map((q) => {
+                                const isSelected = applicantForm.qualification === q
+                                return (
+                                  <button
+                                    key={q}
+                                    type="button"
+                                    onClick={() => handleSelectStudentClass(q)}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs ${
+                                      isSelected
+                                        ? 'bg-[#FF2D8D] text-white shadow-pink-500/20 shadow-md scale-105 border border-[#FF2D8D]'
+                                        : 'bg-white text-gray-700 border border-gray-200 hover:border-pink-200 hover:bg-pink-50/50'
+                                    }`}
+                                  >
+                                    <span>{isSelected ? '✓' : '•'}</span>
+                                    <span>{q}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {/* Dynamic Guidance Banner based on Class */}
+                          <div className="p-2.5 bg-white/90 rounded-xl border border-pink-100 text-[11px] text-gray-600 flex items-center gap-2">
+                            <Sparkles size={14} className="text-[#FF2D8D] shrink-0" />
+                            {(() => {
+                              const q = (applicantForm.qualification || '').toLowerCase()
+                              if (q.includes('6th') || q.includes('7th') || q.includes('8th') || q.includes('9th') || q.includes('10th')) {
+                                return (
+                                  <span>
+                                    Applying as <strong>{applicantForm.qualification} School Scholar</strong>. Enter your current school name and previous standard&apos;s annual exam score.
+                                  </span>
+                                )
+                              } else if (q.includes('11th') || q.includes('12th')) {
+                                return (
+                                  <span>
+                                    Applying as <strong>{applicantForm.qualification} Scholar</strong>. Enter your 10th board passing details and current junior college name.
+                                  </span>
+                                )
+                              }
+                              return (
+                                <span>
+                                  Applying for <strong>{applicantForm.qualification}</strong>. Enter your university / college and qualification details.
+                                </span>
+                              )
+                            })()}
+                          </div>
                         </div>
 
                         {/* List of Dynamic Qualification Standard Cards */}
                         <div className="space-y-4">
-                          {academicRecords.map((record, index) => (
-                            <div
-                              key={record.id}
-                              className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3 relative transition-all hover:border-[#FF2D8D]/40"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-6 h-6 rounded-full bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white flex items-center justify-center text-xs font-bold shadow-xs">
-                                    {index + 1}
-                                  </span>
-                                  <span className="font-extrabold text-gray-900 text-sm">
-                                    {record.qualification} Standard / Degree Record
-                                  </span>
-                                  {!record.is_custom ? (
-                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md">
-                                      Mandatory Standard
+                          {academicRecords.map((record, index) => {
+                            const q = (record.qualification || '').toLowerCase()
+                            const isSchool = q.includes('6th') || q.includes('7th') || q.includes('8th') || q.includes('9th') || q.includes('10th')
+                            const isSeniorSec = q.includes('11th') || q.includes('12th')
+
+                            return (
+                              <div
+                                key={record.id}
+                                className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3 relative transition-all hover:border-[#FF2D8D]/40"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                                      {index + 1}
                                     </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
-                                      Additional Qualification
+                                    <span className="font-extrabold text-gray-900 text-sm">
+                                      {record.qualification} Academic Details
                                     </span>
+                                    {!record.is_custom ? (
+                                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md">
+                                        Primary Standard
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
+                                        Additional Record
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {record.is_custom && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveAcademicRecord(record.id)}
+                                      className="text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                                      title="Remove this record"
+                                    >
+                                      ✕ Remove
+                                    </button>
                                   )}
                                 </div>
 
-                                {record.is_custom && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveAcademicRecord(record.id)}
-                                    className="text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-all"
-                                    title="Remove this record"
-                                  >
-                                    ✕ Remove
-                                  </button>
-                                )}
-                              </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+                                  {/* School / College Name */}
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      {isSchool ? 'School Name *' : isSeniorSec ? 'Junior College / School Name *' : 'College / University Name *'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder={
+                                        isSchool
+                                          ? 'e.g. Delhi Public School / DAV School / Govt High School'
+                                          : isSeniorSec
+                                          ? 'e.g. Senior Secondary School / Junior College'
+                                          : 'e.g. IIT / NIT / State University'
+                                      }
+                                      value={record.institution}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'institution', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
+                                    />
+                                  </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
-                                {/* School / College Name */}
-                                <div className="sm:col-span-2">
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    School / College / Institute Name *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder={
-                                      record.qualification.toLowerCase().includes('10th')
-                                        ? 'e.g. Delhi Public School / St. Mary High School'
-                                        : record.qualification.toLowerCase().includes('12th')
-                                        ? 'e.g. Junior College / Senior Secondary School'
-                                        : 'e.g. IIT / NIT / State University'
-                                    }
-                                    value={record.institution}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'institution', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
-                                  />
-                                </div>
+                                  {/* Board / University */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      {isSchool ? 'School Board *' : 'Board / University *'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder={isSchool ? 'e.g. CBSE / ICSE / BSEB / State Board' : 'e.g. CBSE / State Board / University'}
+                                      value={record.board_university}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'board_university', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
+                                    />
+                                  </div>
 
-                                {/* Board / University */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Board / University *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. CBSE / ICSE / State Board / AKTU"
-                                    value={record.board_university}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'board_university', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                                  />
-                                </div>
+                                  {/* Roll Number / Reg No */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      {isSchool ? 'School Roll / S.R. No.' : 'Roll No / Reg No'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder={isSchool ? 'e.g. 18 / SR-2024' : 'e.g. 12489201'}
+                                      value={record.roll_no}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'roll_no', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
+                                    />
+                                  </div>
 
-                                {/* Roll Number / Reg No */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Roll No / Reg No
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. 12489201"
-                                    value={record.roll_no}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'roll_no', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
-                                  />
-                                </div>
+                                  {/* Passing Year / Academic Year */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      {isSchool ? 'Academic Session *' : 'Passing Year *'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder={isSchool ? 'e.g. 2025-2026' : 'e.g. 2024'}
+                                      value={record.passing_year}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'passing_year', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
+                                    />
+                                  </div>
 
-                                {/* Passing Year */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Passing Year *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. 2022 / 2024"
-                                    value={record.passing_year}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'passing_year', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
-                                  />
-                                </div>
+                                  {/* Marks Obtained (Optional) */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      Marks Obtained (Optional)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      placeholder="e.g. 465"
+                                      value={record.marks_obtained || ''}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'marks_obtained', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
+                                    />
+                                  </div>
 
-                                {/* Marks Obtained (Optional) */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Marks Obtained (Optional)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    placeholder="e.g. 465"
-                                    value={record.marks_obtained || ''}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'marks_obtained', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                                  />
-                                </div>
+                                  {/* Total Marks (Optional) */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      Max / Total Marks
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      placeholder="e.g. 500"
+                                      value={record.total_marks || ''}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'total_marks', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
+                                    />
+                                  </div>
 
-                                {/* Total Marks (Optional) */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Max / Total Marks
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    placeholder="e.g. 500"
-                                    value={record.total_marks || ''}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'total_marks', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                                  />
-                                </div>
-
-                                {/* Final Percentage (%) / CGPA */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                    Percentage (%) / CGPA *
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    max={100}
-                                    required
-                                    placeholder="e.g. 88.50"
-                                    value={record.percentage}
-                                    onChange={(e) => handleUpdateAcademicRecord(record.id, 'percentage', e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm font-bold text-[#FF2D8D] bg-white focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
-                                  />
+                                  {/* Final Percentage (%) / CGPA */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                                      {isSchool ? 'Previous Class Exam % *' : 'Percentage (%) / CGPA *'}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={0}
+                                      max={100}
+                                      required
+                                      placeholder="e.g. 88.50"
+                                      value={record.percentage}
+                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'percentage', e.target.value)}
+                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm font-bold text-[#FF2D8D] bg-white focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
 
                         {/* Add Custom / Additional Degree Bar */}
@@ -2841,41 +3235,31 @@ export default function ScholarshipsPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/70 pb-3">
                           <div>
                             <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">
-                              3. Mandatory Document Dossier & Examination Center Selection
+                              3. Mandatory Document Dossier & Verification
                             </span>
                             <p className="text-[11px] text-gray-500 mt-0.5">
-                              Please upload all verification documents configured by Superadmin for this scholarship scheme, along with your passport photograph and signature.
+                              Upload documents tailored for {applicantForm.qualification || 'your class'}, along with your passport photograph and signature.
                             </p>
                           </div>
                           <span className="text-xs font-extrabold text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1 rounded-full shrink-0">
                             {(() => {
-                              const docs = (selectedScheme?.required_documents && selectedScheme.required_documents.length > 0)
-                                ? selectedScheme.required_documents.filter(d => {
-                                    const l = d.toLowerCase()
-                                    return !l.includes('photo') && !l.includes('photograph') && !l.includes('signature') && !l.includes('sign')
-                                  })
-                                : ['10th / 12th Marksheet', 'Government Photo ID (Aadhaar/PAN)']
-                              return `${docs.length} Scheme Docs + Photo & Sign`
+                              const docs = getApplicableDocumentList(selectedScheme, applicantForm.qualification)
+                              return `${docs.length} Required Docs + Photo & Sign`
                             })()}
                           </span>
                         </div>
 
                         {/* Dynamic Scheme Documents Grid */}
                         {(() => {
-                          const schemeDocs = (selectedScheme?.required_documents && selectedScheme.required_documents.length > 0)
-                            ? selectedScheme.required_documents.filter(d => {
-                                const l = d.toLowerCase()
-                                return !l.includes('photo') && !l.includes('photograph') && !l.includes('signature') && !l.includes('sign')
-                              })
-                            : ['10th / 12th Marksheet', 'Government Photo ID (Aadhaar/PAN)']
+                          const schemeDocs = getApplicableDocumentList(selectedScheme, applicantForm.qualification)
 
                           return (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                               {schemeDocs.map((docName, index) => {
                                 const isUploaded = !!uploadedDocs[docName] || (
-                                  (docName.toLowerCase().includes('aadhaar') && !!applicantForm.aadhaar_url) ||
+                                  ((docName.toLowerCase().includes('aadhaar') || docName.toLowerCase().includes('birth')) && !!applicantForm.aadhaar_url) ||
                                   (docName.toLowerCase().includes('marksheet') && !!applicantForm.marksheet_url) ||
-                                  (docName.toLowerCase().includes('college') && !!applicantForm.college_id_url)
+                                  ((docName.toLowerCase().includes('college') || docName.toLowerCase().includes('school id') || docName.toLowerCase().includes('bonafide')) && !!applicantForm.college_id_url)
                                 )
 
                                 return (
@@ -2886,7 +3270,7 @@ export default function ScholarshipsPage() {
                                     <div>
                                       <div className="flex items-center justify-between mb-1">
                                         <label className="text-xs font-bold text-gray-900 uppercase flex items-center gap-1.5 truncate">
-                                          {docName.toLowerCase().includes('marksheet') ? (
+                                          {docName.toLowerCase().includes('marksheet') || docName.toLowerCase().includes('report') ? (
                                             <GraduationCap size={14} className="text-purple-600 shrink-0" />
                                           ) : docName.toLowerCase().includes('income') ? (
                                             <Landmark size={14} className="text-emerald-600 shrink-0" />
@@ -2931,11 +3315,15 @@ export default function ScholarshipsPage() {
                                           type="button"
                                           onClick={() => {
                                             const sampleUrl = 'data:application/pdf;base64,sample_verified_doc'
-                                            setUploadedDocs(prev => ({ ...prev, [docName]: sampleUrl }))
+                                            setUploadedDocs((prev) => ({ ...prev, [docName]: sampleUrl }))
                                             const l = docName.toLowerCase()
-                                            if (l.includes('aadhaar') || l.includes('id') || l.includes('pan')) setApplicantForm(prev => ({ ...prev, aadhaar_url: sampleUrl }))
-                                            else if (l.includes('marksheet')) setApplicantForm(prev => ({ ...prev, marksheet_url: sampleUrl }))
-                                            else if (l.includes('college') || l.includes('school id')) setApplicantForm(prev => ({ ...prev, college_id_url: sampleUrl }))
+                                            if (l.includes('aadhaar') || l.includes('id') || l.includes('pan') || l.includes('birth')) {
+                                              setApplicantForm((prev) => ({ ...prev, aadhaar_url: sampleUrl }))
+                                            } else if (l.includes('marksheet') || l.includes('report')) {
+                                              setApplicantForm((prev) => ({ ...prev, marksheet_url: sampleUrl }))
+                                            } else if (l.includes('college') || l.includes('school id') || l.includes('bonafide')) {
+                                              setApplicantForm((prev) => ({ ...prev, college_id_url: sampleUrl }))
+                                            }
                                           }}
                                           className="text-[10px] text-blue-600 font-semibold hover:underline block text-center w-full"
                                         >
@@ -3052,40 +3440,70 @@ export default function ScholarshipsPage() {
                           </div>
                         </div>
 
-                        {/* Exam Center Selector */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-xs font-bold text-gray-800 uppercase">
-                              Select Preferred Examination Center / Venue *
+                        {/* Examination City / District Preferences */}
+                        <div className="p-4 bg-gradient-to-r from-purple-50/70 to-pink-50/70 rounded-2xl border border-purple-100 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-xs font-bold text-gray-900 uppercase flex items-center gap-1.5">
+                              <MapPin size={15} className="text-[#9C27FF]" /> Examination Center Preferences (District-Wise) *
                             </label>
-                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-100">
-                              Approved Assessment Centers
+                            <span className="text-[10px] font-bold text-purple-700 bg-white px-2.5 py-0.5 rounded-full border border-purple-200 shadow-xs">
+                              All India / State Allocation
                             </span>
                           </div>
-                          {(() => {
-                            const centers = selectedScheme.exam_centers && selectedScheme.exam_centers.length > 0
-                              ? selectedScheme.exam_centers
-                              : (selectedScheme.exam_venue ? [selectedScheme.exam_venue] : ['National Proctored Online Assessment Hub'])
-                            return (
-                              <div className="relative">
-                                <select
-                                  required
-                                  value={applicantForm.exam_city_preference || centers[0]}
-                                  onChange={(e) => setApplicantForm({ ...applicantForm, exam_city_preference: e.target.value })}
-                                  className="w-full pl-4 pr-10 py-3 rounded-2xl border border-gray-200 text-xs sm:text-sm font-bold text-gray-900 bg-white shadow-xs focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D] cursor-pointer appearance-none"
-                                >
-                                  {centers.map((center, idx) => (
-                                    <option key={idx} value={center}>
-                                      📍 {center}
-                                    </option>
-                                  ))}
-                                </select>
-                                <div className="absolute right-3.5 top-3.5 pointer-events-none text-[#FF2D8D]">
-                                  <MapPin size={18} />
-                                </div>
-                              </div>
-                            )
-                          })()}
+
+                          <p className="text-[11px] text-gray-600 leading-relaxed">
+                            📍 Select your nearest districts. Superadmin will allocate your exact physical examination center / school venue with complete address, room, and reporting time on your <strong>Official Admit Card</strong> based on candidate density.
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                            {/* Preference 1 */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                1st District Preference (Nearest City / District) *
+                              </label>
+                              <select
+                                required
+                                value={applicantForm.preference_district_1 || getDistrictsForState(applicantForm.preference_state || applicantForm.state || 'Bihar')[0] || ''}
+                                onChange={(e) => {
+                                  const d1 = e.target.value
+                                  setApplicantForm({
+                                    ...applicantForm,
+                                    preference_district_1: d1,
+                                    exam_city_preference: `${d1} (Pref 1) / ${applicantForm.preference_district_2 || 'Backup'} (Pref 2)`,
+                                  })
+                                }}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-900 bg-white shadow-xs focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
+                              >
+                                {getDistrictsForState(applicantForm.preference_state || applicantForm.state || 'Bihar').map((d) => (
+                                  <option key={d} value={d}>📍 {d}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Preference 2 */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                2nd District Preference (Alternative District) *
+                              </label>
+                              <select
+                                required
+                                value={applicantForm.preference_district_2 || getDistrictsForState(applicantForm.preference_state || applicantForm.state || 'Bihar')[1] || ''}
+                                onChange={(e) => {
+                                  const d2 = e.target.value
+                                  setApplicantForm({
+                                    ...applicantForm,
+                                    preference_district_2: d2,
+                                    exam_city_preference: `${applicantForm.preference_district_1 || 'Primary'} (Pref 1) / ${d2} (Pref 2)`,
+                                  })
+                                }}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-900 bg-white shadow-xs focus:ring-2 focus:ring-[#9C27FF]/20 focus:border-[#9C27FF]"
+                              >
+                                {getDistrictsForState(applicantForm.preference_state || applicantForm.state || 'Bihar').map((d) => (
+                                  <option key={d} value={d}>📍 {d}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Declaration Checkbox */}
@@ -3281,6 +3699,34 @@ export default function ScholarshipsPage() {
                     </div>
                   </div>
 
+                  {/* Payment & Application Official Receipt Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <div className="font-heading font-black text-emerald-950 text-sm flex items-center gap-1.5">
+                          <span>Payment & Application Receipt</span>
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full uppercase">
+                            Ready
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700">
+                          Official acknowledgment slip with transaction reference, student bio & fee breakdown.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowReceiptModal(true)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <Download size={14} />
+                      <span>Download Receipt (PDF)</span>
+                    </button>
+                  </div>
+
                   <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs space-y-1.5">
                     <div className="font-bold text-gray-800 uppercase text-[10px]">Official Hall Ticket Notice:</div>
                     <p className="text-gray-600 leading-relaxed">
@@ -3288,8 +3734,17 @@ export default function ScholarshipsPage() {
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-1">
                     <button
+                      type="button"
+                      onClick={() => setShowReceiptModal(true)}
+                      className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                      <FileText size={15} />
+                      <span>View & Print Receipt</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => {
                         setSelectedScheme(null)
                         setActiveTab('admit_card')
@@ -3298,13 +3753,14 @@ export default function ScholarshipsPage() {
                           registration_code: generatedApplication.data.registration_code,
                         })
                       }}
-                      className="flex-1 py-3.5 bg-gradient-to-r from-[#9C27FF] to-[#FF2D8D] text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                      className="flex-1 py-3.5 bg-gradient-to-r from-[#9C27FF] to-[#FF2D8D] text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5"
                     >
                       <QrCode size={14} /> Go to Admit Card Desk
                     </button>
                     <button
+                      type="button"
                       onClick={() => setSelectedScheme(null)}
-                      className="px-6 py-3.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 text-center"
+                      className="px-6 py-3.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 text-center transition-colors"
                     >
                       Done
                     </button>
@@ -3732,6 +4188,19 @@ export default function ScholarshipsPage() {
                     <span className="text-[10px] text-gray-500 block">LMS Course Credit</span>
                   </div>
                 </div>
+
+                {/* Detailed Winner Perks Description */}
+                {(inspectingSchemeDoc.winner_description || inspectingSchemeDoc.prize_distribution?.winner_description) && (
+                  <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-1.5 m-4 mt-0">
+                    <div className="flex items-center gap-2 font-black text-amber-950 text-xs uppercase tracking-wide">
+                      <span className="text-base">🏆</span>
+                      <span>Official Winner Rewards, Grant Structure & Perks:</span>
+                    </div>
+                    <p className="text-xs text-gray-800 leading-relaxed whitespace-pre-line font-medium">
+                      {inspectingSchemeDoc.winner_description || inspectingSchemeDoc.prize_distribution?.winner_description}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Mandatory Documents Required */}
@@ -3875,7 +4344,376 @@ export default function ScholarshipsPage() {
         document.body
       )}
 
-      <Footer />
+      {/* OFFICIAL SCHOLARSHIP APPLICATION & PAYMENT ACKNOWLEDGMENT RECEIPT MODAL */}
+      {mounted && showReceiptModal && generatedApplication && createPortal(
+        <div 
+          id="receipt-modal-wrapper"
+          className="fixed inset-0 z-[999999] flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in duration-200"
+          style={{
+            backgroundColor: 'rgba(5, 8, 20, 0.88)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+          }}
+        >
+          {/* Embedded Single-Page Print Stylesheet */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 4mm 6mm !important;
+              }
+              html, body {
+                height: 100% !important;
+                max-height: 100% !important;
+                overflow: hidden !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              body > *:not(#receipt-modal-wrapper) {
+                display: none !important;
+              }
+              body > #receipt-modal-wrapper {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: #ffffff !important;
+                overflow: hidden !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+              }
+              #receipt-modal-wrapper > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                overflow: hidden !important;
+                border-radius: 0 !important;
+              }
+              .no-print, .no-print * {
+                display: none !important;
+                height: 0 !important;
+                max-height: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+              }
+              #printable-receipt {
+                display: block !important;
+                position: relative !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 10px 14px !important;
+                border: 1.5px solid #000000 !important;
+                border-radius: 6px !important;
+                background: #ffffff !important;
+                box-shadow: none !important;
+                page-break-inside: avoid !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                break-inside: avoid !important;
+                break-after: avoid !important;
+                overflow: hidden !important;
+              }
+            }
+          `}} />
+
+          <div className="bg-white sm:rounded-3xl rounded-none max-w-4xl w-full h-full sm:h-auto sm:max-h-[94vh] p-4 sm:p-6 shadow-2xl border border-gray-100 flex flex-col overflow-hidden relative">
+            {/* Modal Navigation Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 shrink-0 no-print">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-heading font-black text-gray-900 text-sm sm:text-base">
+                    Official Fee & Application Receipt (Single Page PDF)
+                  </h3>
+                  <span className="text-[10px] text-gray-400 font-mono">
+                    APP NO: {generatedApplication.data.application_no}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <Printer size={14} />
+                  <span>Print 1-Page PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all font-bold text-sm"
+                  title="Close Receipt"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Receipt Canvas */}
+            <div className="overflow-y-auto pr-1 sm:pr-2 pt-3 flex-1">
+              <div id="printable-receipt" className="border-2 border-gray-900 p-4 sm:p-5 rounded-2xl bg-white space-y-3.5 text-gray-900 text-[11px]">
+                {/* Official Board Letterhead */}
+                <div className="border-b-2 border-gray-900 pb-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <GraduationCap size={24} />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[9px] font-extrabold text-gray-500 uppercase tracking-widest">
+                        AAGAJ NATIONAL SCHOLARSHIP BOARD • GOVT RECOGNIZED INTAKE
+                      </div>
+                      <h2 className="text-sm sm:text-lg font-black text-gray-900 uppercase tracking-tight leading-tight">
+                        AAGAJ FOUNDATION & INFOTECH
+                      </h2>
+                      <p className="text-[10px] font-bold text-[#FF2D8D]">
+                        National Merit Scholarship Entrance Examination (NMSEE-2026)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-center sm:text-right shrink-0">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      ✓ Official Acknowledgment Receipt
+                    </span>
+                    <div className="font-mono text-[9px] text-gray-500 mt-0.5">
+                      Receipt Date: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Receipt Metadata Ribbon */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-xl bg-gray-50 border border-gray-200 text-[10px]">
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Application Number</span>
+                    <strong className="font-mono font-black text-gray-900 text-xs">{generatedApplication.data.application_no}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Security Registration Code</span>
+                    <strong className="font-mono font-black text-purple-700 text-xs">{generatedApplication.data.registration_code}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Payment Status</span>
+                    <strong className="text-emerald-700 font-extrabold text-xs">
+                      ● {generatedApplication.data.payment_amount === 0 ? 'FREE CONFIRMED' : 'PAID & CONFIRMED'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Transaction Ref</span>
+                    <strong className="font-mono font-bold text-gray-700 text-[10px] truncate block">
+                      {generatedApplication.data.payment_reference || `PAY_MOCK_${generatedApplication.data.application_no.slice(-4)}`}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Candidate & Scheme Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  {/* Bio Data (3 cols) */}
+                  <div className="sm:col-span-3 space-y-2.5">
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-100 px-2.5 py-1 font-bold text-[10px] text-gray-700 uppercase border-b border-gray-200">
+                        1. Candidate & Academic Details
+                      </div>
+                      <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Candidate Full Name:</span>
+                          <strong className="text-gray-900 uppercase text-[11px]">{generatedApplication.data.applicant_name}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Father / Guardian Name:</span>
+                          <strong className="text-gray-800 uppercase text-[11px]">{generatedApplication.data.father_name || applicantForm.father_name || 'N/A'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Date of Birth & Gender:</span>
+                          <span className="font-medium text-gray-800">
+                            {generatedApplication.data.dob || applicantForm.dob || '2008-05-15'} • {generatedApplication.data.gender || applicantForm.gender || 'General'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Social Category:</span>
+                          <span className="font-medium text-gray-800">{generatedApplication.data.category || applicantForm.category || 'General'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Applied Standard / Class:</span>
+                          <strong className="text-purple-700 font-bold">{generatedApplication.data.qualification || applicantForm.qualification || 'Class 10th'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">School / Institution Name:</span>
+                          <span className="font-medium text-gray-800 truncate block">{generatedApplication.data.school_college_name || applicantForm.school_college_name || 'Designated School'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Registered Contact:</span>
+                          <span className="font-mono text-gray-800">{generatedApplication.data.applicant_phone || applicantForm.applicant_phone} • {generatedApplication.data.applicant_email}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">State & District:</span>
+                          <span className="font-medium text-gray-800">{applicantForm.district || 'Patna'}, {applicantForm.state || 'Bihar'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Examination District Center Preferences */}
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-100 px-2.5 py-1 font-bold text-[10px] text-gray-700 uppercase border-b border-gray-200">
+                        2. Examination Scheme & District Preferences
+                      </div>
+                      <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                        <div className="sm:col-span-2">
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Scholarship Scheme Name:</span>
+                          <strong className="text-gray-900 text-xs">{selectedScheme?.title || generatedApplication.data.scholarship_title}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">1st District Preference (Exam City):</span>
+                          <strong className="text-emerald-800 font-bold">📍 {applicantForm.preference_district_1 || 'Patna'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">2nd District Preference (Alternative):</span>
+                          <strong className="text-gray-700 font-bold">📍 {applicantForm.preference_district_2 || 'Gaya'}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Photo & Signature (1 col) */}
+                  <div className="space-y-2 flex flex-col items-center justify-start text-center">
+                    <div className="w-24 h-30 border-2 border-gray-800 rounded-xl overflow-hidden bg-gray-50 shadow-xs flex items-center justify-center p-0.5">
+                      <img
+                        src={generatedApplication.data.photo_url || applicantForm.photo_url || DEFAULT_SAMPLE_PHOTOS[0]}
+                        alt={generatedApplication.data.applicant_name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    </div>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase">Verified Candidate Photo</span>
+
+                    <div className="w-24 h-10 border border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-0.5">
+                      {generatedApplication.data.signature_url || applicantForm.signature_url ? (
+                        <img
+                          src={generatedApplication.data.signature_url || applicantForm.signature_url}
+                          alt="Signature"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="font-mono text-[9px] text-gray-500 italic">Digitally Signed</span>
+                      )}
+                    </div>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase">Candidate E-Signature</span>
+                  </div>
+                </div>
+
+                {/* Fee & Payment Statement Table */}
+                <div className="border border-gray-900 rounded-xl overflow-hidden">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="bg-gray-900 text-white text-[9px] uppercase font-bold">
+                      <tr>
+                        <th className="px-2.5 py-1.5">Item Description</th>
+                        <th className="px-2.5 py-1.5">Fee Category</th>
+                        <th className="px-2.5 py-1.5">Payment Mode</th>
+                        <th className="px-2.5 py-1.5 text-right">Amount Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      <tr>
+                        <td className="px-2.5 py-1.5 font-bold text-gray-900">
+                          {selectedScheme?.title || generatedApplication.data.scholarship_title}
+                          <span className="block text-[9px] text-gray-500 font-normal">
+                            Provisional Hall Ticket & District Assessment Desk Intake Fee
+                          </span>
+                        </td>
+                        <td className="px-2.5 py-1.5 font-medium text-gray-700">
+                          {generatedApplication.data.payment_amount === 0 ? 'Exempted / Free Tier' : 'Standard Intake'}
+                        </td>
+                        <td className="px-2.5 py-1.5 font-mono text-gray-700">
+                          {generatedApplication.data.payment_amount === 0 ? 'Merit Exemption' : 'Online / UPI / Card'}
+                        </td>
+                        <td className="px-2.5 py-1.5 text-right font-mono font-black text-gray-900 text-xs">
+                          {generatedApplication.data.payment_amount === 0 ? '₹0.00 (FREE)' : `₹${generatedApplication.data.payment_amount}.00`}
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50 font-bold">
+                        <td colSpan={3} className="px-2.5 py-1 text-right uppercase text-[9px] text-gray-600">
+                          Total Amount Received:
+                        </td>
+                        <td className="px-2.5 py-1 text-right font-mono font-black text-emerald-700 text-xs">
+                          {generatedApplication.data.payment_amount === 0 ? '₹0.00' : `₹${generatedApplication.data.payment_amount}.00`}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Important Instructions for Candidate */}
+                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 text-[9px] text-gray-600 space-y-0.5">
+                  <div className="font-bold text-gray-900 uppercase text-[9px]">Important Instructions:</div>
+                  <ol className="list-decimal pl-3.5 space-y-0.5 leading-tight">
+                    <li>This acknowledgment receipt certifies that your scholarship application has been officially recorded in the National Database.</li>
+                    <li>Please preserve your <strong>Security Registration Code ({generatedApplication.data.registration_code})</strong> carefully to download your Official Exam Admit Card (Hall Ticket).</li>
+                    <li>Superadmin will allocate exact physical exam centers based on candidate district preferences. Admit Cards will be available in the <strong>&quot;Download Admit Card&quot;</strong> tab once published.</li>
+                  </ol>
+                </div>
+
+                {/* Official Sign & Seal Footer */}
+                <div className="pt-2 border-t-2 border-gray-900 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={20} className="text-emerald-600" />
+                    <div>
+                      <div className="font-bold text-gray-900 text-[10px]">National Scholarship Examination Authority</div>
+                      <div>Digitally Certified & Secured System Generated Slip • No Physical Signature Required</div>
+                    </div>
+                  </div>
+
+                  <div className="text-center sm:text-right">
+                    <div className="font-mono font-bold text-gray-800 text-[9px]">AUTHORIZED CONTROLLER OF EXAMINATIONS</div>
+                    <div className="text-gray-400 text-[8px]">AAGAJ FOUNDATION & INFOTECH</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Bottom Action Bar */}
+            <div className="pt-3 mt-2 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0 no-print">
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 border border-gray-200 text-center"
+              >
+                Close Receipt
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <Printer size={15} />
+                  <span>Print 1-Page PDF</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      <div className="no-print">
+        <Footer />
+      </div>
     </div>
   )
 }

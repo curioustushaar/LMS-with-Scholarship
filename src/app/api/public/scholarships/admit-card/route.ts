@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Invalid Registration Code. Please check the code received on your Provisional Admit Card.',
+            error: 'Invalid Registration Code. Please check the code received on your Provisional Confirmation Slip.',
           },
           { status: 401 }
         )
@@ -63,11 +63,11 @@ export async function POST(request: Request) {
 
     const isOfficialReleased = isSchoolApproved && (candidate.admit_card_status === 'released' || candidate.admit_card_status === 'approved')
 
-    let admitCardStatus = 'PROVISIONAL REGISTRATION (SUPERADMIN APPROVAL PENDING)'
+    let admitCardStatus = 'PROVISIONAL REGISTRATION (EXAM CENTER ALLOCATION IN PROGRESS)'
     let customInstructions = [
       'Candidate must carry a printed copy of this Admit Card along with an original Photo ID proof (Aadhaar/PAN/School ID).',
       'Ensure the uploaded photograph and signature are clearly visible on this printed hall ticket.',
-      'For online exams, log in 30 minutes prior to the test slot using your Roll Number and Registration Code.',
+      'Report at the examination center strictly as per the Reporting Time mentioned on this card.',
       'Electronic gadgets, smartwatches, and unauthorized calculators are strictly prohibited inside examination premises.',
       'Any malpractice or impersonation will lead to immediate disqualification and cancellation of scholarship candidature.',
     ]
@@ -84,11 +84,19 @@ export async function POST(request: Request) {
       customInstructions = [
         `⏳ Pending School Verification: Your enrollment is currently awaiting verification from ${candidate.school_name || candidate.school_id}.`,
         'As per scholarship guidelines, Admit Cards are released only after your school authority verifies your Class, Section, and Roll Number.',
-        'Once approved by your school, your official Hall Ticket will be automatically generated.',
+        'Once approved by your school and released by Superadmin, your official Hall Ticket will be accessible.',
       ]
     } else if (isOfficialReleased) {
       admitCardStatus = 'OFFICIAL HALL TICKET ISSUED'
     }
+
+    const resolvedCenterName = isOfficialReleased
+      ? (candidate.assigned_center_name || candidate.exam_center || 'Designated National Examination Center')
+      : `Preferred District: ${candidate.preference_district_1 || candidate.city || 'Regional Center'} (Final venue to be allotted on Admit Card release)`
+
+    const resolvedCenterAddress = isOfficialReleased
+      ? (candidate.assigned_center_address || candidate.assigned_center_name || 'Designated Assessment Campus')
+      : 'Complete physical venue address, room, and reporting instructions will appear upon Official Hall Ticket release.'
 
     return NextResponse.json({
       success: true,
@@ -108,8 +116,12 @@ export async function POST(request: Request) {
           category: candidate.category || 'General',
           address: candidate.address || 'India',
           state: candidate.state || '',
+          district: candidate.district || '',
           city: candidate.city || '',
           pincode: candidate.pincode || '',
+          preference_state: candidate.preference_state || candidate.state || '',
+          preference_district_1: candidate.preference_district_1 || candidate.city || '',
+          preference_district_2: candidate.preference_district_2 || '',
           school_college_name: candidate.school_college_name || '',
           school_name: candidate.school_name || '',
           school_id: candidate.school_id || '',
@@ -135,9 +147,16 @@ export async function POST(request: Request) {
           status: admitCardStatus,
           school_approved: isSchoolApproved,
           school_rejected: isSchoolRejected,
-          roll_number: isOfficialReleased ? (candidate.roll_number || `AAGAJ-26-${candidate.application_no.slice(-4)}`) : (isSchoolRejected ? 'WITHHELD' : 'APPROVAL PENDING'),
-          exam_center: candidate.exam_center || scheme?.exam_venue || 'Main Proctored Assessment Hub',
-          exam_slot: candidate.exam_slot || `${scheme?.exam_date || '2026-09-20'} | ${scheme?.exam_time || '10:00 AM - 12:30 PM'} (Reporting Time: 45 min prior)`,
+          roll_number: isOfficialReleased
+            ? (candidate.roll_number || `SCH26-${candidate.application_no.slice(-4)}`)
+            : (isSchoolRejected ? 'WITHHELD' : 'ALLOCATION PENDING'),
+          exam_center: resolvedCenterName,
+          exam_center_address: resolvedCenterAddress,
+          center_code: candidate.assigned_center_code || 'TBD',
+          center_landmark: candidate.assigned_center_landmark || '',
+          google_maps_url: candidate.assigned_center_maps_url || '',
+          exam_slot: candidate.exam_slot || `${scheme?.exam_date || '2026-09-20'} | ${scheme?.exam_time || '10:00 AM - 12:30 PM'} (Reporting Time: 09:15 AM)`,
+          reporting_time: candidate.reporting_time || '09:15 AM',
           issued_at: candidate.admit_card_issued_at || new Date().toISOString(),
           instructions: customInstructions,
         },

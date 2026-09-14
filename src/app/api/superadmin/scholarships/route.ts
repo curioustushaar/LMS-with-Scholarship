@@ -24,7 +24,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: schemesRes.error.message }, { status: 500 })
     }
 
-    const schemes = schemesRes.data || []
+    const schemes = (schemesRes.data || []).map((s: any) => ({
+      ...s,
+      winner_description: s.winner_description || s.prize_distribution?.winner_description || '',
+    }))
     const schemesMap = schemes.reduce((acc: Record<string, any>, s: any) => {
       acc[s.id] = s
       return acc
@@ -65,8 +68,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Scheme title is required.' }, { status: 400 })
     }
 
+    const prizeDist = rest.prize_distribution ? {
+      ...rest.prize_distribution,
+      winner_description: rest.winner_description || rest.prize_distribution?.winner_description || '',
+    } : {
+      first_prize: rest.first_prize || '₹50,000',
+      second_prize: rest.second_prize || '₹25,000',
+      third_prize: rest.third_prize || '₹10,000',
+      consolation: rest.consolation || 'Certificate & 50% Fee Waiver',
+      winner_description: rest.winner_description || '',
+    }
+
     const schemeId = `sch-${Date.now()}`
-    const newScheme = {
+    const baseScheme = {
       id: schemeId,
       title: title.trim(),
       category: rest.category?.trim() || 'General',
@@ -86,12 +100,7 @@ export async function POST(request: Request) {
         cash_amount: Number(rest.cash_amount) || 50000,
         perks: rest.perks || ['Tuition Fee Waiver', 'Merit Certificate', 'AI Mentorship'],
       },
-      prize_distribution: rest.prize_distribution || {
-        first_prize: rest.first_prize || '₹50,000',
-        second_prize: rest.second_prize || '₹25,000',
-        third_prize: rest.third_prize || '₹10,000',
-        consolation: rest.consolation || 'Certificate & 50% Fee Waiver',
-      },
+      prize_distribution: prizeDist,
       number_of_winners: Number(rest.number_of_winners) || 50,
       exam_date: rest.exam_date || '2026-09-20',
       exam_time: rest.exam_time || '10:00 AM - 12:30 PM',
@@ -118,18 +127,38 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
-    const { data, error } = await supabaseAdmin
+    let insertPayload: any = { ...baseScheme }
+    if (rest.winner_description) {
+      insertPayload.winner_description = rest.winner_description
+    }
+
+    let { data, error } = await supabaseAdmin
       .from('scholarships')
-      .insert(newScheme)
+      .insert(insertPayload)
       .select()
       .single()
+
+    if (error && (error.message?.includes('winner_description') || error.code === '42703')) {
+      const retryRes = await supabaseAdmin
+        .from('scholarships')
+        .insert(baseScheme)
+        .select()
+        .single()
+      data = retryRes.data
+      error = retryRes.error
+    }
 
     if (error) {
       console.error('Error inserting scholarship:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    const resolvedData = data ? {
+      ...data,
+      winner_description: data.winner_description || data.prize_distribution?.winner_description || '',
+    } : data
+
+    return NextResponse.json({ success: true, data: resolvedData })
   } catch (error: any) {
     console.error('Superadmin scholarships POST exception:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -146,19 +175,48 @@ export async function PUT(request: Request) {
     const { id, ...updates } = body
     if (!id) return NextResponse.json({ success: false, error: 'Scheme ID is required' }, { status: 400 })
 
-    const { data, error } = await supabaseAdmin
+    let updatePayload: any = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updates.winner_description) {
+      updatePayload.prize_distribution = {
+        ...(updates.prize_distribution || {}),
+        winner_description: updates.winner_description,
+      }
+    }
+
+    let { data, error } = await supabaseAdmin
       .from('scholarships')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single()
+
+    if (error && (error.message?.includes('winner_description') || error.code === '42703')) {
+      delete updatePayload.winner_description
+      const retryRes = await supabaseAdmin
+        .from('scholarships')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      data = retryRes.data
+      error = retryRes.error
+    }
 
     if (error) {
       console.error('Error updating scholarship:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    const resolvedData = data ? {
+      ...data,
+      winner_description: data.winner_description || data.prize_distribution?.winner_description || '',
+    } : data
+
+    return NextResponse.json({ success: true, data: resolvedData })
   } catch (error: any) {
     console.error('Superadmin scholarships PUT exception:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
