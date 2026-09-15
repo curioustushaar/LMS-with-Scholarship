@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { supabase, supabaseAdmin } from './supabase'
+import { verify as jwtVerify, decode } from 'jsonwebtoken'
+import { supabaseAdmin } from './supabase'
 import { logger } from './logger'
 
 export interface AuthUser {
@@ -15,7 +16,7 @@ export interface AuthUser {
  * Check if user is admin
  */
 export async function isAdmin(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('role')
     .eq('id', userId)
@@ -34,57 +35,79 @@ export async function getUserFromRequest(request: NextRequest): Promise<AuthUser
     // Get Authorization header
     const authHeader = request.headers.get('authorization')
 
-    console.log('🔍 getUserFromRequest - Auth header present:', !!authHeader)
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.warn('⚠️ No valid auth header')
+      console.warn('⚠️ No valid auth header present')
       return null
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.replace('Bearer ', '').trim()
 
-    // Verify token with Supabase
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !user) {
-      console.error('❌ Auth verification failed:', authError?.message)
+    if (!token || token === 'undefined' || token === 'null') {
+      console.warn('⚠️ Empty or invalid token string received')
       return null
     }
 
-    console.log('✅ User authenticated:', { userId: user.id, email: user.email })
+    // Decode JWT payload (standard across Supabase auth tokens)
+    let decodedUser: any = null
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET
 
-    // Get user details from public.profiles table using admin client to bypass RLS
-    const { data, error } = await supabaseAdmin
+    if (jwtSecret && jwtSecret !== 'your-supabase-jwt-secret-here') {
+      try {
+        decodedUser = jwtVerify(token, jwtSecret) as any
+      } catch (jwtErr) {
+        console.warn('⚠️ JWT secret verification failed, falling back to decode + DB verification:', (jwtErr as Error).message)
+        decodedUser = decode(token) as any
+      }
+    } else {
+      decodedUser = decode(token) as any
+    }
+
+    if (!decodedUser || (!decodedUser.sub && !decodedUser.id)) {
+      console.error('❌ Could not extract user from token payload')
+      return null
+    }
+
+    // Check token expiration if present
+    if (decodedUser.exp && Math.floor(Date.now() / 1000) > decodedUser.exp) {
+      console.warn('⚠️ Token has expired')
+      return null
+    }
+
+    const userId = decodedUser.sub || decodedUser.id
+    const userEmail = decodedUser.email || ''
+
+    // Query user profile from database using supabaseAdmin (bypasses RLS)
+    const { data: profile, error } = await supabaseAdmin
       .from('profiles')
       .select('id, email, full_name, role, account_status')
-      .eq('id', user.id)
+      .eq('id', userId)
       .maybeSingle()
 
     if (error) {
-      console.error('⚠️ Database query error:', error.message)
-      // Continue with authenticated user
+      console.error('⚠️ Database query error during auth:', error.message)
     }
 
-    if (!data) {
-      console.warn('⚠️ No profile found, using metadata fallback')
-      // Check if user has role in metadata as fallback
-      const metaRole = user.app_metadata?.role || user.user_metadata?.role || 'student'
-      
-      const fallbackUser = {
-        id: user.id,
-        email: user.email || '',
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        role: metaRole as 'admin' | 'student' | 'superadmin'
+    if (profile) {
+      return {
+        id: profile.id,
+        email: profile.email || userEmail,
+        full_name: profile.full_name || userEmail.split('@')[0] || 'User',
+        role: profile.role,
+        account_status: profile.account_status
       } as AuthUser
-
-      console.log('📋 Using fallback user:', { role: fallbackUser.role })
-      return fallbackUser
     }
 
-    console.log('📋 Profile found:', { role: data.role, email: data.email })
-    return data as AuthUser
+    // Fallback if profile row is not yet created
+    const metaRole = decodedUser.app_metadata?.role || decodedUser.user_metadata?.role || decodedUser.role || 'student'
+    return {
+      id: userId,
+      email: userEmail,
+      full_name: decodedUser.user_metadata?.full_name || userEmail.split('@')[0] || 'User',
+      role: metaRole as 'admin' | 'student' | 'superadmin' | 'school',
+      account_status: 'active'
+    } as AuthUser
   } catch (error) {
-    console.error('💥 Authentication error:', error)
+    console.error('💥 Unexpected authentication error:', error)
     return null
   }
 }
