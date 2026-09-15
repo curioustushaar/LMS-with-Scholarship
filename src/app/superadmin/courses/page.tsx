@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FiPlus, FiEdit2, FiTrash2, FiBookOpen, FiSearch, FiUsers } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
+import { getSuperadminClientAuthToken } from '@/lib/auth-helpers'
 
 interface Course {
   id: string
@@ -30,10 +31,10 @@ export default function SuperadminCoursesPage() {
   const fetchCourses = async () => {
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = await getSuperadminClientAuthToken()
       const response = await fetch('/api/admin/courses', {
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       })
       const data = await response.json()
@@ -53,11 +54,11 @@ export default function SuperadminCoursesPage() {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = await getSuperadminClientAuthToken()
       const response = await fetch(`/api/admin/courses/${courseId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       })
       const data = await response.json()
@@ -299,7 +300,7 @@ function CourseModal({ course, onClose, onSuccess }: {
     setLoading(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = await getSuperadminClientAuthToken()
       const url = course ? `/api/admin/courses/${course.id}` : '/api/admin/courses'
       const method = course ? 'PUT' : 'POST'
 
@@ -307,7 +308,7 @@ function CourseModal({ course, onClose, onSuccess }: {
         method,
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData),
       })

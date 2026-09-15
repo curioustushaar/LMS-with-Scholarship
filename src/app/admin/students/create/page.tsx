@@ -170,8 +170,8 @@ export default function CreateStudentPage() {
         </div>
 
         {/* Credentials Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8 border-2 border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Student Login Credentials</h2>
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8 border-2 border-gray-200">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">Student Login Credentials</h2>
           
           <div className="space-y-6">
             {/* Student Name */}
@@ -222,18 +222,20 @@ export default function CreateStudentPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={successData.password}
                   readOnly
-                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium font-mono"
+                  className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-medium font-mono text-sm sm:text-base"
                 />
                 <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all shrink-0"
                   title={showPassword ? 'Hide' : 'Show'}
                 >
                   {showPassword ? <FiEyeOff /> : <FiEye />}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleCopy(successData.password, 'password')}
-                  className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all shrink-0"
                   title="Copy"
                 >
                   {copiedField === 'password' ? <FiCheck className="text-green-600" /> : <FiCopy />}
@@ -270,10 +272,10 @@ export default function CreateStudentPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-center space-x-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
           <button
             onClick={() => router.push('/admin/students')}
-            className="px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+            className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all text-center"
           >
             Go to Students List
           </button>
@@ -284,7 +286,7 @@ export default function CreateStudentPage() {
               setError('')
               setSelectedCourseIds([])
             }}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+            className="w-full sm:w-auto px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-center"
           >
             Create Another Student
           </button>
@@ -296,14 +298,14 @@ export default function CreateStudentPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Create New Student</h1>
-          <p className="text-gray-600 mt-1">Add a new student to the LMS system - Login credentials will be generated automatically</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Create New Student</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Add a new student to the LMS system - Login credentials will be generated automatically</p>
         </div>
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all flex items-center space-x-2"
+          className="self-start sm:self-auto px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all flex items-center space-x-2"
         >
           <FiX className="text-xl" />
           <span>Cancel</span>
@@ -311,7 +313,7 @@ export default function CreateStudentPage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-8">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-4 sm:p-6 md:p-8">
         <div className="space-y-6">
           {/* Error Display */}
           {error && (
@@ -417,26 +419,29 @@ export default function CreateStudentPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Temporary Password (Auto-generated)
                 </label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    readOnly
-                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg font-mono text-gray-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
-                  >
-                    {showPassword ? <FiEyeOff /> : <FiEye />}
-                  </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      readOnly
+                      className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-300 rounded-lg font-mono text-gray-800 text-sm sm:text-base focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-gray-700 rounded-lg transition-all"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={handleGeneratePassword}
-                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-medium"
+                    className="w-full sm:w-auto px-5 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all font-medium whitespace-nowrap flex items-center justify-center space-x-1.5 shadow-sm shrink-0"
                   >
-                    Regenerate
+                    <span>Regenerate</span>
                   </button>
                 </div>
               </div>
@@ -457,18 +462,18 @@ export default function CreateStudentPage() {
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-6 border-t">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+              className="w-full sm:w-auto px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 text-center"
             >
               {loading ? 'Creating...' : 'Create Student'}
             </button>
