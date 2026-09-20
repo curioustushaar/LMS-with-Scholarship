@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { settingsAPI, superadminAPI } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import { FiSearch, FiBell, FiUser, FiLogOut, FiSettings, FiChevronDown, FiMenu } from 'react-icons/fi'
 
@@ -60,8 +61,24 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
     }
   }, [isSuperadmin])
 
-  const handleLogout = () => {
-    router.push(isSuperadmin ? '/superadmin/login' : '/login')
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.warn('Error signing out:', err)
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.clear()
+      sessionStorage.clear()
+      // Expire auth cookies
+      document.cookie.split(';').forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, '')
+          .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/')
+      })
+      window.location.replace(isSuperadmin ? '/superadmin/login' : '/login')
+    }
   }
   
   const handleSettings = () => {

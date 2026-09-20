@@ -6,7 +6,7 @@ import { Star, Quote } from 'lucide-react'
 const testimonials = [
   {
     id: 1,
-    quote: 'AAGAJ INFOTECH LMS has completely changed the way we learn and grow. The platform is intuitive, powerful and truly student-focused.',
+    quote: 'Gravity LMS has completely changed the way we learn and grow. The platform is intuitive, powerful and truly student-focused.',
     author: 'Ananya Verma',
     role: 'B.Tech CSE Student',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=100&q=80',
@@ -15,7 +15,7 @@ const testimonials = [
   },
   {
     id: 2,
-    quote: 'We have hired 20+ interns from AAGAJ. The students are pre-screened, highly competent, and match our exact tech requirements from day one.',
+    quote: 'We have hired 20+ interns from Gravity. The students are pre-screened, highly competent, and match our exact tech requirements from day one.',
     author: 'Rajesh Kumar',
     role: 'HR Lead, TechVerve Solutions',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80',

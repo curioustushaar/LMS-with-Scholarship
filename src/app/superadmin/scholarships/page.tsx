@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import * as XLSX from 'xlsx'
 import { getClientAuthToken } from '@/lib/auth-helpers'
 import { getIndianStates, getDistrictsForState } from '@/lib/india-locations'
+import { validateName, validatePhone, validateEmail } from '@/lib/scholarship-validation'
 import {
   FiAward,
   FiPlus,
@@ -47,7 +47,34 @@ import {
   FiUpload,
   FiFilter,
   FiTarget,
+  FiShare2,
+  FiX,
 } from 'react-icons/fi'
+
+export interface ReferenceCode {
+  id: string
+  name: string
+  phone: string
+  email: string
+  code: string
+  status: 'active' | 'inactive'
+  notes?: string
+  created_at: string
+  updated_at?: string
+  students_count?: number
+  referred_students?: Array<{
+    id: string
+    application_no: string
+    applicant_name: string
+    applicant_email: string
+    applicant_phone: string
+    scholarship_title: string
+    created_at: string
+    status: string
+    payment_status: string
+    admit_card_status: string
+  }>
+}
 
 export interface ExamCenter {
   id: string
@@ -153,6 +180,7 @@ interface ScholarshipApplicant {
   payment_status: 'paid' | 'free' | 'pending' | 'failed'
   payment_reference?: string
   payment_amount: number
+  reference_code?: string
   created_at: string
   
   // Admit Card & Center Allocation
@@ -196,7 +224,7 @@ export default function SuperadminScholarshipsPage() {
     setMounted(true)
   }, [])
 
-  const [tab, setTab] = useState<'schemes' | 'applications' | 'centers' | 'admit_cards' | 'evaluation' | 'awards'>('schemes')
+  const [tab, setTab] = useState<'schemes' | 'applications' | 'centers' | 'admit_cards' | 'evaluation' | 'awards' | 'referral_codes'>('schemes')
   const [scholarships, setScholarships] = useState<ScholarshipScheme[]>([])
   const [applicants, setApplicants] = useState<ScholarshipApplicant[]>([])
   const [centers, setCenters] = useState<ExamCenter[]>([])
@@ -205,6 +233,15 @@ export default function SuperadminScholarshipsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterScheme, setFilterScheme] = useState<string>('all')
+
+  // Reference Codes State
+  const [referenceCodes, setReferenceCodes] = useState<ReferenceCode[]>([])
+  const [refCodeStats, setRefCodeStats] = useState({ total_codes: 0, active_codes: 0, inactive_codes: 0, total_referred_students: 0 })
+  const [showRefCodeModal, setShowRefCodeModal] = useState(false)
+  const [showRefStudentsModal, setShowRefStudentsModal] = useState<ReferenceCode | null>(null)
+  const [refCodeActionLoading, setRefCodeActionLoading] = useState<string | null>(null)
+  const [copiedRefCode, setCopiedRefCode] = useState<string | null>(null)
+  const [refCodeForm, setRefCodeForm] = useState({ name: '', phone: '', email: '', code: '', notes: '' })
 
   // Exam Centers Master State
   const [showCenterModal, setShowCenterModal] = useState(false)
@@ -402,18 +439,36 @@ export default function SuperadminScholarshipsPage() {
     }
   }
 
+  const fetchReferenceCodes = async () => {
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/superadmin/scholarships/reference-codes', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setReferenceCodes(data.data || [])
+        if (data.stats) setRefCodeStats(data.stats)
+      }
+    } catch (err) {
+      console.error('Failed to load reference codes', err)
+    }
+  }
+
   const fetchData = async () => {
     setLoading(true)
     try {
       const token = await getToken()
-      const [schRes, centersRes, admitRes] = await Promise.all([
+      const [schRes, centersRes, admitRes, refRes] = await Promise.all([
         fetch('/api/superadmin/scholarships', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/superadmin/scholarships/centers', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/superadmin/scholarships/admit-cards', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/superadmin/scholarships/reference-codes', { headers: { Authorization: `Bearer ${token}` } }),
       ])
       const schData = await schRes.json()
       const centersData = await centersRes.json()
       const admitData = await admitRes.json()
+      const refData = await refRes.json()
 
       if (schData.success) {
         if (schData.data) setScholarships(schData.data)
@@ -426,6 +481,10 @@ export default function SuperadminScholarshipsPage() {
         if (admitData.demographics) setDemographics(admitData.demographics)
         if (admitData.applicants) setApplicants(admitData.applicants)
       }
+      if (refData.success) {
+        if (refData.data) setReferenceCodes(refData.data)
+        if (refData.stats) setRefCodeStats(refData.stats)
+      }
     } catch (err) {
       console.error('Failed to load scholarship data', err)
     } finally {
@@ -436,6 +495,111 @@ export default function SuperadminScholarshipsPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Reference Code Handlers
+  const handleGenerateRefCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const nameVal = validateName(refCodeForm.name, 'Representative Name')
+    if (!nameVal.isValid) {
+      alert(nameVal.message)
+      return
+    }
+
+    const phoneVal = validatePhone(refCodeForm.phone)
+    if (!phoneVal.isValid) {
+      alert(phoneVal.message)
+      return
+    }
+
+    if (refCodeForm.email) {
+      const emailVal = validateEmail(refCodeForm.email)
+      if (!emailVal.isValid) {
+        alert(emailVal.message)
+        return
+      }
+    }
+
+    setRefCodeActionLoading('create')
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/superadmin/scholarships/reference-codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...refCodeForm,
+          name: nameVal.cleanName,
+          phone: phoneVal.cleanPhone,
+          email: refCodeForm.email ? validateEmail(refCodeForm.email).cleanEmail : '',
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowRefCodeModal(false)
+        setRefCodeForm({ name: '', phone: '', email: '', code: '', notes: '' })
+        await fetchReferenceCodes()
+        alert(`Reference Code Generated Successfully: ${data.data?.code || 'Generated'}`)
+      } else {
+        alert(data.error || 'Failed to generate reference code')
+      }
+    } catch (err) {
+      console.error('Failed to generate reference code:', err)
+      alert('An error occurred while generating reference code')
+    } finally {
+      setRefCodeActionLoading(null)
+    }
+  }
+
+  const handleToggleRefCodeStatus = async (item: ReferenceCode) => {
+    const newStatus = item.status === 'active' ? 'inactive' : 'active'
+    setRefCodeActionLoading(item.id)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/superadmin/scholarships/reference-codes', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ id: item.id, status: newStatus })
+      })
+      const data = await res.json()
+      if (data.success) {
+        await fetchReferenceCodes()
+      } else {
+        alert(data.error || 'Failed to update status')
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err)
+    } finally {
+      setRefCodeActionLoading(null)
+    }
+  }
+
+  const handleDeleteRefCode = async (id: string, codeStr: string) => {
+    if (!confirm(`Are you sure you want to delete reference code "${codeStr}"?`)) return
+    setRefCodeActionLoading(id)
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/superadmin/scholarships/reference-codes?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        await fetchReferenceCodes()
+      } else {
+        alert(data.error || 'Failed to delete reference code')
+      }
+    } catch (err) {
+      console.error('Failed to delete reference code:', err)
+    } finally {
+      setRefCodeActionLoading(null)
+    }
+  }
 
   // Exam Centers Master Handlers
   const handleOpenAddCenter = () => {
@@ -498,7 +662,7 @@ export default function SuperadminScholarshipsPage() {
       max_capacity: suggestedCap,
       contact_person: `${cleanDist} District Coordinator`,
       contact_phone: '9876543210',
-      contact_email: `center.${cleanDist.toLowerCase().replace(/[^a-z]/g, '')}@aagajinfotech.com`,
+      contact_email: `center.${cleanDist.toLowerCase().replace(/[^a-z]/g, '')}@gravityinfotech.com`,
       reporting_time: '09:00 AM',
       exam_start_time: '10:00 AM',
       exam_end_time: '12:00 PM',
@@ -682,6 +846,33 @@ export default function SuperadminScholarshipsPage() {
       }
     } catch (err: any) {
       alert('Error publishing admit cards: ' + (err?.message || err))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Delete Candidate Application (Superadmin Action)
+  const handleDeleteApplicant = async (app: any) => {
+    if (!confirm(`Are you sure you want to delete candidate "${app.applicant_name}" (Application No: ${app.application_no})? This will permanently remove their intake application, scorecard, and credentials.`)) {
+      return
+    }
+    setActionLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/superadmin/scholarships/admit-cards?id=${encodeURIComponent(app.id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message || 'Candidate deleted successfully.')
+        setApplicants((prev) => prev.filter((a) => a.id !== app.id))
+        fetchData()
+      } else {
+        alert(data.error || 'Failed to delete candidate.')
+      }
+    } catch (err: any) {
+      alert('Error deleting candidate: ' + (err?.message || err))
     } finally {
       setActionLoading(false)
     }
@@ -1001,7 +1192,7 @@ export default function SuperadminScholarshipsPage() {
               ? {
                   ...a,
                   admit_card_status: 'released',
-                  roll_number: a.roll_number || `AAGAJ-26-${Math.floor(1000 + Math.random() * 9000)}`,
+                  roll_number: a.roll_number || `GRAVITY-26-${Math.floor(1000 + Math.random() * 9000)}`,
                 }
               : a
           )
@@ -1110,7 +1301,8 @@ export default function SuperadminScholarshipsPage() {
   }
 
   // Generate & Download Pre-filled Evaluation Sheet (Real Excel .xlsx format)
-  const handleDownloadEvaluationSheet = (targetSchemeId?: string) => {
+  const handleDownloadEvaluationSheet = async (targetSchemeId?: string) => {
+    const XLSX = await import('xlsx')
     const targetId = targetSchemeId || filterScheme
     const targetScheme = scholarships.find((s) => s.id === targetId)
     const targetApplicants = targetId === 'all'
@@ -1127,7 +1319,7 @@ export default function SuperadminScholarshipsPage() {
     // 1. Prepare structured data with clear column names for teachers/examiners
     const worksheetData = targetApplicants.map((app, idx) => ({
       'Sr. No': idx + 1,
-      'Official Roll Number': app.roll_number || `AAGAJ-26-${app.application_no ? app.application_no.slice(-4) : 'XXXX'}`,
+      'Official Roll Number': app.roll_number || `GRAVITY-26-${app.application_no ? app.application_no.slice(-4) : 'XXXX'}`,
       'Application Number': app.application_no || '',
       'Student Full Name': app.applicant_name || '',
       'Scholarship Program': app.scholarship_title || targetScheme?.title || 'Scholarship Scheme',
@@ -1441,7 +1633,7 @@ export default function SuperadminScholarshipsPage() {
 
     const rows = targetApplicants.map((app, idx) => [
       idx + 1,
-      app.roll_number || `AAGAJ-26-${app.application_no ? app.application_no.slice(-4) : 'XXXX'}`,
+      app.roll_number || `GRAVITY-26-${app.application_no ? app.application_no.slice(-4) : 'XXXX'}`,
       app.application_no || '',
       app.applicant_name || '',
       app.scholarship_title || targetScheme?.title || 'Scholarship Scheme',
@@ -1479,9 +1671,10 @@ export default function SuperadminScholarshipsPage() {
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
     const reader = new FileReader()
 
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         if (isExcel) {
+          const XLSX = await import('xlsx')
           const data = new Uint8Array(event.target?.result as ArrayBuffer)
           const workbook = XLSX.read(data, { type: 'array' })
           const firstSheetName = workbook.SheetNames[0]
@@ -1603,6 +1796,13 @@ export default function SuperadminScholarshipsPage() {
       const data = await res.json()
       if (data.success) {
         setShowDossierModal(false)
+        setApplicants((prev) =>
+          prev.map((a) =>
+            a.id === inspectingApplicant.id
+              ? { ...a, document_status: dossierStatus, document_remarks: dossierRemarks }
+              : a
+          )
+        )
         if (data.applicants) {
           setApplicants(data.applicants)
         } else {
@@ -1662,7 +1862,7 @@ export default function SuperadminScholarshipsPage() {
       app.award_disbursement_ref ||
         `DISB-2026-TXN-${app.application_no ? app.application_no.slice(-4) : Math.floor(1000 + Math.random() * 9000)}`
     )
-    setVoucherCode(app.award_voucher_code || `AAGAJ-100-FREE-${app.application_no ? app.application_no.slice(-4) : '2026'}`)
+    setVoucherCode(app.award_voucher_code || `GRAVITY-100-FREE-${app.application_no ? app.application_no.slice(-4) : '2026'}`)
     setPayoutBankUtr(app.payout_details?.bank_utr || `UTR${Date.now().toString().slice(-8)}`)
     setPayoutCashAmount(app.rank === 1 ? '50,000' : app.rank === 2 ? '25,000' : app.rank === 3 ? '10,000' : '0')
     setPayoutNote('Official scholarship prize payout processed via institutional RTGS/UPI.')
@@ -2070,7 +2270,7 @@ export default function SuperadminScholarshipsPage() {
     const lines = [
       `=============================================================`,
       `OFFICIAL CANDIDATE EXAMINATION & VERIFICATION ROSTER`,
-      `AAGAJ INFOTECH & FOUNDATION — NATIONAL SCHOLARSHIP 2026`,
+      `GRAVITY & FOUNDATION — NATIONAL SCHOLARSHIP 2026`,
       `=============================================================`,
       `CENTER: [${group.centerCode}] ${group.centerName}`,
       `LOCATION: ${group.address}, ${group.city}, ${group.district}, ${group.state}`,
@@ -2432,10 +2632,32 @@ export default function SuperadminScholarshipsPage() {
             {awardedScholars}
           </span>
         </button>
+
+        <button
+          onClick={() => setTab('referral_codes')}
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 shrink-0 whitespace-nowrap ${
+            tab === 'referral_codes'
+              ? 'bg-gradient-to-r from-[#C81E4E] to-[#E11D48] text-white shadow-md shadow-pink-500/20'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80'
+          }`}
+        >
+          <FiShare2 size={14} className={tab === 'referral_codes' ? 'text-white' : 'text-fuchsia-600'} />
+          <span className="hidden sm:inline">7. Referral & Ref Codes</span>
+          <span className="sm:hidden">7. Refs</span>
+          <span
+            className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold ${
+              tab === 'referral_codes'
+                ? 'bg-white/20 text-white'
+                : 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200/60'
+            }`}
+          >
+            {refCodeStats.active_codes}
+          </span>
+        </button>
       </div>
 
       {/* Global Filter Bar (for Applications, Admit Cards, Evaluation, Awards) */}
-      {tab !== 'schemes' && tab !== 'centers' && (
+      {tab !== 'schemes' && tab !== 'centers' && tab !== 'referral_codes' && (
         <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-xs sm:shadow-sm flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-80">
@@ -2865,6 +3087,12 @@ export default function SuperadminScholarshipsPage() {
                     <span>App: <strong className="text-gray-800">{app.application_no}</strong></span>
                     <span>{new Date(app.created_at).toLocaleDateString()}</span>
                   </div>
+                  {(app.reference_code || app.documents?.reference_code) && (
+                    <div className="font-mono text-[9px] font-bold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
+                      <span>🔗 Ref Code:</span>
+                      <span className="font-extrabold">{app.reference_code || app.documents?.reference_code}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* District Preferences */}
@@ -2892,15 +3120,27 @@ export default function SuperadminScholarshipsPage() {
                     <span className="text-gray-500 text-[11px] font-medium">{app.qualification}</span>
                   </div>
 
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      app.payment_status === 'paid' || app.payment_status === 'free'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}
-                  >
-                    ● {app.payment_status === 'free' ? 'Free (₹0)' : `Paid ₹${app.payment_amount}`}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        app.payment_status === 'paid' || app.payment_status === 'free'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      ● {app.payment_status === 'free' ? 'Free (₹0)' : `Paid ₹${app.payment_amount}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApplicant(app)}
+                      disabled={actionLoading}
+                      className="px-2.5 py-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
+                      title="Delete Candidate"
+                    >
+                      <FiTrash2 size={11} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -2915,7 +3155,7 @@ export default function SuperadminScholarshipsPage() {
           {/* CANDIDATE INTAKE: DESKTOP DATA TABLE (hidden md:block) */}
           <div className="hidden md:block bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-xs sm:shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-gray-600 min-w-[700px]">
+              <table className="w-full text-left text-xs text-gray-600 min-w-[750px]">
                 <thead className="bg-gray-50/80 text-[10px] sm:text-[11px] uppercase font-bold text-gray-500 border-b border-gray-100">
                   <tr>
                     <th className="px-3.5 sm:px-6 py-3 sm:py-4">App No. & Date</th>
@@ -2925,7 +3165,8 @@ export default function SuperadminScholarshipsPage() {
                     <th className="px-3.5 sm:px-6 py-3 sm:py-4">Academics & Income</th>
                     <th className="px-3.5 sm:px-6 py-3 sm:py-4">Fee Payment</th>
                     <th className="px-3.5 sm:px-6 py-3 sm:py-4">Secret Code</th>
-                    <th className="px-3.5 sm:px-6 py-3 sm:py-4 text-right">Admit Card Status</th>
+                    <th className="px-3.5 sm:px-6 py-3 sm:py-4 text-center">Admit Card Status</th>
+                    <th className="px-3.5 sm:px-6 py-3 sm:py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
@@ -2954,6 +3195,12 @@ export default function SuperadminScholarshipsPage() {
                       <td className="px-3.5 sm:px-6 py-3 sm:py-4">
                         <div className="font-bold text-[#FF2D8D]">{app.scholarship_title}</div>
                         <div className="text-gray-400 text-[10px] mt-0.5">Native: {app.district || 'N/A'}, {app.state || 'Bihar'}</div>
+                        {(app.reference_code || app.documents?.reference_code) && (
+                          <div className="font-mono text-[9px] font-bold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200/60 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
+                            <span>🔗 Ref:</span>
+                            <span>{app.reference_code || app.documents?.reference_code}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-3.5 sm:px-6 py-3 sm:py-4">
                         <div className="space-y-0.5">
@@ -2989,7 +3236,7 @@ export default function SuperadminScholarshipsPage() {
                           {app.registration_code}
                         </span>
                       </td>
-                      <td className="px-3.5 sm:px-6 py-3 sm:py-4 text-right">
+                      <td className="px-3.5 sm:px-6 py-3 sm:py-4 text-center">
                         <span
                           className={`inline-block px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase ${
                             app.admit_card_status === 'released' || app.admit_card_status === 'approved'
@@ -2999,6 +3246,18 @@ export default function SuperadminScholarshipsPage() {
                         >
                           {app.admit_card_status === 'released' ? 'Official Issued' : 'Provisional'}
                         </span>
+                      </td>
+                      <td className="px-3.5 sm:px-6 py-3 sm:py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteApplicant(app)}
+                          disabled={actionLoading}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 hover:text-red-700 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs disabled:opacity-50"
+                          title={`Delete application for ${app.applicant_name}`}
+                        >
+                          <FiTrash2 size={13} />
+                          <span>Delete</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -4416,7 +4675,7 @@ export default function SuperadminScholarshipsPage() {
 
                         <div className="min-w-0">
                           <div className="font-extrabold text-gray-900 text-sm truncate">{app.applicant_name}</div>
-                          <div className="font-mono text-gray-600 text-[10px] font-bold">Roll: {app.roll_number || 'AAGAJ-26-XXXX'}</div>
+                          <div className="font-mono text-gray-600 text-[10px] font-bold">Roll: {app.roll_number || 'GRAVITY-26-XXXX'}</div>
                         </div>
                       </div>
 
@@ -4548,7 +4807,7 @@ export default function SuperadminScholarshipsPage() {
                           )}
                         </td>
                         <td className="px-3.5 sm:px-6 py-3 sm:py-4 font-mono font-bold text-gray-800">
-                          {app.roll_number || 'AAGAJ-26-XXXX'}
+                          {app.roll_number || 'GRAVITY-26-XXXX'}
                         </td>
                         <td className="px-3.5 sm:px-6 py-3 sm:py-4">
                           <div className="flex items-center gap-2">
@@ -4917,6 +5176,188 @@ export default function SuperadminScholarshipsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: REFERRAL & REFERENCE CODES */}
+      {tab === 'referral_codes' && (
+        <div className="space-y-6">
+          {/* Header Bar */}
+          <div className="bg-gradient-to-r from-fuchsia-950 via-purple-900 to-slate-900 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 text-xs font-bold mb-2">
+                  <FiShare2 size={13} />
+                  <span>Agent & Affiliate Referral System</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Reference Code Management
+                </h2>
+                <p className="text-gray-300 text-xs sm:text-sm mt-1 max-w-2xl">
+                  Generate unique referral codes for agents, schools, and partners. Track student applications coming through each reference code in real-time.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowRefCodeModal(true)}
+                className="px-5 py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-fuchsia-500 to-pink-600 hover:from-fuchsia-600 hover:to-pink-700 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-fuchsia-500/25 transition-all flex items-center justify-center gap-2 shrink-0"
+              >
+                <FiPlus size={16} />
+                <span>+ Generate Reference Code</span>
+              </button>
+            </div>
+
+            {/* Overview Metric Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl sm:rounded-2xl border border-white/10">
+                <span className="text-[10px] sm:text-xs font-bold text-fuchsia-200 uppercase tracking-wider block">Total Codes</span>
+                <span className="text-lg sm:text-2xl font-black text-white mt-0.5 block">{refCodeStats.total_codes}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl sm:rounded-2xl border border-white/10">
+                <span className="text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider block">Active Codes</span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-300 mt-0.5 block">{refCodeStats.active_codes}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl sm:rounded-2xl border border-white/10">
+                <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider block">Inactive Codes</span>
+                <span className="text-lg sm:text-2xl font-black text-amber-300 mt-0.5 block">{refCodeStats.inactive_codes}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl sm:rounded-2xl border border-white/10">
+                <span className="text-[10px] sm:text-xs font-bold text-pink-300 uppercase tracking-wider block">Referred Students</span>
+                <span className="text-lg sm:text-2xl font-black text-pink-300 mt-0.5 block">{refCodeStats.total_referred_students}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Reference Codes Table */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                <span>Issued Reference Codes</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-extrabold bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200/60">
+                  {referenceCodes.length}
+                </span>
+              </h3>
+
+              <div className="relative sm:w-72">
+                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Search code, name, phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-600 min-w-[700px]">
+                <thead className="bg-gray-50/80 text-[10px] sm:text-[11px] uppercase font-bold text-gray-500 border-b border-gray-100">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3.5">Reference Code</th>
+                    <th className="px-4 sm:px-6 py-3.5">Representative / Partner</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-center">Status</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-center">Referred Students</th>
+                    <th className="px-4 sm:px-6 py-3.5">Created Date</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {referenceCodes
+                    .filter((rc) => {
+                      if (!searchQuery.trim()) return true
+                      const q = searchQuery.toLowerCase()
+                      return (
+                        rc.code.toLowerCase().includes(q) ||
+                        rc.name.toLowerCase().includes(q) ||
+                        rc.phone.includes(q) ||
+                        (rc.email && rc.email.toLowerCase().includes(q))
+                      )
+                    })
+                    .map((item) => (
+                      <tr key={item.id} className="hover:bg-fuchsia-50/30 transition-colors">
+                        <td className="px-4 sm:px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-sm text-fuchsia-800 bg-fuchsia-50 border border-fuchsia-200/80 px-2.5 py-1 rounded-lg">
+                              {item.code}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.code)
+                                setCopiedRefCode(item.id)
+                                setTimeout(() => setCopiedRefCode(null), 2000)
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-fuchsia-700 hover:bg-fuchsia-50 rounded-lg transition-colors"
+                              title="Copy Code"
+                            >
+                              {copiedRefCode === item.id ? <FiCheck size={14} className="text-emerald-600" /> : <FiCopy size={14} />}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4">
+                          <div className="font-bold text-gray-900 text-xs sm:text-sm">{item.name}</div>
+                          <div className="text-gray-500 text-[11px] font-mono mt-0.5">📞 {item.phone}</div>
+                          {item.email && <div className="text-gray-400 text-[10px] truncate">{item.email}</div>}
+                          {item.notes && <div className="text-gray-400 text-[10px] italic mt-0.5 max-w-xs">{item.notes}</div>}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRefCodeStatus(item)}
+                            disabled={refCodeActionLoading === item.id}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase transition-all shadow-xs ${
+                              item.status === 'active'
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300/80'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.status === 'active' ? 'bg-emerald-600 animate-ping' : 'bg-gray-400'}`} />
+                            <span>{item.status === 'active' ? 'Active' : 'Inactive'}</span>
+                          </button>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setShowRefStudentsModal(item)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-50 to-fuchsia-50 hover:from-purple-100 hover:to-fuchsia-100 text-fuchsia-800 border border-fuchsia-200 font-bold text-xs transition-all shadow-xs"
+                          >
+                            <FiUsers size={13} />
+                            <span>{item.students_count || 0} Candidates</span>
+                          </button>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-xs text-gray-500 font-mono">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRefCode(item.id, item.code)}
+                              disabled={refCodeActionLoading === item.id}
+                              className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors"
+                              title="Delete Reference Code"
+                            >
+                              <FiTrash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+
+              {referenceCodes.length === 0 && (
+                <div className="p-12 text-center text-gray-400 bg-white text-xs">
+                  <FiShare2 size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="font-bold text-gray-600 text-sm">No Reference Codes Generated Yet</p>
+                  <p className="text-gray-400 text-xs mt-1">Click "+ Generate Reference Code" to issue referral codes for your representatives.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -6073,7 +6514,7 @@ export default function SuperadminScholarshipsPage() {
                       type="text"
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. AAGAJ-100-FREE-1360"
+                      placeholder="e.g. GRAVITY-100-FREE-1360"
                       className="flex-1 px-3.5 py-2 rounded-xl border border-purple-200 font-mono font-bold text-sm bg-white text-purple-950 uppercase"
                     />
                     <button
@@ -6681,7 +7122,7 @@ export default function SuperadminScholarshipsPage() {
               <div id="printable-hall-ticket" className="border-4 border-double border-gray-800 p-6 rounded-2xl space-y-5 bg-amber-50/10">
                 <div className="text-center border-b-2 border-gray-800 pb-3 space-y-1">
                   <div className="font-mono text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                    AAGAJ NATIONAL SCHOLARSHIP BOARD
+                    GRAVITY NATIONAL SCHOLARSHIP BOARD
                   </div>
                   <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">
                     Official Examination Admit Card (Hall Ticket)
@@ -6702,7 +7143,7 @@ export default function SuperadminScholarshipsPage() {
                     <div>
                       <span className="text-gray-400">Roll Number: </span>
                       <strong className="font-mono text-emerald-700 font-black text-sm">
-                        {previewAdmitCard.roll_number || 'AAGAJ-26-0041'}
+                        {previewAdmitCard.roll_number || 'GRAVITY-26-0041'}
                       </strong>
                     </div>
                     <div>
@@ -7047,7 +7488,7 @@ export default function SuperadminScholarshipsPage() {
                         {/* Official Institutional Letterhead */}
                         <div className="text-center border-b-2 border-gray-900 pb-2 space-y-0.5">
                           <div className="text-[9px] sm:text-[10px] font-mono font-bold tracking-widest text-gray-600 uppercase">
-                            AAGAJ INFOTECH & FOUNDATION — NATIONAL SCHOLARSHIP BOARD
+                            GRAVITY & FOUNDATION — NATIONAL SCHOLARSHIP BOARD
                           </div>
                           <h2 className="text-base sm:text-xl font-black text-gray-950 uppercase tracking-tight">
                             Official Candidate Examination & Verification Nominal Roll
@@ -7685,7 +8126,7 @@ export default function SuperadminScholarshipsPage() {
               <div className="space-y-0.5 min-w-0 flex-1">
                 <div className="font-extrabold text-gray-950 text-sm truncate">{evaluatingApplicant.applicant_name}</div>
                 <div className="text-[11px] font-mono text-purple-700 font-bold">
-                  Roll: {evaluatingApplicant.roll_number || 'AAGAJ-26-XXXX'}
+                  Roll: {evaluatingApplicant.roll_number || 'GRAVITY-26-XXXX'}
                 </div>
                 <div className="text-[10px] text-gray-500 truncate">
                   {evaluatingApplicant.scholarship_title} • {evaluatingApplicant.qualification || 'Class 10th'}
@@ -7843,6 +8284,210 @@ export default function SuperadminScholarshipsPage() {
               >
                 <FiCheck size={14} />
                 <span>{actionLoading ? 'Saving Score & Ranks...' : 'Save & Re-rank Candidate'}</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* GENERATE REFERENCE CODE MODAL */}
+      {mounted && showRefCodeModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+          style={{
+            backgroundColor: 'rgba(5, 8, 20, 0.88)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+          }}
+        >
+          <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden my-auto">
+            <div className="bg-gradient-to-r from-fuchsia-900 via-purple-900 to-slate-900 p-5 sm:p-6 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg sm:text-xl tracking-tight flex items-center gap-2">
+                  <FiShare2 className="text-fuchsia-400" />
+                  <span>Generate Reference Code</span>
+                </h3>
+                <p className="text-gray-300 text-xs mt-0.5">
+                  Issue a new referral code for a representative or partner
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRefCodeModal(false)}
+                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGenerateRefCode} className="p-5 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Representative Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={refCodeForm.name}
+                  onChange={(e) => setRefCodeForm({ ...refCodeForm, name: e.target.value })}
+                  placeholder="e.g. Rajesh Kumar"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={refCodeForm.phone}
+                    onChange={(e) => setRefCodeForm({ ...refCodeForm, phone: e.target.value })}
+                    placeholder="e.g. 9876543210"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Email Address (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={refCodeForm.email}
+                    onChange={(e) => setRefCodeForm({ ...refCodeForm, email: e.target.value })}
+                    placeholder="e.g. agent@example.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Custom Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={refCodeForm.code}
+                  onChange={(e) => setRefCodeForm({ ...refCodeForm, code: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })}
+                  placeholder="Leave blank to auto-generate (e.g. REF-RAJESH-8392)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono font-bold uppercase focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500"
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block">
+                  Only uppercase letters, numbers, and hyphens allowed.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Notes / Organization (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={refCodeForm.notes}
+                  onChange={(e) => setRefCodeForm({ ...refCodeForm, notes: e.target.value })}
+                  placeholder="e.g. Patna District Franchise Agent"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowRefCodeModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={refCodeActionLoading === 'create'}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-700 hover:to-pink-700 text-white font-extrabold text-xs shadow-md shadow-fuchsia-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <FiCheck size={14} />
+                  <span>{refCodeActionLoading === 'create' ? 'Generating...' : 'Generate Code'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* VIEW REFERRED STUDENTS MODAL */}
+      {mounted && showRefStudentsModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+          style={{
+            backgroundColor: 'rgba(5, 8, 20, 0.88)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+          }}
+        >
+          <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden my-auto max-h-[85vh] flex flex-col">
+            <div className="bg-gradient-to-r from-purple-900 via-fuchsia-950 to-slate-900 p-5 text-white flex items-center justify-between shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-black text-xs bg-fuchsia-500/30 border border-fuchsia-400/40 text-fuchsia-200 px-2 py-0.5 rounded-md">
+                    {showRefStudentsModal.code}
+                  </span>
+                  <span className="text-xs text-gray-300">({showRefStudentsModal.name})</span>
+                </div>
+                <h3 className="font-black text-lg text-white mt-1">
+                  Referred Students ({showRefStudentsModal.referred_students?.length || showRefStudentsModal.students_count || 0})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRefStudentsModal(null)}
+                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {showRefStudentsModal.referred_students && showRefStudentsModal.referred_students.length > 0 ? (
+                <div className="space-y-3">
+                  {showRefStudentsModal.referred_students.map((st) => (
+                    <div key={st.id} className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-fuchsia-50/20 transition-colors flex items-center justify-between gap-3 text-xs">
+                      <div>
+                        <div className="font-bold text-gray-900 text-sm">{st.applicant_name}</div>
+                        <div className="text-gray-500 font-mono text-[11px] mt-0.5">App No: <strong className="text-gray-800">{st.application_no}</strong></div>
+                        <div className="text-gray-400 text-[10px] mt-0.5">📞 {st.applicant_phone} | ✉️ {st.applicant_email}</div>
+                        <div className="text-[#FF2D8D] font-bold text-[11px] mt-1">{st.scholarship_title}</div>
+                      </div>
+
+                      <div className="text-right shrink-0 space-y-1">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          {st.status || 'Submitted'}
+                        </span>
+                        <div className="text-gray-400 text-[10px] font-mono block">
+                          {new Date(st.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-gray-400 text-xs">
+                  <FiUsers size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="font-bold text-gray-600 text-sm">No Students Applied Yet</p>
+                  <p className="text-gray-400 text-xs mt-1">No candidate has registered using this reference code so far.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowRefStudentsModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

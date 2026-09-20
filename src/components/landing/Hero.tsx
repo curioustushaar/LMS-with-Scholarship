@@ -34,7 +34,7 @@ export default function Hero() {
     heading_line2: 'Elevating Careers.',
     heading_line3: 'Transforming Futures.',
     description:
-      'AAGAJ INFOTECH LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
+      'Gravity LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
     cta_primary_text: 'Explore Courses',
     cta_primary_link: '#courses',
     cta_secondary_text: 'Apply Admission',
@@ -241,9 +241,9 @@ export default function Hero() {
                       {/* Logo icon inside mock dashboard */}
                       <div className="flex items-center gap-1 mb-3">
                         <div className="w-4 h-4 rounded-md bg-[#FF2D8D] flex items-center justify-center">
-                          <span className="text-[8px] text-white font-extrabold font-heading">A</span>
+                          <span className="text-[8px] text-white font-extrabold font-heading">G</span>
                         </div>
-                        <span className="font-heading font-extrabold text-[8px] tracking-wider text-white hidden sm:inline">AAGAJ</span>
+                        <span className="font-heading font-extrabold text-[8px] tracking-wider text-white hidden sm:inline">GRAVITY</span>
                       </div>
                       
                       {/* Sidebar Items */}

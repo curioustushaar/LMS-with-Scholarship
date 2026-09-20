@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getSchoolClientAuthToken } from '@/lib/auth-helpers'
+import { validateName, validatePhone, validateEmail, validatePincode } from '@/lib/scholarship-validation'
 import {
   FiUserPlus,
   FiAward,
@@ -45,8 +46,6 @@ interface AcademicQualificationDetail {
   roll_no: string
   passing_year: string
   percentage: string
-  marks_obtained: string
-  total_marks: string
   is_custom?: boolean
 }
 
@@ -130,8 +129,6 @@ export default function SchoolIndividualRegisterPage() {
       roll_no: '',
       passing_year: q.toLowerCase().includes('10th') ? '2022' : q.toLowerCase().includes('12th') ? '2024' : '2026',
       percentage: '85',
-      marks_obtained: '425',
-      total_marks: '500',
       is_custom: false,
     }))
     setAcademicRecords(initial)
@@ -199,18 +196,7 @@ export default function SchoolIndividualRegisterPage() {
   // Handle Academic Record Field Change
   const updateAcademicRecord = (id: string, field: keyof AcademicQualificationDetail, value: string) => {
     setAcademicRecords((prev) =>
-      prev.map((rec) => {
-        if (rec.id !== id) return rec
-        const updated = { ...rec, [field]: value }
-        if (field === 'marks_obtained' || field === 'total_marks') {
-          const obtained = parseFloat(field === 'marks_obtained' ? value : rec.marks_obtained)
-          const total = parseFloat(field === 'total_marks' ? value : rec.total_marks)
-          if (!isNaN(obtained) && !isNaN(total) && total > 0) {
-            updated.percentage = ((obtained / total) * 100).toFixed(2)
-          }
-        }
-        return updated
-      })
+      prev.map((rec) => (rec.id === id ? { ...rec, [field]: value } : rec))
     )
   }
 
@@ -224,8 +210,6 @@ export default function SchoolIndividualRegisterPage() {
       roll_no: '',
       passing_year: new Date().getFullYear().toString(),
       percentage: '',
-      marks_obtained: '',
-      total_marks: '500',
       is_custom: true,
     }
     setAcademicRecords((prev) => [...prev, newRec])
@@ -260,15 +244,6 @@ export default function SchoolIndividualRegisterPage() {
     reader.readAsDataURL(file)
   }
 
-  // Mock Upload for Fast Testing
-  const handleMockUpload = (docLabel: string) => {
-    const mockUrl = `https://images.unsplash.com/photo-1584697964190-7c15291b8a53?w=600&fit=crop&q=80`
-    setUploadedDocs((prev) => ({ ...prev, [docLabel]: mockUrl }))
-    const l = docLabel.toLowerCase()
-    if (l.includes('aadhaar')) setFormData((prev) => ({ ...prev, aadhaar_url: mockUrl }))
-    if (l.includes('marksheet')) setFormData((prev) => ({ ...prev, marksheet_url: mockUrl }))
-  }
-
   // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -278,10 +253,37 @@ export default function SchoolIndividualRegisterPage() {
       setError('Please select a scholarship scheme.')
       return
     }
-    if (!formData.applicant_name.trim()) {
-      setError('Student full name is required.')
+    
+    const nameVal = validateName(formData.applicant_name, 'Student Full Name')
+    if (!nameVal.isValid) {
+      setError(nameVal.message!)
       return
     }
+
+    if (formData.applicant_phone) {
+      const phoneVal = validatePhone(formData.applicant_phone)
+      if (!phoneVal.isValid) {
+        setError(phoneVal.message!)
+        return
+      }
+    }
+
+    if (formData.applicant_email) {
+      const emailVal = validateEmail(formData.applicant_email)
+      if (!emailVal.isValid) {
+        setError(emailVal.message!)
+        return
+      }
+    }
+
+    if (formData.pincode) {
+      const pinVal = validatePincode(formData.pincode)
+      if (!pinVal.isValid) {
+        setError(pinVal.message!)
+        return
+      }
+    }
+
     if (!formData.school_roll_number.trim()) {
       setError('School roll number is required.')
       return
@@ -917,32 +919,6 @@ export default function SchoolIndividualRegisterPage() {
 
                       <div>
                         <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                          Marks Obtained *
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 425"
-                          value={rec.marks_obtained}
-                          onChange={(e) => updateAcademicRecord(rec.id, 'marks_obtained', e.target.value)}
-                          className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs bg-white font-mono font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                          Total Marks *
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 500"
-                          value={rec.total_marks}
-                          onChange={(e) => updateAcademicRecord(rec.id, 'total_marks', e.target.value)}
-                          className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs bg-white font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                           Percentage / Score (%) *
                         </label>
                         <input
@@ -1084,22 +1060,13 @@ export default function SchoolIndividualRegisterPage() {
                         }
                       }}
                     />
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => signInputRef.current?.click()}
-                        className="flex-1 py-2 bg-white border border-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs hover:bg-gray-50"
-                      >
-                        <FiUploadCloud /> {formData.signature_url ? 'Replace Signature' : 'Upload Signature'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, signature_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&fit=crop' }))}
-                        className="px-2.5 py-2 text-[10px] bg-purple-50 text-purple-700 border border-purple-100 rounded-xl font-bold hover:bg-purple-100"
-                      >
-                        Mock Sign
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => signInputRef.current?.click()}
+                      className="w-full py-2 bg-white border border-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs hover:bg-gray-50"
+                    >
+                      <FiUploadCloud /> {formData.signature_url ? 'Replace Signature' : 'Upload Signature'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1134,27 +1101,18 @@ export default function SchoolIndividualRegisterPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <label className="flex-1 py-2 bg-white border border-gray-200 text-gray-800 rounded-xl text-xs font-bold hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
-                              <FiUploadCloud /> {isUploaded ? 'Replace File' : 'Upload File'}
-                              <input
-                                type="file"
-                                accept="image/*,.pdf"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0]
-                                  if (f) handleDocFileUpload(docLabel, f)
-                                }}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => handleMockUpload(docLabel)}
-                              className="px-2.5 py-2 text-[10px] bg-purple-50 text-purple-700 border border-purple-100 rounded-xl font-bold hover:bg-purple-100 shrink-0"
-                            >
-                              Mock File
-                            </button>
-                          </div>
+                          <label className="w-full py-2 bg-white border border-gray-200 text-gray-800 rounded-xl text-xs font-bold hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                            <FiUploadCloud /> {isUploaded ? 'Replace File' : 'Upload File'}
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f) handleDocFileUpload(docLabel, f)
+                              }}
+                            />
+                          </label>
                         </div>
                       )
                     })}

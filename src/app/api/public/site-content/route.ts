@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabaseAdmin
       .from('site_content')
-      .select('*')
+      .select('content_key, content_value')
       .eq('section', section)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
@@ -26,7 +26,14 @@ export async function GET(request: Request) {
       content[item.content_key] = item.content_value
     })
 
-    return NextResponse.json({ success: true, data: content })
+    return NextResponse.json(
+      { success: true, data: content },
+      {
+        headers: {
+          'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      }
+    )
   } catch (error: any) {
     console.error('Site content API error:', error)
     // Return fallback mock data
@@ -41,7 +48,7 @@ function getFallbackContent(section: string): Record<string, string> {
       heading_line1: 'Empowering Education.',
       heading_line2: 'Elevating Careers.',
       heading_line3: 'Transforming Futures.',
-      description: 'AAGAJ INFOTECH LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
+      description: 'GRAVITY LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
       cta_primary_text: 'Explore Courses',
       cta_primary_link: '/courses',
       cta_secondary_text: 'Apply Admission',
@@ -57,9 +64,9 @@ function getFallbackContent(section: string): Record<string, string> {
       stat_6_value: '100', stat_6_suffix: '+', stat_6_label: 'Employer Partners',
     },
     about: {
-      title: 'About AAGAJ INFOTECH',
+      title: 'About GRAVITY',
       subtitle: 'Empowering the next generation of learners',
-      description: 'AAGAJ INFOTECH is a forward-thinking EdTech company dedicated to transforming the educational landscape. We bridge the gap between traditional learning and modern industry requirements through our comprehensive Learning Management System.',
+      description: 'GRAVITY is a forward-thinking EdTech company dedicated to transforming the educational landscape. We bridge the gap between traditional learning and modern industry requirements through our comprehensive Learning Management System.',
       mission: 'To democratize quality education by providing an accessible, technology-driven learning platform that connects students with world-class courses, mentors, internships, and career opportunities.',
       vision: 'To become India\'s most trusted EdTech ecosystem where every student, regardless of their background, can access premium education, earn industry-recognized certifications, and secure meaningful careers.',
       founded_year: '2024',

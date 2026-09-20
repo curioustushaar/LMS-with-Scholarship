@@ -5,8 +5,6 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@supabase/supabase-js'
 import { FaDownload, FaShareAlt, FaCheckCircle, FaAward } from 'react-icons/fa'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
 
 // Create a public Supabase client (no auth required for viewing certificates)
 const supabase = createClient(
@@ -93,6 +91,9 @@ export default function CertificateViewPage() {
         if (!certificateRef.current) return
 
         try {
+            const html2canvas = (await import('html2canvas')).default
+            const jsPDF = (await import('jspdf')).default
+
             const canvas = await html2canvas(certificateRef.current, {
                 scale: 2,
                 useCORS: true,

@@ -7,10 +7,10 @@ import { ShieldCheck, Target, Award, Sparkles, CheckCircle2, ArrowRight } from '
 
 export default function About() {
   const [content, setContent] = useState({
-    title: 'About AAGAJ INFOTECH',
+    title: 'About Gravity',
     subtitle: 'Empowering the next generation of learners & innovators',
     description:
-      'AAGAJ INFOTECH is a forward-thinking EdTech ecosystem dedicated to transforming the educational landscape. We bridge the gap between academic theory and industry reality through our comprehensive Learning Management System.',
+      'Gravity is a forward-thinking EdTech ecosystem dedicated to transforming the educational landscape. We bridge the gap between academic theory and industry reality through our comprehensive Learning Management System.',
     mission:
       'To democratize quality education by providing an accessible, technology-driven platform that connects students with world-class mentors, courses, internships, and scholarships.',
     vision:
@@ -104,10 +104,10 @@ export default function About() {
                 <div className="flex items-center justify-between border-b border-gray-800 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF] flex items-center justify-center shadow-md">
-                      <span className="font-extrabold text-white text-lg">A</span>
+                      <span className="font-extrabold text-white text-lg">G</span>
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm text-white">AAGAJ Core Pillars</h4>
+                      <h4 className="font-bold text-sm text-white">Gravity Core Pillars</h4>
                       <p className="text-[10px] text-gray-400">Integrated SaaS Learning Framework</p>
                     </div>
                   </div>

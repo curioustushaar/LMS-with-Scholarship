@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     if (schemes.length === 0) {
       const defaultScheme = {
         id: 'sch-1',
-        title: 'AAGAJ National STEM Excellence Scholarship',
+        title: 'GRAVITY National STEM Excellence Scholarship',
         category: 'Merit',
         description: 'Premier national STEM scholarship for school students with fee waiver and cash rewards.',
         scholarship_value: 'Up to ₹50,000 Cash Grant + 100% Fee Waiver',

@@ -86,9 +86,7 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
                     <div className="flex itemcourseter space-x-8">
                         <Link href="/student/videos" className="flex items-center space-x-2">
-                            <div className="w-10 h-10 bg-gradient-to-br from-[#C81E4E] to-[#D91E5B] rounded-xl flex items-center justify-center text-white shadow-lg">
-                                <span className="text-xl font-black">L</span>
-                            </div>
+                            <img src="/logo.png" alt="Gravity Logo" className="h-14 w-auto object-contain" />
                             <span className="text-xl font-bold text-gray-900 hidden sm:block tracking-tight">LMS STUDENT</span>
                         </Link>
 

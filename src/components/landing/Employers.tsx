@@ -103,7 +103,7 @@ export default function Employers() {
           </div>
           <Link href="/employers">
             <button className="px-6 py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white text-xs font-bold rounded-full shadow-lg hover:shadow-pink-500/25 transition-all whitespace-nowrap">
-              Hire from AAGAJ
+              Hire from Gravity
             </button>
           </Link>
         </div>

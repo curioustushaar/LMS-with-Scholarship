@@ -40,11 +40,21 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Pa
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to sign out of the School Portal?')) {
-      await supabase.auth.signOut()
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token')
+      try {
+        await supabase.auth.signOut()
+      } catch (e) {
+        // ignore
       }
-      router.push('/school-portal/login')
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+        document.cookie.split(';').forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, '')
+            .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/')
+        })
+        window.location.replace('/school-portal/login')
+      }
     }
   }
 
@@ -82,9 +92,7 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Pa
         {/* Brand Header */}
         <div className="p-6 border-b border-gray-800">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF] rounded-xl flex items-center justify-center shadow-lg">
-              <FiBookOpen className="text-xl text-white" />
-            </div>
+            <img src="/logo.png" alt="Gravity Logo" className="h-14 w-auto object-contain" />
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">
                 School Portal

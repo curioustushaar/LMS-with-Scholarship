@@ -18,7 +18,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         
         if (!session) {
           console.warn('No session found, redirecting to login')
-          router.push('/login')
+          if (typeof window !== 'undefined') window.location.replace('/login')
           return
         }
 
@@ -40,13 +40,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             setIsLoading(false)
             return
           }
-          router.push('/login')
+          if (typeof window !== 'undefined') window.location.replace('/login')
           return
         }
 
         if (!userData || userData.role !== 'admin') {
           console.warn('Unauthorized access to admin portal. Role:', userData?.role)
-          router.push('/login')
+          if (typeof window !== 'undefined') window.location.replace('/login')
           return
         }
 
@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           console.warn('⛔ Account is suspended or inactive. Status:', userData.account_status)
           alert('Your account has been suspended. Please contact the administrator.')
           await supabase.auth.signOut()
-          router.push('/login')
+          if (typeof window !== 'undefined') window.location.replace('/login')
           return
         }
 
@@ -63,11 +63,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         setIsLoading(false)
       } catch (err) {
         console.error('Exception in checkAdmin:', err)
-        router.push('/login')
+        if (typeof window !== 'undefined') window.location.replace('/login')
       }
     }
 
     checkAdmin()
+
+    // BFCache restoration handler for browser Back/Forward navigation
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        checkAdmin()
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pageshow', handlePageShow)
+    }
 
     // Set up periodic check for account status (every 30 seconds)
     const intervalId = setInterval(async () => {
@@ -85,14 +95,19 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           console.warn('⛔ Account status changed to:', userData.account_status)
           alert('Your account has been suspended. You will be logged out.')
           await supabase.auth.signOut()
-          router.push('/login')
+          if (typeof window !== 'undefined') window.location.replace('/login')
         }
       } catch (err) {
         console.error('Error checking account status:', err)
       }
-    }, 30000) // Check every 30 seconds
+    }, 30000)
 
-    return () => clearInterval(intervalId)
+    return () => {
+      clearInterval(intervalId)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pageshow', handlePageShow)
+      }
+    }
   }, [router])
 
   if (isLoading) {

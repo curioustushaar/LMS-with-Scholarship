@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySchoolAccess, schoolErrorResponse } from '@/lib/school-auth'
+import { validateName, validatePhone, validateEmail, validatePincode, validatePercentage } from '@/lib/scholarship-validation'
 
 function generateAppNumber(): string {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000)
@@ -60,12 +61,39 @@ export async function POST(request: Request) {
       documents = {},
     } = body
 
-    if (!scholarship_id || !applicant_name?.trim()) {
-      return schoolErrorResponse('Scholarship ID and student name are required.', 400)
+    if (!scholarship_id) {
+      return schoolErrorResponse('Scholarship ID is required.', 400)
+    }
+
+    const nameVal = validateName(applicant_name, 'Student Name')
+    if (!nameVal.isValid) {
+      return schoolErrorResponse(nameVal.message!, 400)
+    }
+
+    if (applicant_phone) {
+      const phoneVal = validatePhone(applicant_phone)
+      if (!phoneVal.isValid) {
+        return schoolErrorResponse(phoneVal.message!, 400)
+      }
+    }
+
+    if (applicant_email) {
+      const emailVal = validateEmail(applicant_email)
+      if (!emailVal.isValid) {
+        return schoolErrorResponse(emailVal.message!, 400)
+      }
+    }
+
+    if (pincode) {
+      const pinVal = validatePincode(pincode)
+      if (!pinVal.isValid) {
+        return schoolErrorResponse(pinVal.message!, 400)
+      }
     }
 
     const cleanEmail = (applicant_email?.trim() || `${applicant_name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}@schoolstudent.internal`).toLowerCase()
-    const cleanPhone = applicant_phone?.trim() || school.mobile || '+91 9800000000'
+    const cleanPhone = applicant_phone ? validatePhone(applicant_phone).cleanPhone : school.mobile || '9800000000'
+
 
     // 1. Verify scholarship is assigned to this school and active
     const { data: assignment } = await supabaseAdmin

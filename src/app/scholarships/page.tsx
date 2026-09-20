@@ -7,6 +7,16 @@ import Footer from '@/components/landing/Footer'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIndianStates, getDistrictsForState } from '@/lib/india-locations'
 import {
+  validateName,
+  validatePhone,
+  validateEmail,
+  validatePincode,
+  validatePercentage,
+  validateIFSC,
+  validateAccountNumber,
+  validateUPI,
+} from '@/lib/scholarship-validation'
+import {
   GraduationCap,
   Award,
   Landmark,
@@ -185,7 +195,43 @@ export default function ScholarshipsPage() {
     // Exam Preferences & Declaration
     exam_city_preference: 'Patna (Pref 1) / Gaya (Pref 2)',
     declaration_agreed: false,
+
+    // Referral / Reference Code (Optional)
+    reference_code: '',
   })
+
+  // Referral Code Verification State
+  const [refCodeVerifying, setRefCodeVerifying] = useState(false)
+  const [refCodeVerifiedData, setRefCodeVerifiedData] = useState<{ representative_name: string; code: string } | null>(null)
+  const [refCodeVerifyError, setRefCodeVerifyError] = useState<string | null>(null)
+
+  const handleVerifyRefCode = async (overrideCode?: string) => {
+    const codeToVerify = (overrideCode || applicantForm.reference_code).trim()
+    if (!codeToVerify) {
+      setRefCodeVerifyError('Please enter a referral code first.')
+      setRefCodeVerifiedData(null)
+      return
+    }
+
+    setRefCodeVerifying(true)
+    setRefCodeVerifyError(null)
+    setRefCodeVerifiedData(null)
+
+    try {
+      const res = await fetch(`/api/public/scholarships/reference-codes/verify?code=${encodeURIComponent(codeToVerify)}`)
+      const data = await res.json()
+      if (data.success && data.valid && data.data) {
+        setRefCodeVerifiedData(data.data)
+        setApplicantForm((prev) => ({ ...prev, reference_code: data.data.code }))
+      } else {
+        setRefCodeVerifyError(data.error || 'Invalid or inactive referral code.')
+      }
+    } catch (err) {
+      setRefCodeVerifyError('Network error verifying referral code.')
+    } finally {
+      setRefCodeVerifying(false)
+    }
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi')
@@ -298,6 +344,27 @@ export default function ScholarshipsPage() {
   const handleSubmitBankClaim = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!studentScorecard) return
+
+    const accVal = validateAccountNumber(bankClaimForm.account_number)
+    if (!accVal.isValid) {
+      alert(accVal.message)
+      return
+    }
+
+    const ifscVal = validateIFSC(bankClaimForm.ifsc_code)
+    if (!ifscVal.isValid) {
+      alert(ifscVal.message)
+      return
+    }
+
+    if (bankClaimForm.upi_id) {
+      const upiVal = validateUPI(bankClaimForm.upi_id)
+      if (!upiVal.isValid) {
+        alert(upiVal.message)
+        return
+      }
+    }
+
     setBankSubmitting(true)
     setBankSuccessMsg(null)
     try {
@@ -308,11 +375,11 @@ export default function ScholarshipsPage() {
           action: 'submit_bank_details',
           application_no: studentScorecard.application_no,
           registration_code: studentScorecard.registration_code,
-          bank_name: bankClaimForm.bank_name,
-          account_number: bankClaimForm.account_number,
-          ifsc_code: bankClaimForm.ifsc_code,
-          account_holder_name: bankClaimForm.account_holder_name || studentScorecard.applicant_name,
-          upi_id: bankClaimForm.upi_id,
+          bank_name: bankClaimForm.bank_name.trim(),
+          account_number: accVal.cleanAcc,
+          ifsc_code: ifscVal.cleanIFSC,
+          account_holder_name: bankClaimForm.account_holder_name.trim() || studentScorecard.applicant_name,
+          upi_id: bankClaimForm.upi_id.trim(),
         }),
       })
       const data = await res.json()
@@ -377,8 +444,6 @@ export default function ScholarshipsPage() {
       roll_no: '',
       passing_year: new Date().getFullYear().toString(),
       percentage: '',
-      marks_obtained: '',
-      total_marks: '500',
       is_custom: false,
     }]
     setAcademicRecords(initialRecords)
@@ -412,6 +477,7 @@ export default function ScholarshipsPage() {
       signature_url: '',
       exam_city_preference: 'Patna (Pref 1) / Gaya (Pref 2)',
       declaration_agreed: false,
+      reference_code: '',
     })
   }
 
@@ -431,8 +497,6 @@ export default function ScholarshipsPage() {
           roll_no: '',
           passing_year: new Date().getFullYear().toString(),
           percentage: '',
-          marks_obtained: '',
-          total_marks: '500',
           is_custom: false,
         }]
       }
@@ -500,21 +564,7 @@ export default function ScholarshipsPage() {
   // Update specific field in an academic record
   const handleUpdateAcademicRecord = (id: string, field: keyof AcademicQualificationDetail, value: string) => {
     setAcademicRecords((prev) =>
-      prev.map((rec) => {
-        if (rec.id === id) {
-          const updated = { ...rec, [field]: value }
-          // Auto calculate percentage if marks entered
-          if (field === 'marks_obtained' || field === 'total_marks') {
-            const obt = parseFloat(field === 'marks_obtained' ? value : rec.marks_obtained || '0')
-            const tot = parseFloat(field === 'total_marks' ? value : rec.total_marks || '500')
-            if (tot > 0 && obt >= 0 && obt <= tot) {
-              updated.percentage = ((obt / tot) * 100).toFixed(2)
-            }
-          }
-          return updated
-        }
-        return rec
-      })
+      prev.map((rec) => (rec.id === id ? { ...rec, [field]: value } : rec))
     )
   }
 
@@ -529,8 +579,6 @@ export default function ScholarshipsPage() {
       roll_no: '',
       passing_year: new Date().getFullYear().toString(),
       percentage: '',
-      marks_obtained: '',
-      total_marks: '500',
       is_custom: true,
     }
     setAcademicRecords((prev) => [...prev, newRecord])
@@ -653,22 +701,45 @@ export default function ScholarshipsPage() {
       }
     }
 
-    if (!applicantForm.applicant_name?.trim()) {
-      alert('Please enter your Full Name.')
+    const nameVal = validateName(applicantForm.applicant_name, 'Full Name')
+    if (!nameVal.isValid) {
+      alert(nameVal.message)
       return
     }
-    if (!applicantForm.applicant_phone?.trim()) {
-      alert('Please enter your Mobile Number.')
+
+    const phoneVal = validatePhone(applicantForm.applicant_phone)
+    if (!phoneVal.isValid) {
+      alert(phoneVal.message)
       return
     }
-    if (!applicantForm.applicant_email?.trim()) {
-      alert('Please enter your Email Address.')
+
+    const emailVal = validateEmail(applicantForm.applicant_email)
+    if (!emailVal.isValid) {
+      alert(emailVal.message)
       return
     }
+
     if (!applicantForm.address?.trim()) {
       alert('Please enter your Residential Address.')
       return
     }
+
+    if (applicantForm.pincode) {
+      const pinVal = validatePincode(applicantForm.pincode)
+      if (!pinVal.isValid) {
+        alert(pinVal.message)
+        return
+      }
+    }
+
+    // Save cleaned values back to form state
+    setApplicantForm((prev) => ({
+      ...prev,
+      applicant_name: nameVal.cleanName,
+      applicant_phone: phoneVal.cleanPhone,
+      applicant_email: emailVal.cleanEmail,
+    }))
+
     setFormSection('academic')
   }
 
@@ -734,8 +805,135 @@ export default function ScholarshipsPage() {
     }
   }
 
+  // Helper to dynamically load Razorpay Checkout Script
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true)
+        return
+      }
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      document.body.appendChild(script)
+    })
+  }
+
+  // Handle Real Production Razorpay Payment Checkout
+  const handleRazorpayCheckout = async () => {
+    if (!selectedScheme) return
+    setSubmitting(true)
+
+    try {
+      // 1. Call API to create Razorpay Order
+      const res = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: selectedScheme.application_fee,
+          scholarship_id: selectedScheme.id,
+          applicant_name: applicantForm.applicant_name,
+          applicant_email: applicantForm.applicant_email,
+          applicant_phone: applicantForm.applicant_phone,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!data.success) {
+        if (data.requires_config || data.error?.includes('missing in system environment variables')) {
+          const proceedMock = confirm(
+            '⚠️ Razorpay API Keys are not set in your .env file yet.\n\nWould you like to complete with Instant Test Confirmation for now?'
+          )
+          if (proceedMock) {
+            await executeSubmitApplication(`PAY_MOCK_${Date.now().toString().slice(-8)}`)
+          } else {
+            setSubmitting(false)
+          }
+          return
+        }
+        alert(data.error || 'Unable to initiate Razorpay payment.')
+        setSubmitting(false)
+        return
+      }
+
+      // 2. Load Razorpay script
+      const isLoaded = await loadRazorpayScript()
+      if (!isLoaded) {
+        alert('Razorpay Payment Gateway failed to load. Please check your internet connection.')
+        setSubmitting(false)
+        return
+      }
+
+      // 3. Launch Razorpay modal popup
+      const options = {
+        key: data.key_id,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'GRAVITY NATIONAL SCHOLARSHIP BOARD',
+        description: `Application Fee - ${selectedScheme.title}`,
+        image: '/logo.png',
+        order_id: data.order_id,
+        handler: async function (response: any) {
+          try {
+            // Verify payment on server
+            const verifyRes = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            })
+            const verifyData = await verifyRes.json()
+            if (verifyData.success) {
+              await executeSubmitApplication(response.razorpay_payment_id, {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+            } else {
+              alert('Payment Verification Failed: ' + (verifyData.error || 'Invalid signature'))
+              setSubmitting(false)
+            }
+          } catch (err: any) {
+            console.error('Payment verification error:', err)
+            alert('Error verifying payment with server.')
+            setSubmitting(false)
+          }
+        },
+        prefill: {
+          name: applicantForm.applicant_name,
+          email: applicantForm.applicant_email,
+          contact: applicantForm.applicant_phone,
+        },
+        theme: {
+          color: '#FF2D8D',
+        },
+        modal: {
+          ondismiss: function () {
+            setSubmitting(false)
+          },
+        },
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', function (resp: any) {
+        alert('Payment Failed: ' + (resp.error.description || 'Transaction cancelled or declined'))
+        setSubmitting(false)
+      })
+      rzp.open()
+    } catch (err: any) {
+      console.error('Razorpay checkout error:', err)
+      alert('Failed to connect to Razorpay payment gateway.')
+      setSubmitting(false)
+    }
+  }
+
   // Execute Final Application Submission
-  const executeSubmitApplication = async (paymentRef?: string) => {
+  const executeSubmitApplication = async (paymentRef?: string, razorpayDetails?: any) => {
     if (!selectedScheme) return
     setSubmitting(true)
     try {
@@ -766,6 +964,7 @@ export default function ScholarshipsPage() {
           school_admission_no: applicantType === 'SCHOOL_PARTNER' ? schoolStudentInfo.admission_no : null,
           school_class: applicantType === 'SCHOOL_PARTNER' ? schoolStudentInfo.class_name : null,
           school_section: applicantType === 'SCHOOL_PARTNER' ? schoolStudentInfo.section : null,
+          razorpay_details: razorpayDetails || null,
         },
         payment_reference: paymentRef || `PAY_MOCK_${Date.now().toString().slice(-8)}`,
         payment_amount: selectedScheme.application_fee,
@@ -1436,7 +1635,7 @@ export default function ScholarshipsPage() {
                     <div id="printable-hall-ticket" className="border-4 border-double border-gray-800 p-6 sm:p-8 rounded-3xl space-y-6 bg-amber-50/10 shadow-sm relative">
                       <div className="text-center border-b-2 border-gray-800 pb-4 space-y-1">
                         <div className="font-mono text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                          AAGAJ NATIONAL SCHOLARSHIP BOARD
+                          GRAVITY NATIONAL SCHOLARSHIP BOARD
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-tight">
                           Official Examination Admit Card (Hall Ticket)
@@ -1653,7 +1852,7 @@ export default function ScholarshipsPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. AAGAJ-26-5467 or SCH-2026-2378"
+                    placeholder="e.g. GRAVITY-26-5467 or SCH-2026-2378"
                     value={resultLookupInput}
                     onChange={(e) => setResultLookupInput(e.target.value)}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 border-2 border-gray-200 text-xs sm:text-sm font-mono font-bold focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
@@ -1794,7 +1993,7 @@ export default function ScholarshipsPage() {
               >
                 {/* Background Watermark */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-[0.025] pointer-events-none select-none font-black text-7xl text-indigo-950 rotate-[-22deg]">
-                  AAGAJ MERIT 2026
+                  GRAVITY MERIT 2026
                 </div>
 
                 {/* Scorecard Header */}
@@ -1805,7 +2004,7 @@ export default function ScholarshipsPage() {
                     </div>
                     <div>
                       <span className="text-[10px] font-black tracking-widest text-indigo-900 uppercase">
-                        AAGAJ NATIONAL SCHOLARSHIP & MERIT COUNCIL
+                        GRAVITY NATIONAL SCHOLARSHIP & MERIT COUNCIL
                       </span>
                       <h3 className="text-lg sm:text-xl font-heading font-black text-gray-900">
                         Candidate Examination Scorecard & Result Dossier
@@ -2907,6 +3106,58 @@ export default function ScholarshipsPage() {
                             />
                           </div>
                         </div>
+
+                        {/* Reference / Referral Code (Optional) */}
+                        <div className="pt-2 border-t border-gray-200/60">
+                          <div className="p-3.5 bg-gradient-to-r from-pink-50/70 to-purple-50/70 rounded-2xl border border-pink-100 space-y-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-0.5">
+                                <label className="block text-xs font-extrabold text-gray-800 uppercase tracking-wide">
+                                  Reference / Referral Code (Optional)
+                                </label>
+                                <p className="text-[11px] text-gray-500">
+                                  If you were referred by an authorized teacher, campus ambassador, or partner, enter their code here.
+                                </p>
+                              </div>
+                              <div className="w-full sm:w-80 shrink-0 flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. REF-VIP-2026"
+                                  value={applicantForm.reference_code}
+                                  onChange={(e) => {
+                                    setApplicantForm({ ...applicantForm, reference_code: e.target.value.toUpperCase() })
+                                    setRefCodeVerifiedData(null)
+                                    setRefCodeVerifyError(null)
+                                  }}
+                                  className="flex-1 px-3.5 py-2 border border-pink-200 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-white focus:ring-2 focus:ring-[#FF2D8D]/30 focus:border-[#FF2D8D] placeholder:normal-case placeholder:font-normal"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleVerifyRefCode()}
+                                  disabled={refCodeVerifying || !applicantForm.reference_code.trim()}
+                                  className="px-3.5 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white text-xs font-extrabold rounded-xl shadow-xs hover:shadow-md transition-all disabled:opacity-50 shrink-0"
+                                >
+                                  {refCodeVerifying ? 'Verifying...' : 'Verify Code'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Verification Result Badges */}
+                            {refCodeVerifiedData && (
+                              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900 flex items-center gap-2 animate-in fade-in duration-150">
+                                <span className="text-sm">✅</span>
+                                <span>Verified Partner Code: <strong className="text-emerald-950 uppercase">{refCodeVerifiedData.code}</strong> (Representative: <strong className="text-emerald-900">{refCodeVerifiedData.representative_name}</strong>)</span>
+                              </div>
+                            )}
+
+                            {refCodeVerifyError && (
+                              <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2 animate-in fade-in duration-150">
+                                <span className="text-sm">⚠️</span>
+                                <span>{refCodeVerifyError}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="sticky bottom-0 bg-white/95 backdrop-blur-md pt-3.5 pb-1 border-t border-gray-100 flex justify-end">
@@ -3044,9 +3295,9 @@ export default function ScholarshipsPage() {
                                   )}
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 pt-1">
                                   {/* School / College Name */}
-                                  <div className="sm:col-span-2">
+                                  <div className="sm:col-span-2 lg:col-span-6">
                                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                                       {isSchool ? 'School Name *' : isSeniorSec ? 'Junior College / School Name *' : 'College / University Name *'}
                                     </label>
@@ -3067,7 +3318,7 @@ export default function ScholarshipsPage() {
                                   </div>
 
                                   {/* Board / University */}
-                                  <div>
+                                  <div className="lg:col-span-3">
                                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                                       {isSchool ? 'School Board *' : 'Board / University *'}
                                     </label>
@@ -3082,7 +3333,7 @@ export default function ScholarshipsPage() {
                                   </div>
 
                                   {/* Roll Number / Reg No */}
-                                  <div>
+                                  <div className="lg:col-span-3">
                                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                                       {isSchool ? 'School Roll / S.R. No.' : 'Roll No / Reg No'}
                                     </label>
@@ -3096,7 +3347,7 @@ export default function ScholarshipsPage() {
                                   </div>
 
                                   {/* Passing Year / Academic Year */}
-                                  <div>
+                                  <div className="sm:col-span-1 lg:col-span-6">
                                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                                       {isSchool ? 'Academic Session *' : 'Passing Year *'}
                                     </label>
@@ -3110,38 +3361,8 @@ export default function ScholarshipsPage() {
                                     />
                                   </div>
 
-                                  {/* Marks Obtained (Optional) */}
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                      Marks Obtained (Optional)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      step="1"
-                                      placeholder="e.g. 465"
-                                      value={record.marks_obtained || ''}
-                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'marks_obtained', e.target.value)}
-                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                                    />
-                                  </div>
-
-                                  {/* Total Marks (Optional) */}
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                                      Max / Total Marks
-                                    </label>
-                                    <input
-                                      type="number"
-                                      step="1"
-                                      placeholder="e.g. 500"
-                                      value={record.total_marks || ''}
-                                      onChange={(e) => handleUpdateAcademicRecord(record.id, 'total_marks', e.target.value)}
-                                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs bg-white"
-                                    />
-                                  </div>
-
                                   {/* Final Percentage (%) / CGPA */}
-                                  <div>
+                                  <div className="sm:col-span-1 lg:col-span-6">
                                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                                       {isSchool ? 'Previous Class Exam % *' : 'Percentage (%) / CGPA *'}
                                     </label>
@@ -3235,17 +3456,14 @@ export default function ScholarshipsPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/70 pb-3">
                           <div>
                             <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">
-                              3. Mandatory Document Dossier & Verification
+                              3. Document Dossier & Identity Verification
                             </span>
                             <p className="text-[11px] text-gray-500 mt-0.5">
-                              Upload documents tailored for {applicantForm.qualification || 'your class'}, along with your passport photograph and signature.
+                              Upload student identification (Aadhaar / ID), passport photograph, and signature. Previous marksheet and School ID are optional.
                             </p>
                           </div>
                           <span className="text-xs font-extrabold text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1 rounded-full shrink-0">
-                            {(() => {
-                              const docs = getApplicableDocumentList(selectedScheme, applicantForm.qualification)
-                              return `${docs.length} Required Docs + Photo & Sign`
-                            })()}
+                            Candidate Verification & Dossier
                           </span>
                         </div>
 
@@ -3262,6 +3480,15 @@ export default function ScholarshipsPage() {
                                   ((docName.toLowerCase().includes('college') || docName.toLowerCase().includes('school id') || docName.toLowerCase().includes('bonafide')) && !!applicantForm.college_id_url)
                                 )
 
+                                const docLower = docName.toLowerCase()
+                                const isOptional =
+                                  docLower.includes('marksheet') ||
+                                  docLower.includes('report') ||
+                                  docLower.includes('school id') ||
+                                  docLower.includes('college') ||
+                                  docLower.includes('bonafide') ||
+                                  docLower.includes('id card')
+
                                 return (
                                   <div
                                     key={index}
@@ -3270,19 +3497,24 @@ export default function ScholarshipsPage() {
                                     <div>
                                       <div className="flex items-center justify-between mb-1">
                                         <label className="text-xs font-bold text-gray-900 uppercase flex items-center gap-1.5 truncate">
-                                          {docName.toLowerCase().includes('marksheet') || docName.toLowerCase().includes('report') ? (
+                                          {docLower.includes('marksheet') || docLower.includes('report') ? (
                                             <GraduationCap size={14} className="text-purple-600 shrink-0" />
-                                          ) : docName.toLowerCase().includes('income') ? (
+                                          ) : docLower.includes('income') ? (
                                             <Landmark size={14} className="text-emerald-600 shrink-0" />
-                                          ) : docName.toLowerCase().includes('caste') ? (
+                                          ) : docLower.includes('caste') ? (
                                             <ShieldCheck size={14} className="text-amber-600 shrink-0" />
                                           ) : (
                                             <FileText size={14} className="text-blue-600 shrink-0" />
                                           )}
-                                          <span className="truncate">{index + 1}. {docName} *</span>
+                                          <span className="truncate">{index + 1}. {docName}</span>
                                         </label>
                                       </div>
-                                      <p className="text-[10px] text-gray-400">PDF / JPG / PNG (Max 5MB)</p>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isOptional ? 'bg-gray-100 text-gray-600 border border-gray-200' : 'bg-pink-50 text-[#FF2D8D] border border-pink-200'}`}>
+                                          {isOptional ? 'Optional' : 'Mandatory *'}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400">PDF / JPG / PNG (Max 5MB)</span>
+                                      </div>
                                     </div>
 
                                     <div className="space-y-2">
@@ -3306,29 +3538,10 @@ export default function ScholarshipsPage() {
                                         {isUploaded ? 'Change Document' : `Upload ${docName.split(' ')[0]}`}
                                       </button>
 
-                                      {isUploaded ? (
+                                      {isUploaded && (
                                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 block text-center">
                                           ✓ Uploaded & Attached
                                         </span>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const sampleUrl = 'data:application/pdf;base64,sample_verified_doc'
-                                            setUploadedDocs((prev) => ({ ...prev, [docName]: sampleUrl }))
-                                            const l = docName.toLowerCase()
-                                            if (l.includes('aadhaar') || l.includes('id') || l.includes('pan') || l.includes('birth')) {
-                                              setApplicantForm((prev) => ({ ...prev, aadhaar_url: sampleUrl }))
-                                            } else if (l.includes('marksheet') || l.includes('report')) {
-                                              setApplicantForm((prev) => ({ ...prev, marksheet_url: sampleUrl }))
-                                            } else if (l.includes('college') || l.includes('school id') || l.includes('bonafide')) {
-                                              setApplicantForm((prev) => ({ ...prev, college_id_url: sampleUrl }))
-                                            }
-                                          }}
-                                          className="text-[10px] text-blue-600 font-semibold hover:underline block text-center w-full"
-                                        >
-                                          + Quick Demo {docName.split(' ')[0]}
-                                        </button>
                                       )}
                                     </div>
                                   </div>
@@ -3370,27 +3583,12 @@ export default function ScholarshipsPage() {
                                 <button
                                   type="button"
                                   onClick={() => photoFileInputRef.current?.click()}
-                                  className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs"
+                                  className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs"
                                 >
                                   <UploadCloud size={13} className="text-[#FF2D8D]" />
-                                  Upload Photo
+                                  {applicantForm.photo_url ? 'Change Photo' : 'Upload Passport Photo'}
                                 </button>
-
-                                <div className="flex gap-2 items-center">
-                                  <span className="text-[10px] text-gray-400">Sample:</span>
-                                  {DEFAULT_SAMPLE_PHOTOS.slice(0, 3).map((url, i) => (
-                                    <button
-                                      key={i}
-                                      type="button"
-                                      onClick={() => setApplicantForm({ ...applicantForm, photo_url: url })}
-                                      className={`w-6 h-6 rounded-full overflow-hidden border ${
-                                        applicantForm.photo_url === url ? 'border-[#FF2D8D] scale-110' : 'opacity-60'
-                                      }`}
-                                    >
-                                      <img src={url} alt="sample" className="w-full h-full object-cover" />
-                                    </button>
-                                  ))}
-                                </div>
+                                <p className="text-[10px] text-gray-400">Clear frontal passport size photograph (JPG / PNG)</p>
                               </div>
                             </div>
                           </div>
@@ -3409,31 +3607,22 @@ export default function ScholarshipsPage() {
                                 accept="image/*"
                                 className="hidden"
                               />
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => signFileInputRef.current?.click()}
-                                  className="flex-1 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs"
-                                >
-                                  <UploadCloud size={13} className="text-[#9C27FF]" />
-                                  Upload Scan
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setApplicantForm({ ...applicantForm, signature_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="30"><text x="10" y="20" font-family="cursive" font-size="16" fill="%23333">Digital Signed</text></svg>' })}
-                                  className="px-3 py-2 bg-purple-100 text-purple-800 text-xs font-bold rounded-xl hover:bg-purple-200"
-                                >
-                                  + E-Sign
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => signFileInputRef.current?.click()}
+                                className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-xs"
+                              >
+                                <UploadCloud size={13} className="text-[#9C27FF]" />
+                                {applicantForm.signature_url ? 'Change Signature Scan' : 'Upload Signature Scan'}
+                              </button>
 
                               {applicantForm.signature_url ? (
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg block text-center border border-emerald-100">
-                                  ✓ Signature Attached
+                                  ✓ Signature Uploaded & Attached
                                 </span>
                               ) : (
                                 <span className="text-[10px] text-gray-400 block text-center">
-                                  Upload scanned signature image or click + E-Sign
+                                  Upload clear handwritten signature image (JPG / PNG)
                                 </span>
                               )}
                             </div>
@@ -3543,96 +3732,57 @@ export default function ScholarshipsPage() {
                 </div>
               )}
 
-              {/* STEP 2: SIMULATED PAYMENT GATEWAY */}
+              {/* STEP 2: RAZORPAY PRODUCTION PAYMENT GATEWAY */}
               {applyStep === 'payment' && (
                 <div className="space-y-6 max-w-2xl mx-auto py-2">
-                  <div className="p-5 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-100 flex justify-between items-center text-xs">
+                  <div className="p-5 bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 rounded-2xl border border-purple-100 flex justify-between items-center text-xs shadow-sm">
                     <div>
-                      <div className="font-bold text-purple-900 text-sm">Payment for {selectedScheme.title}</div>
+                      <div className="font-bold text-purple-950 text-sm">Payment for {selectedScheme.title}</div>
                       <div className="text-purple-600 text-xs">Examination Processing & Hall Ticket Fee</div>
                     </div>
-                    <div className="text-2xl font-black text-purple-900">₹{selectedScheme.application_fee}</div>
+                    <div className="text-2xl font-black text-[#FF2D8D]">₹{selectedScheme.application_fee}</div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('upi')}
-                      className={`p-3.5 rounded-2xl border text-xs font-bold text-center transition-all ${
-                        paymentMethod === 'upi'
-                          ? 'border-[#FF2D8D] bg-pink-50 text-[#FF2D8D] ring-2 ring-[#FF2D8D]/20 shadow-xs'
-                          : 'border-gray-200 bg-white text-gray-600'
-                      }`}
-                    >
-                      UPI / QR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('card')}
-                      className={`p-3.5 rounded-2xl border text-xs font-bold text-center transition-all ${
-                        paymentMethod === 'card'
-                          ? 'border-[#FF2D8D] bg-pink-50 text-[#FF2D8D] ring-2 ring-[#FF2D8D]/20 shadow-xs'
-                          : 'border-gray-200 bg-white text-gray-600'
-                      }`}
-                    >
-                      Debit / Card
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('netbanking')}
-                      className={`p-3.5 rounded-2xl border text-xs font-bold text-center transition-all ${
-                        paymentMethod === 'netbanking'
-                          ? 'border-[#FF2D8D] bg-pink-50 text-[#FF2D8D] ring-2 ring-[#FF2D8D]/20 shadow-xs'
-                          : 'border-gray-200 bg-white text-gray-600'
-                      }`}
-                    >
-                      Netbanking
-                    </button>
-                  </div>
+                  {/* Razorpay Information Box */}
+                  <div className="p-6 bg-gradient-to-br from-slate-900 to-gray-900 rounded-3xl text-white space-y-4 shadow-xl border border-gray-800">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={20} className="text-emerald-400" />
+                        <span className="font-bold text-sm text-white">Razorpay 256-Bit SSL Secured Payment</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                        Official Production Gateway
+                      </span>
+                    </div>
 
-                  {paymentMethod === 'upi' ? (
-                    <div className="p-6 bg-gray-50 rounded-2xl border border-gray-200 text-center space-y-3">
-                      <div className="w-36 h-36 bg-white p-2 border border-gray-200 rounded-2xl mx-auto flex items-center justify-center shadow-xs">
-                        <QrCode size={120} className="text-gray-800" />
-                      </div>
-                      <div className="text-xs font-bold text-gray-800">Scan UPI QR with GPay, PhonePe, Paytm or BHIM</div>
-                      <div className="font-mono text-xs font-bold text-purple-700 bg-purple-50 py-1 px-3 rounded-lg inline-block border border-purple-200">
-                        UPI ID: aagaj.scholarships@axisbank
-                      </div>
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      You will be redirected to the official Razorpay Checkout popup supporting <strong>UPI (GPay, PhonePe, Paytm, BHIM)</strong>, <strong>Debit & Credit Cards</strong>, <strong>Netbanking</strong>, and <strong>Wallets</strong>.
+                    </p>
+
+                    <div className="grid grid-cols-4 gap-2 pt-1 text-center">
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-pink-300">UPI / QR</div>
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-purple-300">Cards</div>
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-emerald-300">Netbanking</div>
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-amber-300">Wallets</div>
                     </div>
-                  ) : (
-                    <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Card Number</label>
-                        <input
-                          type="text"
-                          placeholder="Card Number (4111 2222 3333 4444)"
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-mono bg-white"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <input type="text" placeholder="MM/YY" className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs bg-white" />
-                        <input type="password" placeholder="CVV" className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs bg-white" />
-                      </div>
-                    </div>
-                  )}
+                  </div>
 
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => setApplyStep('form')}
-                      className="px-5 py-3 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      className="px-5 py-3.5 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
                     >
                       ← Back
                     </button>
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => executeSubmitApplication()}
-                      className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold text-xs rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      onClick={() => handleRazorpayCheckout()}
+                      className="flex-1 py-4 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-extrabold text-sm rounded-xl shadow-lg hover:shadow-pink-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
                     >
-                      <CreditCard size={15} />
-                      {submitting ? 'Confirming Payment...' : `Complete Payment (₹${selectedScheme.application_fee})`}
+                      <CreditCard size={18} />
+                      {submitting ? 'Connecting to Razorpay...' : `Pay & Submit Application (₹${selectedScheme.application_fee})`}
                     </button>
                   </div>
                 </div>
@@ -3802,7 +3952,7 @@ export default function ScholarshipsPage() {
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-amber-900 uppercase tracking-widest">
-                      AAGAJ NATIONAL MERIT COUNCIL
+                      GRAVITY NATIONAL MERIT COUNCIL
                     </div>
                     <div className="text-base sm:text-lg font-heading font-black text-gray-900">
                       Official Institutional Award Cheque
@@ -3930,7 +4080,7 @@ export default function ScholarshipsPage() {
                   Sarkari Notification
                 </span>
                 <span className="text-xs font-mono font-bold text-gray-500 hidden sm:inline">
-                  ADVT NO: AAGAJ/SCH/2026/0{inspectingSchemeDoc.id?.replace('sch-', '') || '01'}
+                  ADVT NO: GRAVITY/SCH/2026/0{inspectingSchemeDoc.id?.replace('sch-', '') || '01'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -3962,7 +4112,7 @@ export default function ScholarshipsPage() {
                   Government & Institutional Scholarship Directorate • National Examination Board
                 </div>
                 <h2 className="text-lg sm:text-2xl md:text-3xl font-black font-serif text-gray-950 uppercase tracking-tight">
-                  Aagaj Infotech National Scholarship Portal
+                  Gravity National Scholarship Portal
                 </h2>
                 <div className="inline-block bg-red-700 text-white font-black text-xs sm:text-sm px-4 py-1 rounded-full uppercase shadow-sm">
                   {inspectingSchemeDoc.title}
@@ -3982,7 +4132,7 @@ export default function ScholarshipsPage() {
                   <span>📌</span> Short Details of Official Notification & Scheme Overview
                 </div>
                 <p className="text-xs text-gray-800 leading-relaxed font-medium">
-                  {inspectingSchemeDoc.description || 'Aagaj Infotech Directorate announces the online applications for national level scholarship and cash award grant scheme. Meritorious and eligible candidates across recognized boards and universities can review the complete eligibility standards, exam dates, fee guidelines and submit their online admission form before the deadline.'}
+                  {inspectingSchemeDoc.description || 'Gravity Directorate announces the online applications for national level scholarship and cash award grant scheme. Meritorious and eligible candidates across recognized boards and universities can review the complete eligibility standards, exam dates, fee guidelines and submit their online admission form before the deadline.'}
                 </p>
                 <div className="text-[11px] font-bold text-red-700 pt-1">
                   🏆 Scholarship Grant / Value: <strong className="text-gray-900">{inspectingSchemeDoc.scholarship_value}</strong>
@@ -4302,7 +4452,7 @@ export default function ScholarshipsPage() {
                   </div>
                 </div>
                 <div className="text-center sm:text-right font-mono text-[10px] text-gray-400">
-                  REF NO: AAGAJ-SCH-BULLETIN-{inspectingSchemeDoc.id?.toUpperCase()}
+                  REF NO: GRAVITY-SCH-BULLETIN-{inspectingSchemeDoc.id?.toUpperCase()}
                 </div>
               </div>
             </div>
@@ -4468,9 +4618,14 @@ export default function ScholarshipsPage() {
 
             {/* Printable Receipt Canvas */}
             <div className="overflow-y-auto pr-1 sm:pr-2 pt-3 flex-1">
-              <div id="printable-receipt" className="border-2 border-gray-900 p-4 sm:p-5 rounded-2xl bg-white space-y-3.5 text-gray-900 text-[11px]">
+              <div id="printable-receipt" className="border-2 border-gray-900 p-4 sm:p-5 rounded-2xl bg-white space-y-3.5 text-gray-900 text-[11px] relative overflow-hidden">
+                {/* Background Watermark */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] select-none transform -rotate-12 font-black text-3xl sm:text-5xl text-gray-900 uppercase text-center leading-tight">
+                  AAGAJ FOUNDATION & INFOTECH
+                </div>
+
                 {/* Official Board Letterhead */}
-                <div className="border-b-2 border-gray-900 pb-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
+                <div className="border-b-2 border-gray-900 pb-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left relative z-10">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center shrink-0 shadow-sm">
                       <GraduationCap size={24} />
@@ -4482,8 +4637,8 @@ export default function ScholarshipsPage() {
                       <h2 className="text-sm sm:text-lg font-black text-gray-900 uppercase tracking-tight leading-tight">
                         AAGAJ FOUNDATION & INFOTECH
                       </h2>
-                      <p className="text-[10px] font-bold text-[#FF2D8D]">
-                        National Merit Scholarship Entrance Examination (NMSEE-2026)
+                      <p className="text-[10px] sm:text-[11px] font-extrabold text-[#FF2D8D] uppercase tracking-wide">
+                        {selectedScheme?.title || generatedApplication.data.scholarship_title}
                       </p>
                     </div>
                   </div>
@@ -4499,7 +4654,7 @@ export default function ScholarshipsPage() {
                 </div>
 
                 {/* Receipt Metadata Ribbon */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-xl bg-gray-50 border border-gray-200 text-[10px]">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-xl bg-gray-50/90 border border-gray-200 text-[10px] relative z-10">
                   <div>
                     <span className="text-[9px] text-gray-500 uppercase font-bold block">Application Number</span>
                     <strong className="font-mono font-black text-gray-900 text-xs">{generatedApplication.data.application_no}</strong>
@@ -4515,18 +4670,18 @@ export default function ScholarshipsPage() {
                     </strong>
                   </div>
                   <div>
-                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Transaction Ref</span>
-                    <strong className="font-mono font-bold text-gray-700 text-[10px] truncate block">
-                      {generatedApplication.data.payment_reference || `PAY_MOCK_${generatedApplication.data.application_no.slice(-4)}`}
+                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Razorpay Txn Ref</span>
+                    <strong className="font-mono font-bold text-emerald-800 text-[10px] truncate block">
+                      {generatedApplication.data.payment_reference || `pay_${generatedApplication.data.application_no.slice(-6)}`}
                     </strong>
                   </div>
                 </div>
 
                 {/* Candidate & Scheme Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 relative z-10">
                   {/* Bio Data (3 cols) */}
                   <div className="sm:col-span-3 space-y-2.5">
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/90">
                       <div className="bg-gray-100 px-2.5 py-1 font-bold text-[10px] text-gray-700 uppercase border-b border-gray-200">
                         1. Candidate & Academic Details
                       </div>
@@ -4558,10 +4713,14 @@ export default function ScholarshipsPage() {
                           <span className="font-medium text-gray-800 truncate block">{generatedApplication.data.school_college_name || applicantForm.school_college_name || 'Designated School'}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Registered Contact:</span>
-                          <span className="font-mono text-gray-800">{generatedApplication.data.applicant_phone || applicantForm.applicant_phone} • {generatedApplication.data.applicant_email}</span>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Registered Phone Number:</span>
+                          <strong className="font-mono text-gray-900 text-[11px]">{generatedApplication.data.applicant_phone || applicantForm.applicant_phone || 'N/A'}</strong>
                         </div>
                         <div>
+                          <span className="text-[9px] text-gray-500 block uppercase font-semibold">Registered Email Address:</span>
+                          <strong className="font-mono text-gray-900 text-[11px] truncate block">{generatedApplication.data.applicant_email || applicantForm.applicant_email}</strong>
+                        </div>
+                        <div className="sm:col-span-2 pt-0.5 border-t border-gray-100">
                           <span className="text-[9px] text-gray-500 block uppercase font-semibold">State & District:</span>
                           <span className="font-medium text-gray-800">{applicantForm.district || 'Patna'}, {applicantForm.state || 'Bihar'}</span>
                         </div>
@@ -4569,7 +4728,7 @@ export default function ScholarshipsPage() {
                     </div>
 
                     {/* Examination District Center Preferences */}
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/90">
                       <div className="bg-gray-100 px-2.5 py-1 font-bold text-[10px] text-gray-700 uppercase border-b border-gray-200">
                         2. Examination Scheme & District Preferences
                       </div>
@@ -4617,7 +4776,7 @@ export default function ScholarshipsPage() {
                 </div>
 
                 {/* Fee & Payment Statement Table */}
-                <div className="border border-gray-900 rounded-xl overflow-hidden">
+                <div className="border border-gray-900 rounded-xl overflow-hidden relative z-10">
                   <table className="w-full text-[10px] text-left">
                     <thead className="bg-gray-900 text-white text-[9px] uppercase font-bold">
                       <tr>
@@ -4627,7 +4786,7 @@ export default function ScholarshipsPage() {
                         <th className="px-2.5 py-1.5 text-right">Amount Paid</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-200 bg-white/90">
                       <tr>
                         <td className="px-2.5 py-1.5 font-bold text-gray-900">
                           {selectedScheme?.title || generatedApplication.data.scholarship_title}
@@ -4639,7 +4798,7 @@ export default function ScholarshipsPage() {
                           {generatedApplication.data.payment_amount === 0 ? 'Exempted / Free Tier' : 'Standard Intake'}
                         </td>
                         <td className="px-2.5 py-1.5 font-mono text-gray-700">
-                          {generatedApplication.data.payment_amount === 0 ? 'Merit Exemption' : 'Online / UPI / Card'}
+                          {generatedApplication.data.payment_amount === 0 ? 'Merit Exemption' : 'Razorpay Online (UPI / Card / Netbanking)'}
                         </td>
                         <td className="px-2.5 py-1.5 text-right font-mono font-black text-gray-900 text-xs">
                           {generatedApplication.data.payment_amount === 0 ? '₹0.00 (FREE)' : `₹${generatedApplication.data.payment_amount}.00`}
@@ -4658,7 +4817,7 @@ export default function ScholarshipsPage() {
                 </div>
 
                 {/* Important Instructions for Candidate */}
-                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 text-[9px] text-gray-600 space-y-0.5">
+                <div className="p-2.5 bg-gray-50/90 rounded-xl border border-gray-200 text-[9px] text-gray-600 space-y-0.5 relative z-10">
                   <div className="font-bold text-gray-900 uppercase text-[9px]">Important Instructions:</div>
                   <ol className="list-decimal pl-3.5 space-y-0.5 leading-tight">
                     <li>This acknowledgment receipt certifies that your scholarship application has been officially recorded in the National Database.</li>
@@ -4668,7 +4827,7 @@ export default function ScholarshipsPage() {
                 </div>
 
                 {/* Official Sign & Seal Footer */}
-                <div className="pt-2 border-t-2 border-gray-900 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500">
+                <div className="pt-2 border-t-2 border-gray-900 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500 relative z-10">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck size={20} className="text-emerald-600" />
                     <div>
@@ -4679,7 +4838,7 @@ export default function ScholarshipsPage() {
 
                   <div className="text-center sm:text-right">
                     <div className="font-mono font-bold text-gray-800 text-[9px]">AUTHORIZED CONTROLLER OF EXAMINATIONS</div>
-                    <div className="text-gray-400 text-[8px]">AAGAJ FOUNDATION & INFOTECH</div>
+                    <div className="text-gray-500 text-[8px] font-bold uppercase">AAGAJ FOUNDATION & INFOTECH</div>
                   </div>
                 </div>
               </div>

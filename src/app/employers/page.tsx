@@ -44,7 +44,7 @@ export default function EmployersPage() {
               location: 'Mumbai, India',
               partnership_type: 'hiring',
               is_featured: true,
-              description: 'Global design agency partnering with AAGAJ for talent pipelines in UI/UX and product design.',
+              description: 'Global design agency partnering with Gravity for talent pipelines in UI/UX and product design.',
             },
             {
               id: '3',
@@ -85,7 +85,7 @@ export default function EmployersPage() {
             Our <span className="text-gradient">Hiring Partners</span> & Corporate Network
           </h1>
           <p className="text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Discover top tech enterprises and innovative startups that hire skilled developers, designers, and data professionals directly from AAGAJ INFOTECH.
+            Discover top tech enterprises and innovative startups that hire skilled developers, designers, and data professionals directly from Gravity.
           </p>
         </div>
       </section>

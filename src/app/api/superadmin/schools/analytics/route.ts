@@ -9,11 +9,11 @@ export async function GET(request: Request) {
 
   try {
     const [schoolsRes, schemesRes, assignmentsRes, appsRes, payoutsRes] = await Promise.all([
-      supabaseAdmin.from('schools').select('*'),
-      supabaseAdmin.from('scholarships').select('*'),
-      supabaseAdmin.from('school_scholarships').select('*'),
-      supabaseAdmin.from('scholarship_applications').select('*'),
-      supabaseAdmin.from('school_incentive_payouts').select('*'),
+      supabaseAdmin.from('schools').select('school_id, name, city, state, board, status'),
+      supabaseAdmin.from('scholarships').select('id, title, status, application_fee'),
+      supabaseAdmin.from('school_scholarships').select('school_id, scholarship_id, incentive_per_verified_registration'),
+      supabaseAdmin.from('scholarship_applications').select('id, scholarship_id, school_id, registration_source, payment_status, status, merit_status'),
+      supabaseAdmin.from('school_incentive_payouts').select('id, status, amount'),
     ])
 
     const schools = schoolsRes.data || []

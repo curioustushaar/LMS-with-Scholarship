@@ -25,7 +25,7 @@ export default function AboutPage() {
             Empowering Minds. <span className="text-gradient">Shaping Futures.</span>
           </h1>
           <p className="text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            AAGAJ INFOTECH is building India&apos;s most integrated technology and professional education ecosystem, connecting students with leading mentors, real projects, and dream careers.
+            GRAVITY is building India&apos;s most integrated technology and professional education ecosystem, connecting students with leading mentors, real projects, and dream careers.
           </p>
         </div>
       </section>

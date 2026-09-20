@@ -32,7 +32,7 @@ export default function SchoolPartnersPage() {
               institution_type: 'school',
               location: 'New Delhi, India',
               students_enrolled: 250,
-              description: 'National K-12 education leader pioneering AI foundational labs and STEM coursework with AAGAJ.',
+              description: 'National K-12 education leader pioneering AI foundational labs and STEM coursework with Gravity.',
             },
             {
               id: '2',

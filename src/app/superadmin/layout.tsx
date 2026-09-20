@@ -28,7 +28,11 @@ export default function SuperadminLayout({ children }: { children: ReactNode }) 
         
         if (sessionError || !session) {
           console.warn('No active session found, redirecting to superadmin login')
-          router.push('/superadmin/login')
+          if (typeof window !== 'undefined') {
+            window.location.replace('/superadmin/login')
+          } else {
+            router.replace('/superadmin/login')
+          }
           return
         }
 
@@ -41,25 +45,41 @@ export default function SuperadminLayout({ children }: { children: ReactNode }) 
 
         if (error) {
           console.error('Error fetching user profile:', error)
-          router.push('/superadmin/login')
+          if (typeof window !== 'undefined') window.location.replace('/superadmin/login')
           return
         }
 
         if (!userData || userData.role !== 'superadmin') {
           console.warn('Unauthorized access to superadmin portal. Role:', userData?.role)
           await supabase.auth.signOut()
-          router.push('/superadmin/login')
+          if (typeof window !== 'undefined') window.location.replace('/superadmin/login')
           return
         }
 
         setIsLoading(false)
       } catch (err) {
         console.error('Exception in checkSuperadmin:', err)
-        router.push('/superadmin/login')
+        if (typeof window !== 'undefined') window.location.replace('/superadmin/login')
       }
     }
 
     checkSuperadmin()
+
+    // BFCache restoration handler for browser Back/Forward navigation
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        checkSuperadmin()
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pageshow', handlePageShow)
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pageshow', handlePageShow)
+      }
+    }
   }, [router, isLoginPage])
 
   // Show loading spinner only when not on login page and still checking auth
