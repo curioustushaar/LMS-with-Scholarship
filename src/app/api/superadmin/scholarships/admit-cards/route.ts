@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 import { parseCenterTimingFromLandmark } from '@/lib/exam-center-timings'
+import { sendAnnouncementEmail } from '@/lib/email'
 
 // GET /api/superadmin/scholarships/admit-cards
 export async function GET(request: Request) {
@@ -348,6 +349,19 @@ export async function POST(request: Request) {
       })
 
       await Promise.all(updatePromises)
+
+      // Send admit card announcement emails to all eligible candidates asynchronously
+      const emailPromises = eligibleTargets
+        .filter((app) => app.applicant_email)
+        .map((app) =>
+          sendAnnouncementEmail({
+            to: app.applicant_email,
+            applicant_name: app.applicant_name || 'Candidate',
+            type: 'ADMIT_CARD',
+            title: app.scholarship_title || (app.scholarships?.title) || 'Scholarship Examination',
+          }).catch((e) => console.error(`Email failed for ${app.applicant_email}:`, e))
+        )
+      Promise.all(emailPromises).catch(console.error)
 
       return NextResponse.json({
         success: true,

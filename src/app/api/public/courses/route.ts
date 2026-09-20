@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/public/courses?featured=true&limit=6
 export async function GET(request: Request) {
   try {
@@ -16,14 +18,17 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (featured === 'true') query = query.eq('is_featured', true)
     if (category) query = query.eq('category', category)
 
     const { data, error } = await query
 
     if (error) throw error
 
-    return NextResponse.json({ success: true, data: data || [] })
+    // Client-side filter for is_featured if requested
+    const result = (data || [])
+    const filtered = featured === 'true' ? result.filter((c: any) => c.is_featured !== false) : result
+
+    return NextResponse.json({ success: true, data: filtered })
   } catch (error: any) {
     console.error('Public courses API error:', error)
     return NextResponse.json({
