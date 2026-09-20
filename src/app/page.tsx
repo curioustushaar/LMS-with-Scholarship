@@ -18,6 +18,23 @@ const Training = dynamic(() => import('@/components/landing/Training'))
 const Marquee = dynamic(() => import('@/components/landing/Marquee'))
 const Testimonials = dynamic(() => import('@/components/landing/Testimonials'))
 const Newsletter = dynamic(() => import('@/components/landing/Newsletter'))
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'GRAVITY | AAGAJ Foundation',
+  description: 'GRAVITY by AAGAJ Foundation is a complete learning ecosystem connecting students, schools, employers, and scholarships through modern interactive technology.',
+  alternates: {
+    canonical: 'https://aagajfoundation.in/',
+  },
+  openGraph: {
+    title: 'GRAVITY | AAGAJ Foundation',
+    description: 'Empowering Education. Elevating Careers. GRAVITY by AAGAJ Foundation connects students, schools, employers, and scholarships.',
+    url: 'https://aagajfoundation.in/',
+    siteName: 'GRAVITY',
+    locale: 'en_IN',
+    type: 'website',
+  },
+}
 
 export default function HomePage() {
   return (

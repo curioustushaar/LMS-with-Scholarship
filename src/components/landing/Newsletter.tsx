@@ -12,7 +12,6 @@ export default function Newsletter() {
   const [contactData, setContactData] = useState({
     sender_name: '',
     sender_email: '',
-    sender_phone: '',
     subject: '',
     message: '',
     category: 'general',
@@ -44,7 +43,6 @@ export default function Newsletter() {
         setContactData({
           sender_name: '',
           sender_email: '',
-          sender_phone: '',
           subject: '',
           message: '',
           category: 'general',
@@ -102,8 +100,8 @@ export default function Newsletter() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Email Inquiries</h4>
-                  <a href="mailto:gravityfoundationpaliganj@gmail.com" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors break-all mt-0.5 block">
-                    gravityfoundationpaliganj@gmail.com
+                  <a href="mailto:aagajfoundationpaliganj@gmail.com" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors break-all mt-0.5 block">
+                    aagajfoundationpaliganj@gmail.com
                   </a>
                 </div>
               </div>
@@ -137,40 +135,29 @@ export default function Newsletter() {
               <form onSubmit={handleContactSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Your Full Name *</label>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Your Name</label>
                     <input
                       type="text"
-                      required
                       value={contactData.sender_name}
                       onChange={(e) => setContactData({ ...contactData, sender_name: e.target.value })}
-                      placeholder="e.g. Aanya Sharma"
+                      placeholder="Enter your full name"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Your Email Address *</label>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Your Email *</label>
                     <input
                       type="email"
                       required
                       value={contactData.sender_email}
                       onChange={(e) => setContactData({ ...contactData, sender_email: e.target.value })}
-                      placeholder="e.g. aanya@example.com"
+                      placeholder="Enter your email address"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Phone Number</label>
-                    <input
-                      type="tel"
-                      value={contactData.sender_phone}
-                      onChange={(e) => setContactData({ ...contactData, sender_phone: e.target.value })}
-                      placeholder="e.g. +91 9876543210"
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
-                    />
-                  </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Inquiry Category</label>
                     <select
@@ -179,10 +166,10 @@ export default function Newsletter() {
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
                     >
                       <option value="general">General Inquiry</option>
-                      <option value="admission">Admissions & Intake</option>
+                      <option value="admission">Admissions &amp; Intake</option>
                       <option value="course">Course Details</option>
                       <option value="scholarship">Scholarship Assistance</option>
-                      <option value="internship">Internships & Placement</option>
+                      <option value="internship">Internships &amp; Placement</option>
                       <option value="employer">Employer / Hiring Partnership</option>
                       <option value="partnership">School / College Alliance</option>
                       <option value="training">Corporate Training</option>
@@ -196,7 +183,7 @@ export default function Newsletter() {
                     type="text"
                     value={contactData.subject}
                     onChange={(e) => setContactData({ ...contactData, subject: e.target.value })}
-                    placeholder="e.g. Question regarding syllabus prerequisites"
+                    placeholder="Enter message subject"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]/20 focus:border-[#FF2D8D]"
                   />
                 </div>

@@ -104,7 +104,7 @@ export default function Header() {
             <Link href="/" className="flex items-center gap-2 group">
               <img
                 src="/logo.png"
-                alt="Gravity"
+                alt="GRAVITY by AAGAJ Foundation"
                 className="h-14 sm:h-16 lg:h-18 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </Link>

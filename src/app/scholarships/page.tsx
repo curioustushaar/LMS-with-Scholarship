@@ -255,6 +255,83 @@ export default function ScholarshipsPage() {
   const [admitResult, setAdmitResult] = useState<any>(null)
   const [admitError, setAdmitError] = useState<string | null>(null)
 
+  // MSG91 OTP Verification State for Admit Card & Scorecard Download
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpTargetMobile, setOtpTargetMobile] = useState('')
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('')
+  const [otpInput, setOtpInput] = useState('')
+  const [otpReqId, setOtpReqId] = useState<string | null>(null)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [otpSuccessMsg, setOtpSuccessMsg] = useState<string | null>(null)
+  const [otpPendingData, setOtpPendingData] = useState<any | null>(null)
+  const [otpPendingType, setOtpPendingType] = useState<'admit_card' | 'scorecard' | null>(null)
+
+  const handleSendMsg91Otp = async () => {
+    if (!otpTargetMobile) return
+    setOtpSending(true)
+    setOtpError(null)
+    setOtpSuccessMsg(null)
+    try {
+      const res = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: otpTargetMobile }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setOtpSent(true)
+        if (data.req_id) setOtpReqId(data.req_id)
+        setOtpSuccessMsg(data.message || 'OTP sent to registered phone number via MSG91.')
+      } else {
+        setOtpError(data.error || 'Failed to send OTP. Please try again.')
+      }
+    } catch (err: any) {
+      setOtpError('Network error while sending OTP.')
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  const handleVerifyMsg91Otp = async () => {
+    if (!otpInput.trim()) return
+    setOtpVerifying(true)
+    setOtpError(null)
+    try {
+      const res = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mobile: otpTargetMobile,
+          otp: otpInput.trim(),
+          req_id: otpReqId,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowOtpModal(false)
+        if (otpPendingType === 'admit_card' && otpPendingData) {
+          setAdmitResult(otpPendingData)
+        } else if (otpPendingType === 'scorecard' && otpPendingData) {
+          setStudentScorecard(otpPendingData)
+        }
+        setOtpPendingData(null)
+        setOtpPendingType(null)
+        setOtpInput('')
+        setOtpReqId(null)
+        setOtpSent(false)
+      } else {
+        setOtpError(data.error || 'Invalid OTP. Please check the code and try again.')
+      }
+    } catch (err: any) {
+      setOtpError('Network error verifying OTP.')
+    } finally {
+      setOtpVerifying(false)
+    }
+  }
+
   // Merit List & Results State
   const [meritQuery, setMeritQuery] = useState('')
   const [meritSchemeFilter, setMeritSchemeFilter] = useState('all')
@@ -329,7 +406,24 @@ export default function ScholarshipsPage() {
       const res = await fetch(`/api/public/scholarships/merit-list?lookup_app_no=${encodeURIComponent(resultLookupInput.trim())}`)
       const data = await res.json()
       if (data.success && data.individual_scorecard) {
-        setStudentScorecard(data.individual_scorecard)
+        const phone = data.individual_scorecard.applicant_phone || data.individual_scorecard.phone || ''
+        if (phone) {
+          const cleaned = phone.replace(/\D/g, '')
+          const masked = cleaned.length >= 10
+            ? `+91 ${cleaned.slice(0, 2)}*****${cleaned.slice(-3)}`
+            : phone
+          setOtpTargetMobile(phone)
+          setOtpMaskedPhone(masked)
+          setOtpPendingData(data.individual_scorecard)
+          setOtpPendingType('scorecard')
+          setOtpInput('')
+          setOtpSent(false)
+          setOtpError(null)
+          setOtpSuccessMsg(null)
+          setShowOtpModal(true)
+        } else {
+          setStudentScorecard(data.individual_scorecard)
+        }
       } else {
         setResultLookupError(data.error || 'No candidate found with the provided Application No / Roll No.')
       }
@@ -1013,7 +1107,24 @@ export default function ScholarshipsPage() {
       })
       const data = await res.json()
       if (data.success && data.data) {
-        setAdmitResult(data.data)
+        const phone = data.data.applicant?.applicant_phone || data.data.applicant?.phone || ''
+        if (phone) {
+          const cleaned = phone.replace(/\D/g, '')
+          const masked = cleaned.length >= 10
+            ? `+91 ${cleaned.slice(0, 2)}*****${cleaned.slice(-3)}`
+            : phone
+          setOtpTargetMobile(phone)
+          setOtpMaskedPhone(masked)
+          setOtpPendingData(data.data)
+          setOtpPendingType('admit_card')
+          setOtpInput('')
+          setOtpSent(false)
+          setOtpError(null)
+          setOtpSuccessMsg(null)
+          setShowOtpModal(true)
+        } else {
+          setAdmitResult(data.data)
+        }
       } else {
         setAdmitError(data.error || 'Unable to find an application with matching credentials.')
       }
@@ -1784,33 +1895,33 @@ export default function ScholarshipsPage() {
                   </div>
                 ) : (
                   /* Provisional Notice */
-                  <div className="p-8 rounded-3xl bg-amber-50 border border-amber-200 text-center space-y-4">
-                    <Clock size={44} className="text-amber-600 mx-auto animate-pulse" />
-                    <h3 className="font-bold text-amber-900 text-lg">Provisional Registration Confirmed!</h3>
+                  <div className="p-4 sm:p-8 rounded-3xl bg-amber-50 border border-amber-200 text-center space-y-4">
+                    <Clock size={40} className="text-amber-600 mx-auto animate-pulse" />
+                    <h3 className="font-heading font-black text-amber-950 text-base sm:text-xl">Provisional Registration Confirmed!</h3>
                     <p className="text-xs text-amber-800 max-w-lg mx-auto leading-relaxed">
                       Your application <strong>{admitResult.applicant.application_no}</strong> is verified in the system. Official Hall Tickets are being approved in bulk by the Superadmin Examination Board.
                     </p>
 
-                    <div className="p-4 bg-white rounded-2xl border border-amber-200 max-w-md mx-auto text-xs text-left flex gap-4 items-center">
-                      <div className="w-16 h-20 border border-gray-200 rounded-lg overflow-hidden shrink-0 bg-gray-50">
+                    <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-amber-200 max-w-md mx-auto text-xs flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left shadow-xs">
+                      <div className="w-20 h-24 border border-gray-200 rounded-xl overflow-hidden shrink-0 bg-gray-50 shadow-2xs">
                         <img
                           src={admitResult.applicant.photo_url || DEFAULT_SAMPLE_PHOTOS[0]}
                           alt={admitResult.applicant.applicant_name}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Applicant:</span>
-                          <strong>{admitResult.applicant.applicant_name}</strong>
+                      <div className="space-y-1.5 w-full flex-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 font-semibold">Applicant:</span>
+                          <strong className="text-gray-900 font-bold">{admitResult.applicant.applicant_name}</strong>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Security Code:</span>
-                          <strong className="font-mono text-purple-700">{admitResult.applicant.registration_code}</strong>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 font-semibold">Security Code:</span>
+                          <strong className="font-mono text-purple-700 font-bold">{admitResult.applicant.registration_code}</strong>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Scheduled Exam Date:</span>
-                          <strong>{admitResult.scholarship.exam_date}</strong>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 font-semibold">Scheduled Exam Date:</span>
+                          <strong className="text-gray-900 font-bold">{admitResult.scholarship?.exam_date || '2026-09-28'}</strong>
                         </div>
                       </div>
                     </div>
@@ -1892,6 +2003,38 @@ export default function ScholarshipsPage() {
 
           {/* Official Candidate Examination Scorecard */}
           {studentScorecard && (
+            studentScorecard.is_released === false ? (
+              <div className="p-8 rounded-3xl bg-amber-50 border-2 border-amber-200 text-center space-y-4 shadow-md">
+                <Clock size={48} className="text-amber-600 mx-auto animate-pulse" />
+                <h3 className="font-heading font-black text-amber-950 text-xl sm:text-2xl">Result Not Issued / Announced Yet</h3>
+                <p className="text-xs sm:text-sm text-amber-800 max-w-lg mx-auto leading-relaxed">
+                  Your application <strong>{studentScorecard.application_no}</strong> ({studentScorecard.applicant_name}) is registered in the system. The examination evaluation and official result declaration for <strong>{studentScorecard.scholarship_title}</strong> are currently under review by the Superadmin board.
+                </p>
+                <div className="inline-block p-3 bg-white rounded-2xl border border-amber-200 text-xs text-left max-w-md w-full space-y-1 text-gray-700 shadow-2xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Candidate Name:</span>
+                    <strong className="text-gray-900">{studentScorecard.applicant_name}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Application Number:</span>
+                    <strong className="font-mono text-purple-700">{studentScorecard.application_no}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Result Status:</span>
+                    <strong className="text-amber-700 font-bold">EVALUATION IN PROGRESS (NOT PUBLISHED)</strong>
+                  </div>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setStudentScorecard(null)}
+                    className="px-6 py-2.5 bg-amber-600 text-white font-bold text-xs rounded-xl shadow hover:bg-amber-700 transition-all"
+                  >
+                    Close Notice
+                  </button>
+                </div>
+              </div>
+            ) : (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2348,6 +2491,7 @@ export default function ScholarshipsPage() {
                 </div>
               </div>
             </motion.div>
+            )
           )}
         </section>
       )}
@@ -4869,6 +5013,110 @@ export default function ScholarshipsPage() {
         </div>,
         document.body
       )}
+
+      {/* MSG91 OTP VERIFICATION POPUP MODAL */}
+      {mounted && showOtpModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          style={{
+            backgroundColor: 'rgba(5, 8, 20, 0.88)',
+            backdropFilter: 'blur(25px)',
+            WebkitBackdropFilter: 'blur(25px)',
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-gray-100 space-y-6 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtpModal(false)
+                setOtpPendingData(null)
+                setOtpPendingType(null)
+              }}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-purple-50 text-[#9C27FF] flex items-center justify-center mx-auto shadow-sm">
+                <ShieldCheck size={30} />
+              </div>
+              <h3 className="font-heading font-black text-gray-900 text-xl">
+                Mobile OTP Verification Required
+              </h3>
+              <p className="text-xs text-gray-500 max-w-xs mx-auto">
+                An OTP will be sent via MSG91 SMS gateway to registered phone number <strong className="text-gray-900 font-mono">{otpMaskedPhone || otpTargetMobile}</strong> to verify identity.
+              </p>
+            </div>
+
+            {otpSuccessMsg && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{otpSuccessMsg}</span>
+              </div>
+            )}
+
+            {otpError && (
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle size={16} className="text-red-500 shrink-0" />
+                <span>{otpError}</span>
+              </div>
+            )}
+
+            {!otpSent ? (
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSendMsg91Otp}
+                  disabled={otpSending}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Sparkles size={15} />
+                  {otpSending ? 'Sending MSG91 OTP...' : 'Send OTP to Mobile'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                    Enter 4-Digit OTP Code *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                    placeholder="Enter 4-digit OTP"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 text-center font-mono font-black text-lg tracking-widest focus:ring-2 focus:ring-[#9C27FF]/20 focus:border-[#9C27FF]"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSendMsg91Otp}
+                    disabled={otpSending}
+                    className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all"
+                  >
+                    Resend OTP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleVerifyMsg91Otp}
+                    disabled={otpVerifying || !otpInput.trim()}
+                    className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <CheckCircle2 size={16} />
+                    {otpVerifying ? 'Verifying OTP...' : 'Verify OTP & Access Data'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )
+      }
 
       <div className="no-print">
         <Footer />

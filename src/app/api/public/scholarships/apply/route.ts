@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendScholarshipPaymentEmail } from '@/lib/email'
 import { validateName, validatePhone, validateEmail, validatePincode, validatePercentage } from '@/lib/scholarship-validation'
 import { checkCustomRateLimit, getClientIP } from '@/lib/rateLimit'
 
@@ -288,6 +289,20 @@ export async function POST(request: Request) {
       insertedData = retryData
     } else {
       insertedData = firstTry
+    }
+
+    // Trigger email confirmation asynchronously
+    if (insertedData?.applicant_email) {
+      sendScholarshipPaymentEmail({
+        applicant_name: insertedData.applicant_name,
+        applicant_email: insertedData.applicant_email,
+        application_no: insertedData.application_no,
+        registration_code: insertedData.registration_code,
+        scholarship_title: insertedData.scholarship_title,
+        father_name: insertedData.father_name,
+        payment_reference: insertedData.payment_reference,
+        amount: insertedData.amount || '0',
+      }).catch((err) => console.error('Error sending scholarship confirmation email:', err))
     }
 
     return NextResponse.json({

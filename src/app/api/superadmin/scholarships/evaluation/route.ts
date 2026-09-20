@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
+import { sendAnnouncementEmail } from '@/lib/email'
 
 // Helper to normalize applicant result status
 function normalizeApplicant(app: any, schemesMap: Record<string, any>) {
@@ -665,6 +666,21 @@ export async function POST(request: Request) {
           .from('scholarships')
           .update({ status: 'results_declared', updated_at: new Date().toISOString() })
           .eq('id', scheme.id)
+
+        // Send result announcement emails to all candidates in this scheme
+        if (schemeApps && schemeApps.length > 0) {
+          const resultEmailPromises = schemeApps
+            .filter((app: any) => app.applicant_email)
+            .map((app: any) =>
+              sendAnnouncementEmail({
+                to: app.applicant_email,
+                applicant_name: app.applicant_name || 'Candidate',
+                type: 'RESULT',
+                title: scheme.title || 'Scholarship Examination',
+              }).catch((e) => console.error(`Result email failed for ${app.applicant_email}:`, e))
+            )
+          Promise.all(resultEmailPromises).catch(console.error)
+        }
       }
 
       const [allAppsRes, allSchemesRes] = await Promise.all([

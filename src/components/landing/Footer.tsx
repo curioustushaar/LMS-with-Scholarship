@@ -18,7 +18,7 @@ export default function Footer() {
           {/* Logo & Student Credit Card (lg:col-span-5) */}
           <div className="lg:col-span-5 space-y-6">
             <Link href="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="Gravity" className="h-14 sm:h-16 w-auto object-contain" />
+              <img src="/logo.png" alt="GRAVITY by AAGAJ Foundation" className="h-14 sm:h-16 w-auto object-contain" />
             </Link>
 
             <p className="text-xs text-gray-400 font-normal max-w-sm leading-relaxed">
@@ -98,8 +98,8 @@ export default function Footer() {
               </li>
               <li className="flex gap-2 items-start">
                 <Mail size={13} className="text-[#9C27FF] shrink-0 mt-0.5" />
-                <a href="mailto:gravityfoundationpaliganj@gmail.com" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors break-all">
-                  gravityfoundationpaliganj@gmail.com
+                <a href="mailto:aagajfoundationpaliganj@gmail.com" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors break-all">
+                  aagajfoundationpaliganj@gmail.com
                 </a>
               </li>
               <li className="flex gap-2 items-start">
@@ -116,7 +116,7 @@ export default function Footer() {
         {/* Bottom Bar: Copyright & Legal */}
         <div className="pt-8 border-t border-gray-50 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-[10px] text-gray-400 font-semibold">
-            &copy; 2026 Gravity. All rights reserved.
+            &copy; 2026 GRAVITY by AAGAJ Foundation. All rights reserved.
           </p>
           <div className="flex gap-6 text-[10px] text-gray-400 font-semibold">
             <a href="#" className="hover:text-[#FF2D8D] transition-colors">Privacy Policy</a>
