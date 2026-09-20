@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // Verify if user is superadmin
 async function verifySuperadmin(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')

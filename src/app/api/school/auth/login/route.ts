@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin, supabase } from '@/lib/supabase'
 import { schoolErrorResponse, schoolSuccessResponse, generateSchoolToken } from '@/lib/school-auth'
 
+export const dynamic = 'force-dynamic'
+
 // Fallback demo schools in case DB is being provisioned
 const DEFAULT_FALLBACK_SCHOOLS = [
   {

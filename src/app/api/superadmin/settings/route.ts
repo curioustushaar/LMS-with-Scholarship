@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/superadmin/settings
  * Get superadmin profile

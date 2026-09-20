@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 import { sendAnnouncementEmail } from '@/lib/email'
 
+export const dynamic = 'force-dynamic'
+
 // Helper to normalize applicant result status
 function normalizeApplicant(app: any, schemesMap: Record<string, any>) {
   const scheme = schemesMap[app.scholarship_id]

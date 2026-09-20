@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/student/submissions/upload-file
  * Upload submission file (PDF, DOC, DOCX, etc.) to Supabase Storage

@@ -3,6 +3,8 @@ import { sendMSG91OTP } from '@/lib/msg91'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getClientIP, checkCustomRateLimit } from '@/lib/rateLimit'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/otp/send
 export async function POST(request: Request) {
   try {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/public/courses/[id] - Fetch single course with modules/weeks and video lesson previews
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {

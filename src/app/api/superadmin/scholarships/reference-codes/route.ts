@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 import { validateName, validatePhone, validateEmail } from '@/lib/scholarship-validation'
 
+export const dynamic = 'force-dynamic'
+
 // Helper to generate a clean, readable reference code
 function generateReferenceCode(name: string): string {
   const cleanName = name.replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase() || 'VIP'

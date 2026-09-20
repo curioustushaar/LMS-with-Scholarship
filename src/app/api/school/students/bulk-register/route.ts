@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySchoolAccess, schoolErrorResponse } from '@/lib/school-auth'
 
+export const dynamic = 'force-dynamic'
+
 function generateAppNumber(): string {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000)
   return `SCH-2026-${randomSuffix}`

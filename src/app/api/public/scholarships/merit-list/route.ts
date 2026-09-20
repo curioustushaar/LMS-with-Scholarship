@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/public/scholarships/merit-list?scheme_id=...&query=...
 export async function GET(request: Request) {
   try {

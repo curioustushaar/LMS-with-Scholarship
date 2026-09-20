@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess, errorResponse, successResponse } from '@/lib/superadmin-auth'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/superadmin/schools/[id]
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { authorized } = await verifySuperadminAccess(request)
