@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/student/tasks
  * Get all tasks for the authenticated student

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/student/projects/[id]/upload-file
  * Upload a file deliverable for a project

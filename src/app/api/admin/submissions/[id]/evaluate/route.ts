@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 import { checkAndAwardTaskBadges } from '@/lib/badges'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * PATCH /api/admin/submissions/[id]/evaluate
  * Evaluate/grade a submission

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySchoolAccess, schoolErrorResponse } from '@/lib/school-auth'
 
+export const dynamic = 'force-dynamic'
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // POST /api/school/auth/change-password

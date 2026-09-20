@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/admin/certificates/eligible/all
  * Fetch ALL students eligible for certificates across ALL courses

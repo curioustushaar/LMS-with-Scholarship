@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // Verify superadmin (reusable)
 async function verifySuperadmin(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('Authorization')

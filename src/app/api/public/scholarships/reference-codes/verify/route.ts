@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkCustomRateLimit, getClientIP } from '@/lib/rateLimit'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/public/scholarships/reference-codes/verify?code=REF-VIP-1001
 export async function GET(request: Request) {
   try {

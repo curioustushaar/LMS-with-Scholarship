@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { verifyMSG91OTP } from '@/lib/msg91'
 import { getClientIP, checkCustomRateLimit } from '@/lib/rateLimit'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/otp/verify
 export async function POST(request: Request) {
   try {

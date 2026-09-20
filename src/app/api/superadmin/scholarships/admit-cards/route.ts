@@ -4,6 +4,8 @@ import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 import { parseCenterTimingFromLandmark } from '@/lib/exam-center-timings'
 import { sendAnnouncementEmail } from '@/lib/email'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/superadmin/scholarships/admit-cards
 export async function GET(request: Request) {
   const { authorized } = await verifySuperadminAccess(request)

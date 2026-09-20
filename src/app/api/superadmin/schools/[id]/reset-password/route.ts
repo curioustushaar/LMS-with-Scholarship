@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess, errorResponse, successResponse } from '@/lib/superadmin-auth'
 
+export const dynamic = 'force-dynamic'
+
 function generateTemporaryPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let code = ''

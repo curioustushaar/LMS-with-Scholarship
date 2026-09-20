@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifySchoolAccess, schoolErrorResponse } from '@/lib/school-auth'
 import { validateName, validatePhone, validateEmail, validatePincode, validatePercentage } from '@/lib/scholarship-validation'
 
+export const dynamic = 'force-dynamic'
+
 function generateAppNumber(): string {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000)
   return `SCH-2026-${randomSuffix}`

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/public/schools/verify?school_id=SCH000105&scholarship_id=xxx
 export async function GET(request: Request) {
   try {

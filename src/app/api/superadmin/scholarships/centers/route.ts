@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess } from '@/lib/superadmin-auth'
 import { packCenterTimingToLandmark, parseCenterTimingFromLandmark } from '@/lib/exam-center-timings'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/superadmin/scholarships/centers
 export async function GET(request: Request) {
   const { authorized } = await verifySuperadminAccess(request)
