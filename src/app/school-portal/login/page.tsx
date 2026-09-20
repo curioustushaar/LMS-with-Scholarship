@@ -63,8 +63,8 @@ export default function SchoolPortalLoginPage() {
       <div className="max-w-md w-full">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF] rounded-3xl mb-4 shadow-2xl shadow-purple-500/20">
-            <FiBookOpen className="text-4xl text-white" />
+          <div className="inline-flex items-center justify-center p-3 bg-white/10 backdrop-blur-md rounded-3xl mb-4 shadow-2xl">
+            <img src="/logo.png" alt="Gravity Logo" className="h-20 w-auto object-contain" />
           </div>
           <span className="text-xs font-bold text-pink-400 uppercase tracking-widest block mb-1">
             Institutional Partner Access

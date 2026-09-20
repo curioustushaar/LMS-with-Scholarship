@@ -119,13 +119,10 @@ export default function SuperadminLogin() {
           {/* Top Brand Header */}
           <div className="space-y-3 sm:space-y-4 relative z-10">
             <div className="flex flex-wrap items-center justify-between lg:flex-col lg:items-start gap-3">
-              <Link href="/" className="inline-flex items-center gap-2.5 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#FF2D8D] to-[#9C27FF] flex items-center justify-center shadow-lg shadow-[#FF2D8D]/30 group-hover:scale-105 transition-transform shrink-0">
-                  <FiShield className="text-white text-lg sm:text-xl" />
-                </div>
+              <Link href="/" className="inline-block group">
                 <div>
-                  <span className="font-extrabold text-sm sm:text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-pink-100 to-purple-200">
-                    AAGAJ INFOTECH
+                  <span className="font-extrabold text-base sm:text-lg tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-pink-100 to-purple-200">
+                    GRAVITY
                   </span>
                   <span className="block text-[9px] sm:text-[10px] font-bold tracking-widest text-[#FF2D8D] uppercase">
                     Superadmin Command Hub
@@ -224,7 +221,7 @@ export default function SuperadminLogin() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="superadmin@aagajinfotech.com"
+                    placeholder="superadmin@gravity.com"
                     disabled={loading}
                     className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder-gray-500 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FF2D8D]/40 focus:border-[#FF2D8D] transition-all"
                   />

@@ -14,7 +14,7 @@ export default function ContactPage() {
       <section className="pt-32 pb-8 bg-gradient-to-b from-pink-50/40 to-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <span className="text-xs font-bold text-[#FF2D8D] uppercase tracking-widest px-3 py-1 bg-pink-50 rounded-full border border-pink-100">
-            Reach Out to AAGAJ
+            Reach Out to Gravity
           </span>
           <h1 className="text-4xl sm:text-5xl font-heading font-extrabold text-gray-900 tracking-tight">
             Connect with Our <span className="text-gradient">Academic & Support Team</span>

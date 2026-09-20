@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import {
   FiHome,
   FiUserCheck,
@@ -24,6 +25,7 @@ import {
   FiMenu,
   FiUserPlus,
   FiAward,
+  FiLogOut,
 } from 'react-icons/fi'
 
 interface SuperadminSidebarProps {
@@ -119,17 +121,14 @@ export default function SuperadminSidebar({ isOpen, onClose }: SuperadminSidebar
         </button>
 
         {/* Logo/Brand */}
-        <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#C81E4E] to-[#D91E5B] rounded-lg flex items-center justify-center">
-              <FiShield className="text-2xl text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
-                SUPERADMIN
-              </h1>
-              <p className="text-xs text-gray-400">System Control Panel</p>
-            </div>
+        <div className="p-6 border-b border-gray-700/60">
+          <div>
+            <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-[#C81E4E] via-[#E11D48] to-[#F43F5E] bg-clip-text text-transparent">
+              SUPERADMIN
+            </h1>
+            <p className="text-xs font-medium text-gray-400 mt-1 tracking-wide">
+              System Control Panel
+            </p>
           </div>
         </div>
 
@@ -204,21 +203,48 @@ export default function SuperadminSidebar({ isOpen, onClose }: SuperadminSidebar
           </ul>
         </nav>
 
-        {/* Admin Portal Access */}
-        <div className="p-4 border-t border-gray-700">
+        {/* Admin Portal Access & Logout */}
+        <div className="p-4 border-t border-gray-700 space-y-2">
           <Link
             href="/admin/dashboard"
-            className="block w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-center text-sm font-medium transition-colors"
+            className="block w-full px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-center text-xs font-semibold transition-colors"
           >
             Switch to Admin Portal
           </Link>
+
+          <button
+            type="button"
+            onClick={async () => {
+              if (confirm('Are you sure you want to sign out of Superadmin?')) {
+                try {
+                  await supabase.auth.signOut()
+                } catch (e) {
+                  // ignore
+                }
+                if (typeof window !== 'undefined') {
+                  localStorage.clear()
+                  sessionStorage.clear()
+                  document.cookie.split(';').forEach((c) => {
+                    document.cookie = c
+                      .replace(/^ +/, '')
+                      .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/')
+                  })
+                  window.location.replace('/superadmin/login')
+                }
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 rounded-lg text-xs font-bold transition-all"
+          >
+            <FiLogOut className="text-sm" />
+            Sign Out Superadmin
+          </button>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="text-xs text-gray-500 text-center">
+        <div className="p-3 border-t border-gray-700/60">
+          <div className="text-[11px] text-gray-500 text-center">
             <p>© 2026 LMS Superadmin</p>
-            <p className="mt-1">Version 1.0.0</p>
+            <p className="mt-0.5">Version 1.0.0</p>
           </div>
         </div>
       </div>

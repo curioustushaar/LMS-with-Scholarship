@@ -90,6 +90,16 @@ export async function POST(request: Request) {
   }
 }
 
+function handleNavbarError(error: any) {
+  if (error?.code === 'PGRST205' || error?.message?.includes('schema cache')) {
+    return NextResponse.json({
+      success: false,
+      error: 'Table public.navbar_items does not exist in Supabase database yet. Please run the SQL file "migrations/RUN_THIS_IN_SUPABASE.sql" in your Supabase SQL Editor.'
+    }, { status: 500 })
+  }
+  return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+}
+
 // DELETE
 export async function DELETE(request: Request) {
   const { authorized } = await verifySuperadminAccess(request)
@@ -101,9 +111,9 @@ export async function DELETE(request: Request) {
     if (!id) return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 })
 
     const { error } = await supabaseAdmin.from('navbar_items').delete().eq('id', id)
-    if (error) throw error
+    if (error) return handleNavbarError(error)
     return NextResponse.json({ success: true, message: 'Navbar item deleted' })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    return handleNavbarError(error)
   }
 }

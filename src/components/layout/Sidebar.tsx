@@ -130,10 +130,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Logo/Brand */}
         <div className="p-6 border-b border-gray-700">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
+          <img src="/logo.png" alt="Gravity Logo" className="h-14 w-auto object-contain mb-2" />
+          <h1 className="text-xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
             LMS ADMIN
           </h1>
-          <p className="text-xs text-gray-400 mt-1">Learning Management System</p>
+          <p className="text-xs text-gray-400 mt-0.5">Learning Management System</p>
         </div>
 
         {/* Navigation Menu */}

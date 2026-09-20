@@ -60,7 +60,7 @@ export async function GET(request: Request) {
         else if (candidate.rank === 2) defaultAwardAmount = prizeDist.second_prize || '🥈 2nd Prize Winner: ₹25,000 Cash + 75% Fee Waiver'
         else if (candidate.rank === 3) defaultAwardAmount = prizeDist.third_prize || '🥉 3rd Prize Winner: ₹10,000 Cash + 50% Fee Waiver'
         else defaultAwardAmount = prizeDist.consolation || 'Merit Certificate & 50% Fee Waiver'
-        voucherCode = candidate.documents?.award_voucher_code || `AAGAJ-SCH-100-${candidate.application_no ? candidate.application_no.slice(-4) : '2026'}`
+        voucherCode = candidate.documents?.award_voucher_code || `GRAVITY-SCH-100-${candidate.application_no ? candidate.application_no.slice(-4) : '2026'}`
       } else {
         defaultAwardAmount = null
       }
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         individual_scorecard: {
           id: candidate.id,
           application_no: candidate.application_no,
-          roll_number: candidate.roll_number || 'AAGAJ-26-XXXX',
+          roll_number: candidate.roll_number || 'GRAVITY-26-XXXX',
           registration_code: candidate.registration_code || `REG-${candidate.id.slice(-6)}`,
           applicant_name: candidate.applicant_name,
           applicant_email: candidate.applicant_email,
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
           award_status: isQualified ? (candidate.award_status || 'awarded') : 'none',
           award_type: isQualified ? (candidate.award_type || 'both') : 'none',
           award_amount: isQualified ? (candidate.award_amount || defaultAwardAmount) : defaultAwardAmount,
-          award_disbursement_ref: isQualified ? (candidate.award_disbursement_ref || `AWARD-AAGAJ-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`) : `REF-AAGAJ-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`,
+          award_disbursement_ref: isQualified ? (candidate.award_disbursement_ref || `AWARD-GRAVITY-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`) : `REF-GRAVITY-${candidate.application_no ? candidate.application_no.slice(-4) : '001'}`,
           award_voucher_code: voucherCode,
           bank_details: bankDetails,
           payout_details: payoutDetails,
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
           id: app.id,
           rank: app.rank,
           applicant_name: app.applicant_name,
-          roll_number: app.roll_number || `AAGAJ-26-${app.application_no.slice(-4)}`,
+          roll_number: app.roll_number || `GRAVITY-26-${app.application_no.slice(-4)}`,
           scholarship_title: app.scholarship_title,
           exam_marks: app.exam_marks,
           total_marks: app.total_marks || 100,
@@ -180,7 +180,7 @@ export async function GET(request: Request) {
       merit_list: releasedApplicants.map((app) => ({
         id: app.id,
         rank: app.rank,
-        roll_number: app.roll_number || `AAGAJ-26-${app.application_no.slice(-4)}`,
+        roll_number: app.roll_number || `GRAVITY-26-${app.application_no.slice(-4)}`,
         applicant_name: app.applicant_name,
         scholarship_title: app.scholarship_title,
         photo_url: app.photo_url,
@@ -192,7 +192,7 @@ export async function GET(request: Request) {
         award_status: app.award_status || 'awarded',
         award_type: app.award_type || 'fee_waiver',
         award_amount: app.award_amount || 'Tuition Fee Waiver',
-        award_disbursement_ref: app.award_disbursement_ref || `TXN-AAGAJ-${app.id.slice(-6)}`,
+        award_disbursement_ref: app.award_disbursement_ref || `TXN-GRAVITY-${app.id.slice(-6)}`,
       })),
     })
   } catch (error: any) {

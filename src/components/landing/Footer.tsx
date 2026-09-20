@@ -18,17 +18,11 @@ export default function Footer() {
           {/* Logo & Student Credit Card (lg:col-span-5) */}
           <div className="lg:col-span-5 space-y-6">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF]">
-                <span className="text-white font-heading font-extrabold text-sm">A</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-900 font-heading font-extrabold text-sm tracking-wider leading-none">AAGAJ</span>
-                <span className="text-[#9C27FF] font-sans font-bold text-[9px] tracking-widest leading-none mt-0.5">INFOTECH</span>
-              </div>
+              <img src="/logo.png" alt="Gravity" className="h-14 sm:h-16 w-auto object-contain" />
             </Link>
 
             <p className="text-xs text-gray-400 font-normal max-w-sm leading-relaxed">
-              AAGAJ INFOTECH LMS is a complete learning ecosystem designed to connect students, academic institutions, employers, and scholarships through modern interactive systems.
+              Gravity LMS is a complete learning ecosystem designed to connect students, academic institutions, employers, and scholarships through modern interactive systems.
             </p>
 
             {/* In-Footer Student Credit Card */}
@@ -98,12 +92,14 @@ export default function Footer() {
             <ul className="space-y-3 text-xs text-gray-400 font-semibold">
               <li className="flex gap-2 items-start">
                 <MapPin size={13} className="text-[#FF2D8D] shrink-0 mt-0.5" />
-                <span className="text-gray-500 font-normal">New Delhi, India</span>
+                <span className="text-gray-500 font-normal leading-normal">
+                  Bhupatipur Road, Near Krishi Anusandhan Kendra, Patna - 800020, Bihar
+                </span>
               </li>
               <li className="flex gap-2 items-start">
                 <Mail size={13} className="text-[#9C27FF] shrink-0 mt-0.5" />
-                <a href="mailto:aagajfoundationpaliganj@gmail.com" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors break-all">
-                  aagajfoundationpaliganj@gmail.com
+                <a href="mailto:gravityfoundationpaliganj@gmail.com" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors break-all">
+                  gravityfoundationpaliganj@gmail.com
                 </a>
               </li>
               <li className="flex gap-2 items-start">
@@ -120,7 +116,7 @@ export default function Footer() {
         {/* Bottom Bar: Copyright & Legal */}
         <div className="pt-8 border-t border-gray-50 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-[10px] text-gray-400 font-semibold">
-            &copy; 2026 AAGAJ INFOTECH. All rights reserved.
+            &copy; 2026 Gravity. All rights reserved.
           </p>
           <div className="flex gap-6 text-[10px] text-gray-400 font-semibold">
             <a href="#" className="hover:text-[#FF2D8D] transition-colors">Privacy Policy</a>

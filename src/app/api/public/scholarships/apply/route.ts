@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { validateName, validatePhone, validateEmail, validatePincode, validatePercentage } from '@/lib/scholarship-validation'
+import { checkCustomRateLimit, getClientIP } from '@/lib/rateLimit'
 
 function generateAppNumber(): string {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000)
@@ -14,6 +16,16 @@ function generateRegistrationCode(): string {
 // POST /api/public/scholarships/apply
 export async function POST(request: Request) {
   try {
+    // 0a. Rate Limiting Check (Max 5 submissions per 15 minutes per IP)
+    const clientIp = getClientIP(request)
+    const rateCheck = checkCustomRateLimit(`apply_app_${clientIp}`, 5, 15 * 60 * 1000)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `Too many application submissions from your IP. Please try again in ${Math.ceil(rateCheck.resetSeconds / 60)} minutes.` },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const {
       scholarship_id,
@@ -55,16 +67,64 @@ export async function POST(request: Request) {
       school_admission_no,
       school_class,
       school_section,
+      reference_code,
     } = body
 
-    if (!scholarship_id || !applicant_name?.trim() || !applicant_email?.trim()) {
-      return NextResponse.json(
-        { success: false, error: 'Scholarship ID, full name, and email are required.' },
-        { status: 400 }
-      )
+    if (!scholarship_id) {
+      return NextResponse.json({ success: false, error: 'Scholarship scheme selection is required.' }, { status: 400 })
     }
 
-    const cleanEmail = applicant_email.trim().toLowerCase()
+    const nameVal = validateName(applicant_name, 'Full Name')
+    if (!nameVal.isValid) {
+      return NextResponse.json({ success: false, error: nameVal.message }, { status: 400 })
+    }
+
+    const phoneVal = validatePhone(applicant_phone)
+    if (!phoneVal.isValid) {
+      return NextResponse.json({ success: false, error: phoneVal.message }, { status: 400 })
+    }
+
+    const emailVal = validateEmail(applicant_email)
+    if (!emailVal.isValid) {
+      return NextResponse.json({ success: false, error: emailVal.message }, { status: 400 })
+    }
+
+    if (pincode) {
+      const pinVal = validatePincode(pincode)
+      if (!pinVal.isValid) {
+        return NextResponse.json({ success: false, error: pinVal.message }, { status: 400 })
+      }
+    }
+
+    if (percentage !== undefined && percentage !== '') {
+      const pctVal = validatePercentage(percentage)
+      if (!pctVal.isValid) {
+        return NextResponse.json({ success: false, error: pctVal.message }, { status: 400 })
+      }
+    }
+
+    const cleanEmail = emailVal.cleanEmail
+    const cleanPhone = phoneVal.cleanPhone
+    const cleanRefCode = reference_code ? reference_code.toString().trim().toUpperCase() : null
+
+    // 0. Server-Side Referral Code Re-Validation
+    if (cleanRefCode) {
+      const { data: refRecord, error: refErr } = await supabaseAdmin
+        .from('scholarship_reference_codes')
+        .select('id, code, status')
+        .eq('code', cleanRefCode)
+        .maybeSingle()
+
+      if (refErr && refErr.code !== 'PGRST205') {
+        console.warn('Notice re-validating referral code server-side:', refErr.message)
+      } else if (!refRecord || refRecord.status !== 'active') {
+        return NextResponse.json(
+          { success: false, error: `The provided referral code "${cleanRefCode}" is invalid or inactive.` },
+          { status: 400 }
+        )
+      }
+    }
+
 
     // 0. Duplicate Registration Check
     const { data: existingApp } = await supabaseAdmin
@@ -144,7 +204,9 @@ export async function POST(request: Request) {
       aadhaar_url: aadhaar_url || '',
       marksheet_url: marksheet_url || '',
       college_id_url: college_id_url || '',
-      documents: documents || {
+      reference_code: cleanRefCode,
+      documents: {
+        ...(typeof documents === 'object' && documents ? documents : {}),
         aadhaar_uploaded: !!aadhaar_url,
         marksheet_uploaded: !!marksheet_url,
         college_id_uploaded: !!college_id_url,
@@ -158,6 +220,7 @@ export async function POST(request: Request) {
         school_class: school_class || null,
         school_section: school_section || null,
         school_approval_status: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? 'PENDING' : 'NOT_APPLICABLE',
+        reference_code: cleanRefCode,
       },
       status: 'confirmed',
       registration_source: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? 'SCHOOL' : 'DIRECT',
@@ -184,7 +247,7 @@ export async function POST(request: Request) {
     if (insertErr) {
       console.warn('Initial insert notice (possible missing column in DB schema):', insertErr.message)
       
-      // Fallback: If DB schema doesn't have district/preference columns yet, embed them into documents JSONB and retry
+      // Fallback: If DB schema doesn't have district/preference/reference_code columns yet, embed them into documents JSONB and retry
       const safeDocuments = {
         ...(newApplicant.documents || {}),
         district: newApplicant.district,
@@ -194,6 +257,7 @@ export async function POST(request: Request) {
         preference_state: newApplicant.preference_state,
         preference_district_1: newApplicant.preference_district_1,
         preference_district_2: newApplicant.preference_district_2,
+        reference_code: cleanRefCode,
       }
 
       const fallbackApplicant: any = { ...newApplicant }
@@ -208,7 +272,7 @@ export async function POST(request: Request) {
       delete fallbackApplicant.assigned_center_landmark
       delete fallbackApplicant.assigned_center_maps_url
       delete fallbackApplicant.exam_shift
-      delete fallbackApplicant.reporting_time
+      delete fallbackApplicant.reference_code
       fallbackApplicant.documents = safeDocuments
 
       const { data: retryData, error: retryErr } = await supabaseAdmin

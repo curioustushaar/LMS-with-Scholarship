@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
       return {
         id: app.id,
-        roll_number: app.roll_number || `AAGAJ-26-${app.application_no.slice(-4)}`,
+        roll_number: app.roll_number || `GRAVITY-26-${app.application_no.slice(-4)}`,
         applicant_name: app.applicant_name,
         school_roll_number: app.school_roll_number,
         school_class: app.school_class || app.qualification,

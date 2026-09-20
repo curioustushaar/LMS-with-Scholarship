@@ -69,6 +69,69 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { action } = body
 
+    if (action === 'verify_document') {
+      const { applicant_id, document_status, document_remarks, checklist } = body
+      if (!applicant_id) return NextResponse.json({ success: false, error: 'Applicant ID required' }, { status: 400 })
+
+      const { data: targetApp, error: fetchErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .select('*')
+        .eq('id', applicant_id)
+        .single()
+
+      if (fetchErr || !targetApp) {
+        return NextResponse.json({ success: false, error: 'Applicant not found' }, { status: 404 })
+      }
+
+      const newDocs = {
+        ...(targetApp.documents || {}),
+        document_status: document_status || 'verified',
+        document_remarks: document_remarks || '',
+        verification_checklist: checklist || {},
+        verified_at: new Date().toISOString(),
+      }
+
+      // Update DB record
+      const { error: updateErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .update({
+          document_status: document_status || 'verified',
+          documents: newDocs,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', applicant_id)
+
+      if (updateErr) {
+        console.warn('Initial document_status column notice (falling back to documents JSONB):', updateErr.message)
+        await supabaseAdmin
+          .from('scholarship_applications')
+          .update({
+            documents: newDocs,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', applicant_id)
+      }
+
+      // Fetch refreshed list
+      const [allAppsRes, allSchemesRes] = await Promise.all([
+        supabaseAdmin.from('scholarship_applications').select('*').order('created_at', { ascending: false }),
+        supabaseAdmin.from('scholarships').select('*').order('created_at', { ascending: false }),
+      ])
+
+      const schemesMap = (allSchemesRes.data || []).reduce((acc: Record<string, any>, s: any) => {
+        acc[s.id] = s
+        return acc
+      }, {})
+
+      const normalized = (allAppsRes.data || []).map((app) => normalizeApplicant(app, schemesMap))
+
+      return NextResponse.json({
+        success: true,
+        message: 'Dossier verification status updated successfully!',
+        applicants: normalized,
+      })
+    }
+
     if (action === 'submit_marks') {
       const { applicant_id, marks, total_marks, merit_status: customStatus, remarks } = body
       if (!applicant_id) return NextResponse.json({ success: false, error: 'Applicant ID required' }, { status: 400 })
@@ -578,7 +641,7 @@ export async function POST(request: Request) {
               ...(app.documents || {}),
               result_status: 'released',
               result_released_at: new Date().toISOString(),
-              award_voucher_code: app.documents?.award_voucher_code || `AAGAJ-SCH-100-${app.application_no ? app.application_no.slice(-4) : '2026'}`,
+              award_voucher_code: app.documents?.award_voucher_code || `GRAVITY-SCH-100-${app.application_no ? app.application_no.slice(-4) : '2026'}`,
             }
 
             return supabaseAdmin
@@ -727,7 +790,7 @@ export async function POST(request: Request) {
 
       const updatedDocs = {
         ...(targetApplicant.documents || {}),
-        award_voucher_code: voucher_code || `AAGAJ-SCH-100-${targetApplicant.application_no ? targetApplicant.application_no.slice(-4) : '2026'}`,
+        award_voucher_code: voucher_code || `GRAVITY-SCH-100-${targetApplicant.application_no ? targetApplicant.application_no.slice(-4) : '2026'}`,
         payout_details: payout_details || {
           bank_utr: disbursement_ref,
           amount: award_amount,

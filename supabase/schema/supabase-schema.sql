@@ -556,5 +556,31 @@ VALUES ('admin@lms.com', 'Admin User', 'admin', 'active')
 ON CONFLICT (email) DO NOTHING;
 
 -- ==========================================
+-- SCHOLARSHIP REFERENCE CODES TABLE
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.scholarship_reference_codes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'active',
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scholarship_ref_code ON public.scholarship_reference_codes(code);
+CREATE INDEX IF NOT EXISTS idx_scholarship_ref_phone ON public.scholarship_reference_codes(phone);
+CREATE INDEX IF NOT EXISTS idx_scholarship_ref_email ON public.scholarship_reference_codes(email);
+
+ALTER TABLE public.scholarship_reference_codes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read active reference codes" ON public.scholarship_reference_codes;
+DROP POLICY IF EXISTS "Full access to reference codes for service role" ON public.scholarship_reference_codes;
+CREATE POLICY "Public read active reference codes" ON public.scholarship_reference_codes FOR SELECT USING (true);
+CREATE POLICY "Full access to reference codes for service role" ON public.scholarship_reference_codes FOR ALL USING (true);
+
+-- ==========================================
 -- DONE! Your database is ready.
 -- ==========================================
+

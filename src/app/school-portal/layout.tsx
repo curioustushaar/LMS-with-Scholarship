@@ -34,7 +34,7 @@ export default function SchoolPortalLayout({ children }: { children: ReactNode }
         const token = await getSchoolClientAuthToken()
 
         if (!token) {
-          router.push('/school-portal/login')
+          if (typeof window !== 'undefined') window.location.replace('/school-portal/login')
           return
         }
 
@@ -45,7 +45,7 @@ export default function SchoolPortalLayout({ children }: { children: ReactNode }
 
         if (!data.success || !data.school) {
           console.warn('Unauthorized school portal access')
-          router.push('/school-portal/login')
+          if (typeof window !== 'undefined') window.location.replace('/school-portal/login')
           return
         }
 
@@ -58,11 +58,27 @@ export default function SchoolPortalLayout({ children }: { children: ReactNode }
         setIsLoading(false)
       } catch (err) {
         console.error('School auth check error:', err)
-        router.push('/school-portal/login')
+        if (typeof window !== 'undefined') window.location.replace('/school-portal/login')
       }
     }
 
     checkSchoolAuth()
+
+    // BFCache restoration handler for browser Back/Forward navigation
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        checkSchoolAuth()
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pageshow', handlePageShow)
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pageshow', handlePageShow)
+      }
+    }
   }, [pathname, isLoginPage, router])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {

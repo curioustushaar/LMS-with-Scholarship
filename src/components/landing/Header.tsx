@@ -98,22 +98,15 @@ export default function Header() {
         }`}
       >
         <div className="w-full px-4 sm:px-8 lg:px-12">
-          <div className="flex justify-between items-center h-12">
+          <div className="flex justify-between items-center h-14 sm:h-16">
             
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF] shadow-md shadow-[#FF2D8D]/20 transition-transform group-hover:scale-105">
-                <span className="text-white font-heading font-extrabold text-lg select-none">A</span>
-                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#FF2D8D] animate-ping" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-900 font-heading font-extrabold text-base tracking-wider leading-none">
-                  AAGAJ
-                </span>
-                <span className="text-[#9C27FF] font-sans font-bold text-[10px] tracking-widest leading-none mt-1">
-                  INFOTECH
-                </span>
-              </div>
+              <img
+                src="/logo.png"
+                alt="Gravity"
+                className="h-14 sm:h-16 lg:h-18 w-auto object-contain transition-transform group-hover:scale-105"
+              />
             </Link>
 
             {/* Desktop Navigation Links */}
@@ -275,12 +268,9 @@ export default function Header() {
               className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl border-l border-gray-100 flex flex-col xl:hidden"
             >
               <div className="p-6 flex justify-between items-center border-b border-gray-50">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-[#FF2D8D] to-[#9C27FF]">
-                    <span className="text-white font-heading font-extrabold text-sm">A</span>
-                  </div>
-                  <span className="text-gray-900 font-heading font-extrabold text-sm tracking-wider">AAGAJ</span>
-                </div>
+                <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+                  <img src="/logo.png" alt="Gravity" className="h-14 sm:h-16 w-auto object-contain" />
+                </Link>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"

@@ -90,7 +90,9 @@ export default function Newsletter() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Registered Office</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">New Delhi, India</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-normal">
+                    Bhupatipur Road, Near Krishi Anusandhan Kendra, Patna - 800020, Bihar
+                  </p>
                 </div>
               </div>
 
@@ -100,8 +102,8 @@ export default function Newsletter() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Email Inquiries</h4>
-                  <a href="mailto:aagajfoundationpaliganj@gmail.com" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors break-all mt-0.5 block">
-                    aagajfoundationpaliganj@gmail.com
+                  <a href="mailto:gravityfoundationpaliganj@gmail.com" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors break-all mt-0.5 block">
+                    gravityfoundationpaliganj@gmail.com
                   </a>
                 </div>
               </div>
@@ -238,7 +240,7 @@ export default function Newsletter() {
 
           <div className="space-y-2 max-w-md relative z-10 text-white">
             <h3 className="text-2xl sm:text-3xl font-heading font-extrabold tracking-tight">
-              Stay Updated with<br />AAGAJ INFOTECH
+              Stay Updated with<br />GRAVITY
             </h3>
             <p className="text-xs sm:text-sm text-white/80 font-normal leading-relaxed">
               Subscribe to get notified of new admissions, internship openings, and scholarship dead-lines.

@@ -428,9 +428,127 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Admit Card reverted to provisional status' })
     }
 
+    // ── ACTION 6: DELETE CANDIDATE APPLICATION ──────────────────────────────
+    if (action === 'delete') {
+      const { applicant_id } = body
+      if (!applicant_id) return NextResponse.json({ success: false, error: 'Applicant ID required' }, { status: 400 })
+
+      const { data: appData } = await supabaseAdmin
+        .from('scholarship_applications')
+        .select('id, application_no, applicant_name, assigned_center_id')
+        .eq('id', applicant_id)
+        .maybeSingle()
+
+      const { error: delErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .delete()
+        .eq('id', applicant_id)
+
+      if (delErr) {
+        return NextResponse.json({ success: false, error: delErr.message }, { status: 500 })
+      }
+
+      if (appData?.assigned_center_id) {
+        try {
+          const { data: center } = await supabaseAdmin
+            .from('exam_centers')
+            .select('allocated_count')
+            .eq('id', appData.assigned_center_id)
+            .single()
+          if (center && (center.allocated_count || 0) > 0) {
+            await supabaseAdmin
+              .from('exam_centers')
+              .update({ allocated_count: Math.max(0, (center.allocated_count || 1) - 1) })
+              .eq('id', appData.assigned_center_id)
+          }
+        } catch (e) {}
+      }
+
+      return NextResponse.json({ success: true, message: `Candidate ${appData?.applicant_name || ''} deleted successfully.` })
+    }
+
     return NextResponse.json({ success: false, error: 'Invalid action parameter' }, { status: 400 })
   } catch (error: any) {
     console.error('Admit card approve exception:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+// DELETE /api/superadmin/scholarships/admit-cards
+export async function DELETE(request: Request) {
+  const { authorized } = await verifySuperadminAccess(request)
+  if (!authorized) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const { searchParams } = new URL(request.url)
+    let applicantId = searchParams.get('id')
+
+    if (!applicantId) {
+      try {
+        const body = await request.json()
+        applicantId = body.applicant_id || body.id
+      } catch (e) {}
+    }
+
+    if (!applicantId) {
+      return NextResponse.json({ success: false, error: 'Candidate Application ID is required to delete.' }, { status: 400 })
+    }
+
+    // 1. Fetch applicant details
+    let targetAppId = applicantId
+    const { data: appData } = await supabaseAdmin
+      .from('scholarship_applications')
+      .select('id, application_no, applicant_name, assigned_center_id')
+      .eq('id', applicantId)
+      .maybeSingle()
+
+    if (!appData) {
+      const { data: appByNo } = await supabaseAdmin
+        .from('scholarship_applications')
+        .select('id, application_no, applicant_name, assigned_center_id')
+        .eq('application_no', applicantId)
+        .maybeSingle()
+      if (appByNo) {
+        targetAppId = appByNo.id
+      }
+    }
+
+    // 2. Delete candidate record
+    const { error: deleteErr } = await supabaseAdmin
+      .from('scholarship_applications')
+      .delete()
+      .eq('id', targetAppId)
+
+    if (deleteErr) {
+      console.error('Error deleting candidate application:', deleteErr)
+      return NextResponse.json({ success: false, error: deleteErr.message }, { status: 500 })
+    }
+
+    // 3. Decrement center count if was assigned
+    if (appData?.assigned_center_id) {
+      try {
+        const { data: center } = await supabaseAdmin
+          .from('exam_centers')
+          .select('allocated_count')
+          .eq('id', appData.assigned_center_id)
+          .single()
+        if (center && (center.allocated_count || 0) > 0) {
+          await supabaseAdmin
+            .from('exam_centers')
+            .update({ allocated_count: Math.max(0, (center.allocated_count || 1) - 1) })
+            .eq('id', appData.assigned_center_id)
+        }
+      } catch (err) {
+        console.warn('Could not decrement center count:', err)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Candidate application ${appData?.application_no ? `(${appData.application_no})` : ''} deleted successfully.`,
+    })
+  } catch (error: any) {
+    console.error('Admit card DELETE exception:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

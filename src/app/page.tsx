@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic'
 import Header from '@/components/landing/Header'
 import Hero from '@/components/landing/Hero'
 import Stats from '@/components/landing/Stats'
@@ -5,17 +6,18 @@ import About from '@/components/landing/About'
 import Features from '@/components/landing/Features'
 import Modules from '@/components/landing/Modules'
 import Journey from '@/components/landing/Journey'
-import Courses from '@/components/landing/Courses'
-import Admissions from '@/components/landing/Admissions'
-import Internships from '@/components/landing/Internships'
-import Scholarships from '@/components/landing/Scholarships'
-import Employers from '@/components/landing/Employers'
-import SchoolPartners from '@/components/landing/SchoolPartners'
-import Training from '@/components/landing/Training'
-import Marquee from '@/components/landing/Marquee'
-import Testimonials from '@/components/landing/Testimonials'
-import Newsletter from '@/components/landing/Newsletter'
 import Footer from '@/components/landing/Footer'
+
+const Courses = dynamic(() => import('@/components/landing/Courses'))
+const Admissions = dynamic(() => import('@/components/landing/Admissions'))
+const Internships = dynamic(() => import('@/components/landing/Internships'))
+const Scholarships = dynamic(() => import('@/components/landing/Scholarships'))
+const Employers = dynamic(() => import('@/components/landing/Employers'))
+const SchoolPartners = dynamic(() => import('@/components/landing/SchoolPartners'))
+const Training = dynamic(() => import('@/components/landing/Training'))
+const Marquee = dynamic(() => import('@/components/landing/Marquee'))
+const Testimonials = dynamic(() => import('@/components/landing/Testimonials'))
+const Newsletter = dynamic(() => import('@/components/landing/Newsletter'))
 
 export default function HomePage() {
   return (

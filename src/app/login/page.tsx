@@ -103,9 +103,10 @@ export default function LoginPage() {
             <div className="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-white/5 blur-xl pointer-events-none" />
             <div className="absolute -bottom-12 -right-12 w-48 h-48 rounded-full bg-black/10 blur-xl pointer-events-none" />
 
-            <div className="text-center mb-4 relative z-10">
+            <div className="text-center mb-4 relative z-10 flex flex-col items-center">
+              <img src="/logo.png" alt="Gravity Logo" className="h-20 w-auto mb-3 object-contain" />
               <h1 className="text-2xl md:text-3xl font-heading font-extrabold mb-1 tracking-wider uppercase">
-                AAGAJ INFOTECH
+                GRAVITY
               </h1>
               <p className="text-xs md:text-sm font-semibold tracking-wide text-pink-100 uppercase">
                 Next-Gen Education Ecosystem

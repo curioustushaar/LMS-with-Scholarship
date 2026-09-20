@@ -17,8 +17,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'AAGAJ INFOTECH - Empowering Education. Elevating Careers.',
-  description: 'AAGAJ INFOTECH LMS is a complete learning ecosystem connecting students, schools, employers, and scholarships through modern interactive technology.',
+  title: 'GRAVITY - Empowering Education. Elevating Careers.',
+  description: 'GRAVITY LMS is a complete learning ecosystem connecting students, schools, employers, and scholarships through modern interactive technology.',
 }
 
 export default function RootLayout({

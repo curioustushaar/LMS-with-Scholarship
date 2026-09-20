@@ -111,83 +111,35 @@ export async function GET(req: NextRequest) {
     
     console.log('✅ Analytics API: Auth verified for user:', authCheck.user?.email)
 
-    // Get total admins (active only, or if account_status is null)
-    const { count: totalAdmins, error: adminsError } = await supabaseAdmin
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'admin')
-      .or('account_status.eq.active,account_status.is.null')
-    
-    console.log('📊 Total admins:', totalAdmins, adminsError ? `Error: ${adminsError.message}` : '')
-
-    console.log('📊 Total admins:', totalAdmins)
-
-    // Get total students
-    const { count: totalStudents, error: studentsError } = await supabaseAdmin
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'student')
-    
-    console.log('📊 Total students:', totalStudents, studentsError ? `Error: ${studentsError.message}` : '')
-
-    // Get total courses
-    const { count: totalCourses, error: coursesError } = await supabaseAdmin
-      .from('courses')
-      .select('*', { count: 'exact', head: true })
-    
-    console.log('📊 Total courses:', totalCourses, coursesError ? `Error: ${coursesError.message}` : '')
-
-    // Get total tasks (handle if table doesn't exist)
-    let totalTasks = 0
-    try {
-      const { count } = await supabaseAdmin
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-      totalTasks = count || 0
-    } catch (e) {
-      console.log('Tasks table not found or error:', e)
+    // 1. Parallelize total system counts (Execute 8 counts concurrently)
+    const safeCountQuery = async (fn: () => Promise<any>) => {
+      try {
+        const res = await fn()
+        return res?.count || 0
+      } catch (_) {
+        return 0
+      }
     }
 
-    // Get total projects (handle if table doesn't exist)
-    let totalProjects = 0
-    try {
-      const { count } = await supabaseAdmin
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-      totalProjects = count || 0
-    } catch (e) {
-      console.log('Projects table not found or error:', e)
-    }
-
-    // Get total tickets (handle if table doesn't exist)
-    let totalTickets = 0
-    let pendingTickets = 0
-    try {
-      const { count: allTickets } = await supabaseAdmin
-        .from('tickets')
-        .select('*', { count: 'exact', head: true })
-      totalTickets = allTickets || 0
-
-      const { count: pending } = await supabaseAdmin
-        .from('tickets')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'open')
-      pendingTickets = pending || 0
-    } catch (e) {
-      console.log('Tickets table not found or error:', e)
-    }
-
-    // Get pending projects (handle if table doesn't exist)
-    let pendingProjects = 0
-    try {
-      const { count } = await supabaseAdmin
-        .from('project_submissions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'submitted')
-      pendingProjects = count || 0
-    } catch (e) {
-      console.log('Project submissions table not found or error:', e)
-    }
+    const [
+      { count: totalAdmins },
+      { count: totalStudents },
+      { count: totalCourses },
+      totalTasks,
+      totalProjects,
+      totalTickets,
+      pendingTickets,
+      pendingProjects
+    ] = await Promise.all([
+      supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin').or('account_status.eq.active,account_status.is.null'),
+      supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
+      supabaseAdmin.from('courses').select('*', { count: 'exact', head: true }),
+      safeCountQuery(async () => await supabaseAdmin.from('tasks').select('*', { count: 'exact', head: true })),
+      safeCountQuery(async () => await supabaseAdmin.from('projects').select('*', { count: 'exact', head: true })),
+      safeCountQuery(async () => await supabaseAdmin.from('tickets').select('*', { count: 'exact', head: true })),
+      safeCountQuery(async () => await supabaseAdmin.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open')),
+      safeCountQuery(async () => await supabaseAdmin.from('project_submissions').select('*', { count: 'exact', head: true }).eq('status', 'submitted'))
+    ])
 
     // Get admin performance (last 7 days) - Calculate from actual tables
     const sevenDaysAgo = new Date()
@@ -196,84 +148,25 @@ export async function GET(req: NextRequest) {
     
     console.log('📊 Fetching recent activity from:', sevenDaysAgoISO)
 
-    // Get students added (last 7 days) - grouped by date
-    // Using created_at from auth metadata if table column is null
-    const { data: studentsAdded, error: studentsQueryError } = await supabaseAdmin
-      .from('profiles')
-      .select('created_at, id')
-      .eq('role', 'student')
-      .gte('created_at', sevenDaysAgoISO)
-      .order('created_at', { ascending: false })
+    // 2. Parallelize recent activity queries
+    const [
+      { data: studentsAdded, error: studentsQueryError },
+      { data: coursesAdded },
+      { data: projectsCreated },
+      { data: tasksCreated },
+      { data: ticketsResolved }
+    ] = await Promise.all([
+      supabaseAdmin.from('profiles').select('created_at, id').eq('role', 'student').gte('created_at', sevenDaysAgoISO).order('created_at', { ascending: false }),
+      supabaseAdmin.from('courses').select('created_at').gte('created_at', sevenDaysAgoISO).order('created_at', { ascending: false }),
+      supabaseAdmin.from('projects').select('created_at').gte('created_at', sevenDaysAgoISO).order('created_at', { ascending: false }),
+      supabaseAdmin.from('tasks').select('created_at').gte('created_at', sevenDaysAgoISO).order('created_at', { ascending: false }),
+      supabaseAdmin.from('tickets').select('resolved_at').eq('status', 'resolved').gte('resolved_at', sevenDaysAgoISO).order('resolved_at', { ascending: false })
+    ])
     
     console.log('📊 Students added in last 7 days (via created_at):', studentsAdded?.length || 0)
     if (studentsQueryError) {
       console.error('❌ Error fetching students:', studentsQueryError.message)
     }
-    
-    // For students without created_at, get from auth users as fallback
-    let authStudentsAdded: any[] = []
-    try {
-      const { data: authData } = await supabaseAdmin.auth.admin.listUsers()
-      if (authData?.users) {
-        // Filter students created in last 7 days from auth
-        authStudentsAdded = authData.users
-          .filter(u => {
-            const isStudent = u.user_metadata?.role === 'student' || u.role === 'student'
-            const createdAt = new Date(u.created_at)
-            const isRecent = createdAt >= sevenDaysAgo
-            return isStudent && isRecent
-          })
-          .map(u => ({
-            id: u.id,
-            created_at: u.created_at
-          }))
-        console.log('📊 Students from auth (last 7 days):', authStudentsAdded.length)
-      }
-    } catch (authError: any) {
-      console.error('⚠️ Error fetching auth users:', authError.message)
-    }
-    
-    // Merge students from both sources, removing duplicates
-    const allStudents = [...(studentsAdded || []), ...authStudentsAdded]
-    const uniqueStudents = Array.from(
-      new Map(allStudents.map(s => [s.id, s])).values()
-    )
-    console.log('📊 Total unique students added in last 7 days:', uniqueStudents.length)
-
-    // Get courses added (last 7 days) - grouped by date
-    const { data: coursesAdded } = await supabaseAdmin
-      .from('courses')
-      .select('created_at')
-      .gte('created_at', sevenDaysAgoISO)
-      .order('created_at', { ascending: false })
-    
-    console.log('📊 Courses added in last 7 days:', coursesAdded?.length || 0)
-
-    // Get projects created (last 7 days) - grouped by date
-    const { data: projectsCreated } = await supabaseAdmin
-      .from('projects')
-      .select('created_at')
-      .gte('created_at', sevenDaysAgoISO)
-      .order('created_at', { ascending: false })
-    
-    console.log('📊 Projects created in last 7 days:', projectsCreated?.length || 0)
-
-    // Get tasks created (last 7 days) - grouped by date
-    const { data: tasksCreated } = await supabaseAdmin
-      .from('tasks')
-      .select('created_at')
-      .gte('created_at', sevenDaysAgoISO)
-      .order('created_at', { ascending: false })
-    
-    console.log('📊 Tasks created in last 7 days:', tasksCreated?.length || 0)
-
-    // Get tickets resolved (last 7 days) - grouped by date
-    const { data: ticketsResolved } = await supabaseAdmin
-      .from('tickets')
-      .select('resolved_at')
-      .eq('status', 'resolved')
-      .gte('resolved_at', sevenDaysAgoISO)
-      .order('resolved_at', { ascending: false })
     
     console.log('📊 Tickets resolved in last 7 days:', ticketsResolved?.length || 0)
 
@@ -311,8 +204,8 @@ export async function GET(req: NextRequest) {
     
     console.log('📊 Initialized activity dates:', Object.keys(activityByDate))
     
-    // Count students by date (using merged unique students)
-    uniqueStudents?.forEach((student) => {
+    // Count students by date
+    studentsAdded?.forEach((student: any) => {
       const dateStr = getDateStr(student.created_at)
       if (dateStr && activityByDate[dateStr]) {
         activityByDate[dateStr].students_added++
@@ -359,133 +252,93 @@ export async function GET(req: NextRequest) {
     
     console.log('📊 Activity by date calculated:', Object.keys(activityByDate).length, 'days')
 
-    // Get top performing admins
+    // Get top performing admins — BATCHED (5 queries total, not N*7 per admin)
     const { data: adminProfiles } = await supabaseAdmin
       .from('profiles')
-      .select('*')
+      .select('id, email, full_name, created_at')
       .in('role', ['admin', 'superadmin'])
       .order('created_at', { ascending: false })
 
-    // Calculate activity stats for each admin - using actual data
-    const adminsWithActivity = await Promise.all(
-      (adminProfiles || []).map(async (admin) => {
-        // Count students created by this admin (using created_by_admin_id field)
-        const { count: studentsCount } = await supabaseAdmin
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('role', 'student')
-          .eq('created_by_admin_id', admin.id)
-        
-        // Count courses created by this admin (if course has created_by field)
-        const { count: coursesCount } = await supabaseAdmin
-          .from('courses')
-          .select('*', { count: 'exact', head: true })
-          .eq('created_by', admin.id)
-        
-        // Count projects in courses assigned to this admin
-        const { data: adminCourses } = await supabaseAdmin
-          .from('admin_course_assignments')
-          .select('course_id')
-          .eq('admin_id', admin.id)
-        
-        const courseIds = adminCourses?.map(ac => ac.course_id) || []
-        
-        let projectsCount = 0
-        let tasksCount = 0
-        
-        if (courseIds.length > 0) {
-          const { count: pCount } = await supabaseAdmin
-            .from('projects')
-            .select('*', { count: 'exact', head: true })
-            .in('course_id', courseIds)
-          projectsCount = pCount || 0
-          
-          const { count: tCount } = await supabaseAdmin
-            .from('tasks')
-            .select('*', { count: 'exact', head: true })
-            .in('course_id', courseIds)
-          tasksCount = tCount || 0
-        }
-        
-        // Count tickets resolved by this admin (if tickets has resolved_by or assigned_to)
-        const { count: ticketsCount } = await supabaseAdmin
-          .from('tickets')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'resolved')
-          .eq('assigned_to', admin.id)
-        
-        // Calculate active days based on creation date
-        const createdDate = new Date(admin.created_at)
-        const today = new Date()
-        const daysDiff = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24))
+    const adminIds = (adminProfiles || []).map((a) => a.id)
 
-        const totalStats = {
-          total_courses_added: coursesCount || 0,
-          total_students_added: studentsCount || 0,
-          total_projects_evaluated: projectsCount,
-          total_tasks_created: tasksCount,
-          total_tickets_resolved: ticketsCount || 0,
-          active_days: daysDiff > 0 ? daysDiff : 1,
-        }
+    // Fetch all supporting data in parallel (5 queries total regardless of admin count)
+    const [
+      { data: allStudentsByAdmin },
+      { data: allCoursesByAdmin },
+      { data: allCourseAssignments },
+      { data: allEnrollments },
+      { data: allResolvedTickets }
+    ] = await Promise.all([
+      supabaseAdmin.from('profiles').select('created_by_admin_id').eq('role', 'student').in('created_by_admin_id', adminIds),
+      supabaseAdmin.from('courses').select('id, created_by').in('created_by', adminIds),
+      supabaseAdmin.from('admin_course_assignments').select('admin_id, course_id').in('admin_id', adminIds),
+      supabaseAdmin.from('enrollments').select('user_id, course_id'),
+      supabaseAdmin.from('tickets').select('assigned_to').eq('status', 'resolved').in('assigned_to', adminIds)
+    ])
 
-        // Get assigned students count and other assignment data
-        let assignedStudentsCount = 0
-        let assignedCoursesCount = 0
-        let assignedTasksCount = 0
-        let assignedProjectsCount = 0
-        
-        // Get admin's assigned courses
-        const { data: courseAssignments } = await supabaseAdmin
-          .from('admin_course_assignments')
-          .select('course_id')
-          .eq('admin_id', admin.id)
-        
-        if (courseAssignments && courseAssignments.length > 0) {
-          const courseIds = courseAssignments.map(a => a.course_id)
-          assignedCoursesCount = courseIds.length
-          
-          // Get all enrollments in those courses
-          const { data: enrollments } = await supabaseAdmin
-            .from('enrollments')
-            .select('user_id')
-            .in('course_id', courseIds)
-          
-          // Count unique students
-          if (enrollments) {
-            assignedStudentsCount = new Set(enrollments.map(e => e.user_id)).size
-          }
-          
-          // Get tasks count in assigned courses
-          const { count: tasksCount } = await supabaseAdmin
-            .from('tasks')
-            .select('*', { count: 'exact', head: true })
-            .in('course_id', courseIds)
-          assignedTasksCount = tasksCount || 0
-          
-          // Get projects count in assigned courses
-          const { count: projectsCount } = await supabaseAdmin
-            .from('projects')
-            .select('*', { count: 'exact', head: true })
-            .in('course_id', courseIds)
-          assignedProjectsCount = projectsCount || 0
-        }
+    // Build lookup maps once
+    const studentCountByAdmin: Record<string, number> = {}
+    ;(allStudentsByAdmin || []).forEach((s: any) => {
+      if (s.created_by_admin_id) studentCountByAdmin[s.created_by_admin_id] = (studentCountByAdmin[s.created_by_admin_id] || 0) + 1
+    })
 
-        return {
-          admin_id: admin.id,
-          email: admin.email,
-          full_name: admin.full_name,
-          assigned_courses_count: assignedCoursesCount,
-          assigned_students_count: assignedStudentsCount,
-          assigned_tasks_count: assignedTasksCount,
-          assigned_projects_count: assignedProjectsCount,
-          ...totalStats,
-        }
+    const coursesByAdmin: Record<string, string[]> = {}
+    ;(allCoursesByAdmin || []).forEach((c: any) => {
+      if (c.created_by) {
+        if (!coursesByAdmin[c.created_by]) coursesByAdmin[c.created_by] = []
+        coursesByAdmin[c.created_by].push(c.id)
+      }
+    })
+
+    const assignedCoursesByAdmin: Record<string, string[]> = {}
+    ;(allCourseAssignments || []).forEach((a: any) => {
+      if (!assignedCoursesByAdmin[a.admin_id]) assignedCoursesByAdmin[a.admin_id] = []
+      assignedCoursesByAdmin[a.admin_id].push(a.course_id)
+    })
+
+    // Build enrolled student count per course
+    const enrolledUsersByCourse: Record<string, Set<string>> = {}
+    ;(allEnrollments || []).forEach((e: any) => {
+      if (!enrolledUsersByCourse[e.course_id]) enrolledUsersByCourse[e.course_id] = new Set()
+      enrolledUsersByCourse[e.course_id].add(e.user_id)
+    })
+
+    const ticketCountByAdmin: Record<string, number> = {}
+    ;(allResolvedTickets || []).forEach((t: any) => {
+      if (t.assigned_to) ticketCountByAdmin[t.assigned_to] = (ticketCountByAdmin[t.assigned_to] || 0) + 1
+    })
+
+    const today = new Date()
+    const adminsWithActivity = (adminProfiles || []).map((admin) => {
+      const assignedCourseIds = assignedCoursesByAdmin[admin.id] || []
+      const assignedStudents = new Set<string>()
+      assignedCourseIds.forEach((cid) => {
+        enrolledUsersByCourse[cid]?.forEach((uid) => assignedStudents.add(uid))
       })
-    )
 
-    // Sort by projects evaluated and get top 5
+      const createdDate = new Date(admin.created_at)
+      const daysDiff = Math.max(1, Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)))
+
+      return {
+        admin_id: admin.id,
+        email: admin.email,
+        full_name: admin.full_name,
+        assigned_courses_count: assignedCourseIds.length,
+        assigned_students_count: assignedStudents.size,
+        assigned_tasks_count: 0,
+        assigned_projects_count: 0,
+        total_courses_added: (coursesByAdmin[admin.id] || []).length,
+        total_students_added: studentCountByAdmin[admin.id] || 0,
+        total_projects_evaluated: 0,
+        total_tasks_created: 0,
+        total_tickets_resolved: ticketCountByAdmin[admin.id] || 0,
+        active_days: daysDiff,
+      }
+    })
+
+    // Sort by students added and get top 5
     const topAdmins = adminsWithActivity
-      .sort((a, b) => b.total_projects_evaluated - a.total_projects_evaluated)
+      .sort((a, b) => b.total_students_added - a.total_students_added)
       .slice(0, 5)
 
     const responseData = {

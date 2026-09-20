@@ -65,7 +65,7 @@ export default function WebsiteCMSPage() {
       id: '1',
       name: 'Aanya Sharma',
       role: 'Full Stack Engineer at TechVerve',
-      content: 'AAGAJ LMS gave me the project mentorship and mock interviews that helped me land my dream software role within 4 months.',
+      content: 'Gravity LMS gave me the project mentorship and mock interviews that helped me land my dream software role within 4 months.',
       rating: 5,
       avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
     },
@@ -142,7 +142,7 @@ export default function WebsiteCMSPage() {
         heading_line2: 'Elevating Careers.',
         heading_line3: 'Transforming Futures.',
         description:
-          'AAGAJ INFOTECH LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
+          'Gravity LMS is a complete learning ecosystem that connects Students, Institutions, Employers & Opportunities through intelligent technology and seamless experiences.',
         cta_primary_text: 'Explore Courses',
         cta_primary_link: '#courses',
         cta_secondary_text: 'Apply Admission',
@@ -170,10 +170,10 @@ export default function WebsiteCMSPage() {
         stat_6_label: 'Hiring Companies',
       },
       about: {
-        title: 'About AAGAJ INFOTECH',
+        title: 'About Gravity',
         subtitle: 'Empowering the next generation of learners',
         description:
-          'AAGAJ INFOTECH is a forward-thinking EdTech company dedicated to transforming the educational landscape. We bridge the gap between traditional learning and modern industry requirements through our comprehensive Learning Management System.',
+          'Gravity is a forward-thinking EdTech company dedicated to transforming the educational landscape. We bridge the gap between traditional learning and modern industry requirements through our comprehensive Learning Management System.',
         mission:
           'To democratize quality education by providing an accessible, technology-driven learning platform that connects students with world-class courses, mentors, internships, and career opportunities.',
         vision:
@@ -291,7 +291,7 @@ export default function WebsiteCMSPage() {
                   id: Date.now().toString(),
                   name: 'New Student',
                   role: 'Software Engineer',
-                  content: 'AAGAJ LMS helped me build industry-ready skills.',
+                  content: 'Gravity LMS helped me build industry-ready skills.',
                   rating: 5,
                   avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
                 }
