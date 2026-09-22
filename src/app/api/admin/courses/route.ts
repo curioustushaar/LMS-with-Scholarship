@@ -37,17 +37,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const isActive = body.is_active !== false && body.status !== 'draft' && body.status !== false
+    const status = typeof body.status === 'string'
+      ? body.status.toLowerCase()
+      : isActive
+        ? 'active'
+        : 'draft'
+
     const courseData = {
       title: title.trim(),
       description: description ? description.trim() : null,
       thumbnail_url: thumbnail_url || null,
       duration_weeks: duration_weeks || null,
       level: level ? level.toLowerCase() : 'beginner',
-      status: typeof body.status === 'string'
-        ? body.status.toLowerCase()
-        : body.status === true
-          ? 'active'
-          : 'draft',
+      status: status,
+      is_active: isActive,
       created_by: authResult.id
     }
 
@@ -61,6 +65,7 @@ export async function POST(request: NextRequest) {
       duration_weeks: courseData.duration_weeks,
       level: courseData.level,
       status: courseData.status,
+      is_active: courseData.is_active,
       created_by: courseData.created_by
     }
 

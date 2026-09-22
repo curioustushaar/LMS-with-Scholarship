@@ -57,6 +57,7 @@ export interface ReferenceCode {
   phone: string
   email: string
   code: string
+  discount_percent?: number
   status: 'active' | 'inactive'
   notes?: string
   created_at: string
@@ -241,7 +242,7 @@ export default function SuperadminScholarshipsPage() {
   const [showRefStudentsModal, setShowRefStudentsModal] = useState<ReferenceCode | null>(null)
   const [refCodeActionLoading, setRefCodeActionLoading] = useState<string | null>(null)
   const [copiedRefCode, setCopiedRefCode] = useState<string | null>(null)
-  const [refCodeForm, setRefCodeForm] = useState({ name: '', phone: '', email: '', code: '', notes: '' })
+  const [refCodeForm, setRefCodeForm] = useState({ name: '', phone: '', email: '', code: '', notes: '', discount_percent: 0 })
 
   // Exam Centers Master State
   const [showCenterModal, setShowCenterModal] = useState(false)
@@ -531,6 +532,7 @@ export default function SuperadminScholarshipsPage() {
         },
         body: JSON.stringify({
           ...refCodeForm,
+          discount_percent: Number(refCodeForm.discount_percent) || 0,
           name: nameVal.cleanName,
           phone: phoneVal.cleanPhone,
           email: refCodeForm.email ? validateEmail(refCodeForm.email).cleanEmail : '',
@@ -539,7 +541,7 @@ export default function SuperadminScholarshipsPage() {
       const data = await res.json()
       if (data.success) {
         setShowRefCodeModal(false)
-        setRefCodeForm({ name: '', phone: '', email: '', code: '', notes: '' })
+        setRefCodeForm({ name: '', phone: '', email: '', code: '', notes: '', discount_percent: 0 })
         await fetchReferenceCodes()
         alert(`Reference Code Generated Successfully: ${data.data?.code || 'Generated'}`)
       } else {
@@ -5260,6 +5262,7 @@ export default function SuperadminScholarshipsPage() {
                   <tr>
                     <th className="px-4 sm:px-6 py-3.5">Reference Code</th>
                     <th className="px-4 sm:px-6 py-3.5">Representative / Partner</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-center">Discount Rate</th>
                     <th className="px-4 sm:px-6 py-3.5 text-center">Status</th>
                     <th className="px-4 sm:px-6 py-3.5 text-center">Referred Students</th>
                     <th className="px-4 sm:px-6 py-3.5">Created Date</th>
@@ -5304,6 +5307,17 @@ export default function SuperadminScholarshipsPage() {
                           <div className="text-gray-500 text-[11px] font-mono mt-0.5">📞 {item.phone}</div>
                           {item.email && <div className="text-gray-400 text-[10px] truncate">{item.email}</div>}
                           {item.notes && <div className="text-gray-400 text-[10px] italic mt-0.5 max-w-xs">{item.notes}</div>}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-center">
+                          {item.discount_percent && item.discount_percent > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🎉 {item.discount_percent}% OFF
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold text-gray-500 bg-gray-100">
+                              0% (Standard)
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-center">
                           <button
@@ -8379,6 +8393,60 @@ export default function SuperadminScholarshipsPage() {
                 <span className="text-[10px] text-gray-400 mt-1 block">
                   Only uppercase letters, numbers, and hyphens allowed.
                 </span>
+              </div>
+
+              {/* Discount Percentage Field */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 rounded-2xl border border-emerald-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wide">
+                    Candidate Form Discount (%) *
+                  </label>
+                  <span className="text-xs font-black text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                    {refCodeForm.discount_percent || 0}% Discount
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      required
+                      value={refCodeForm.discount_percent}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(100, Number(e.target.value) || 0))
+                        setRefCodeForm({ ...refCodeForm, discount_percent: val })
+                      }}
+                      placeholder="e.g. 20"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 text-sm font-black text-emerald-950 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">%</span>
+                  </div>
+                </div>
+
+                {/* Quick 1-Click Discount Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-emerald-900 uppercase mr-1">Presets:</span>
+                  {[0, 10, 20, 25, 50, 100].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setRefCodeForm({ ...refCodeForm, discount_percent: pct })}
+                      className={`text-[10px] font-extrabold px-2 py-1 rounded-lg transition-all ${
+                        refCodeForm.discount_percent === pct
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-100/60'
+                      }`}
+                    >
+                      {pct === 0 ? '0% (Standard)' : pct === 100 ? '100% (Free Form)' : `${pct}% OFF`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-emerald-700/90 leading-tight">
+                  When a candidate enters this code during scholarship application, this percentage will be deducted in real time from the form application fee.
+                </p>
               </div>
 
               <div>

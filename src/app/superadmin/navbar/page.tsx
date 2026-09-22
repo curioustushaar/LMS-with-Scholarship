@@ -47,7 +47,7 @@ export default function SuperadminNavbarPage() {
           { id: '3', name: 'Courses', href: '/courses', sort_order: 3, is_visible: true },
           { id: '4', name: 'Internships', href: '/internships', sort_order: 4, is_visible: true },
           { id: '5', name: 'Scholarships', href: '/scholarships', sort_order: 5, is_visible: true },
-          { id: '6', name: 'Training', href: '/training', sort_order: 6, is_visible: true },
+          { id: '6', name: 'Notice', href: '#notices', sort_order: 6, is_visible: true },
           { id: '7', name: 'School Partners', href: '/school-partners', sort_order: 7, is_visible: true },
           { id: '8', name: 'Employers', href: '/employers', sort_order: 8, is_visible: true },
           { id: '9', name: 'Admissions', href: '/admissions', sort_order: 9, is_visible: true },

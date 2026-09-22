@@ -104,7 +104,9 @@ export default function LoginPage() {
             <div className="absolute -bottom-12 -right-12 w-48 h-48 rounded-full bg-black/10 blur-xl pointer-events-none" />
 
             <div className="text-center mb-4 relative z-10 flex flex-col items-center">
-              <img src="/logo.png" alt="Gravity Logo" className="h-20 w-auto mb-3 object-contain" />
+              <div className="p-2.5 bg-white/95 rounded-2xl shadow-lg mb-3">
+                <img src="/logo.png" alt="Gravity Logo" className="h-10 w-auto object-contain" />
+              </div>
               <h1 className="text-2xl md:text-3xl font-heading font-extrabold mb-1 tracking-wider uppercase">
                 GRAVITY
               </h1>

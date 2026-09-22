@@ -112,8 +112,8 @@ export default function Newsletter() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Phone Support</h4>
-                  <a href="tel:+919608369002" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors mt-0.5 block">
-                    +91 9608369002
+                  <a href="tel:+919431430464" className="text-xs text-gray-500 hover:text-[#FF2D8D] transition-colors mt-0.5 block">
+                    +91 9431430464
                   </a>
                 </div>
               </div>

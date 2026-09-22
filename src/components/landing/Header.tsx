@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, ArrowRight, Shield, GraduationCap, Briefcase } from 'lucide-react'
+import { motion, AnimatePresence, Variants } from 'framer-motion'
+import { Menu, X, ArrowRight, Shield, GraduationCap, Briefcase, ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 
 interface NavLinkItem {
   id?: string
@@ -22,7 +22,7 @@ const defaultNavLinks: NavLinkItem[] = [
   { name: 'Scholarships', href: '#scholarships' },
   { name: 'Employers', href: '#employers' },
   { name: 'School Partners', href: '#school-partners' },
-  { name: 'Training', href: '#training' },
+  { name: 'Notice', href: '#notices' },
   { name: 'Contact', href: '#contact' },
 ]
 
@@ -45,11 +45,16 @@ export default function Header() {
           const links = data.data
             .filter((item: any) => item.is_visible)
             .map((item: any) => {
+              // Replace any legacy 'Training' item with 'Notice'
+              const isTraining = item.name?.toLowerCase() === 'training' || item.href?.includes('training')
+              const name = isTraining ? 'Notice' : item.name
+              const rawHref = isTraining ? '#notices' : item.href
+
               // Convert routes to hash anchors if on home page
-              const hash = item.href === '/' ? '#home' : item.href.startsWith('/') ? `#${item.href.substring(1)}` : item.href
+              const hash = rawHref === '/' ? '#home' : rawHref.startsWith('/') ? `#${rawHref.substring(1)}` : rawHref
               return {
                 id: item.id,
-                name: item.name,
+                name: name,
                 href: hash,
               }
             })
@@ -62,20 +67,41 @@ export default function Header() {
       setIsScrolled(window.scrollY > 20)
 
       if (isHomePage) {
-        const sections = navLinks.map((link) => link.href.replace(/^#/, ''))
-        for (const section of sections.reverse()) {
+        const sections = navLinks
+          .map((link) => link.href.replace(/^#/, '').replace(/^\//, ''))
+          .filter(Boolean)
+
+        const scrollPosition = window.scrollY + 180
+
+        for (const section of sections) {
           const el = document.getElementById(section)
-          if (el && window.scrollY >= el.offsetTop - 140) {
-            setActiveSection(section)
-            break
+          if (el) {
+            const top = el.offsetTop
+            const height = el.offsetHeight
+            if (scrollPosition >= top && scrollPosition < top + height) {
+              setActiveSection(section)
+              break
+            }
           }
         }
       }
     }
 
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [isHomePage])
+  }, [isHomePage, navLinks])
+
+  // Prevent background scroll when mobile drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
 
   const getLinkHref = (linkHref: string) => {
     if (isHomePage) {
@@ -83,6 +109,22 @@ export default function Header() {
     }
     // If on a subpage, navigate to root with anchor or dedicated route
     return linkHref.startsWith('#') ? `/${linkHref}` : linkHref
+  }
+
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.035,
+        delayChildren: 0.08,
+      },
+    },
+  }
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, x: 20 },
+    show: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
   }
 
   return (
@@ -101,11 +143,15 @@ export default function Header() {
           <div className="flex justify-between items-center h-14 sm:h-16">
             
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
+            <Link 
+              href="/" 
+              onClick={() => setActiveSection('home')}
+              className="flex items-center gap-2 group shrink-0"
+            >
               <img
                 src="/logo.png"
                 alt="GRAVITY by AAGAJ Foundation"
-                className="h-14 sm:h-16 lg:h-18 w-auto object-contain transition-transform group-hover:scale-105"
+                className="h-10 sm:h-11 md:h-12 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </Link>
 
@@ -113,13 +159,16 @@ export default function Header() {
             <nav className="hidden xl:flex items-center gap-0.5">
               {navLinks.map((link) => {
                 const sectionId = link.href.replace(/^#/, '').replace(/^\//, '')
-                const isActive = isHomePage && activeSection === sectionId
+                const isActive = activeSection === sectionId
 
                 return (
                   <Link
                     key={link.name}
                     href={getLinkHref(link.href)}
-                    className="relative px-2.5 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors duration-200"
+                    onClick={() => setActiveSection(sectionId)}
+                    className={`relative px-2.5 py-2 text-xs font-semibold transition-colors duration-200 ${
+                      isActive ? 'text-[#FF2D8D]' : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
                     {link.name}
                     {isActive && (
@@ -136,7 +185,7 @@ export default function Header() {
 
             {/* Desktop CTAs */}
             <div className="hidden lg:flex items-center gap-3 relative">
-              <Link href={getLinkHref('#courses')}>
+              <Link href={getLinkHref('#courses')} onClick={() => setActiveSection('courses')}>
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -236,75 +285,225 @@ export default function Header() {
 
             {/* Hamburger Button */}
             <div className="xl:hidden flex items-center">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.9 }}
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100/50 transition-all focus:outline-none"
+                className="p-2.5 rounded-xl text-gray-700 hover:text-[#FF2D8D] bg-gray-50/80 hover:bg-pink-50/80 border border-gray-100 transition-all focus:outline-none shadow-sm"
                 aria-label="Toggle menu"
               >
-                {isOpen ? <X size={22} /> : <Menu size={22} />}
-              </button>
+                {isOpen ? <X size={22} className="text-[#FF2D8D]" /> : <Menu size={22} />}
+              </motion.button>
             </div>
 
           </div>
         </div>
       </motion.header>
 
-      {/* Mobile Drawer Navigation */}
+      {/* Mobile Drawer Navigation with Background Blur and Half-Screen Side Sheet */}
       <AnimatePresence>
         {isOpen && (
           <>
+            {/* Backdrop with Deep Blur & Soft Dim */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
-              className="fixed inset-0 z-40 bg-gray-900/20 backdrop-blur-sm xl:hidden"
+              transition={{ duration: 0.25 }}
+              onClick={() => {
+                setIsOpen(false)
+                setShowMobileLoginOpts(false)
+              }}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md xl:hidden"
             />
+
+            {/* Half-Screen Floating / Slide-in Drawer */}
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl border-l border-gray-100 flex flex-col xl:hidden"
+              initial={{ x: '100%', opacity: 0.8 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0.8 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-[78%] sm:w-[320px] max-w-[340px] bg-white/95 backdrop-blur-2xl shadow-[-12px_0_35px_rgba(0,0,0,0.18)] border-l border-white/60 rounded-l-[28px] flex flex-col justify-between overflow-hidden xl:hidden"
             >
-              <div className="p-6 flex justify-between items-center border-b border-gray-50">
-                <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <img src="/logo.png" alt="Gravity" className="h-14 sm:h-16 w-auto object-contain" />
-                </Link>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
+              {/* Drawer Top / Header */}
+              <div className="p-4 sm:p-5 flex justify-between items-center border-b border-gray-100/80 bg-gradient-to-r from-pink-50/30 via-white to-purple-50/30">
+                <Link 
+                  href="/" 
+                  className="flex items-center gap-2 group shrink-0" 
+                  onClick={() => {
+                    setActiveSection('home')
+                    setIsOpen(false)
+                    setShowMobileLoginOpts(false)
+                  }}
                 >
-                  <X size={20} />
-                </button>
+                  <img src="/logo.png" alt="Gravity" className="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105" />
+                </Link>
+
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowMobileLoginOpts(false)
+                  }}
+                  className="w-9 h-9 rounded-full bg-gray-100/80 hover:bg-pink-100/60 text-gray-500 hover:text-[#FF2D8D] flex items-center justify-center transition-all shadow-sm"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </motion.button>
               </div>
 
-              <div className="flex-1 overflow-y-auto py-6 px-6 space-y-1">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.name}
-                    href={getLinkHref(link.href)}
-                    onClick={() => setIsOpen(false)}
-                    className="flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-pink-50/50 hover:text-[#FF2D8D] transition-all"
+              {/* Navigation Items List with Staggered Animations */}
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="flex-1 overflow-y-auto py-3 px-3.5 space-y-1 scrollbar-thin scrollbar-thumb-gray-200"
+              >
+                {navLinks.map((link) => {
+                  const sectionId = link.href.replace(/^#/, '').replace(/^\//, '')
+                  const isActive = activeSection === sectionId
+
+                  return (
+                    <motion.div key={link.name} variants={itemVariants}>
+                      <Link
+                        href={getLinkHref(link.href)}
+                        onClick={() => {
+                          setActiveSection(sectionId)
+                          setIsOpen(false)
+                          setShowMobileLoginOpts(false)
+                        }}
+                        className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-[#FF2D8D]/12 via-[#9C27FF]/8 to-transparent text-[#FF2D8D] font-bold shadow-sm'
+                            : 'text-gray-700 active:bg-pink-50/50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          {isActive ? (
+                            <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] shadow-sm shadow-[#FF2D8D]/50" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-transparent" />
+                          )}
+                          <span>{link.name}</span>
+                        </span>
+
+                        {isActive ? (
+                          <ChevronRight size={14} className="text-[#FF2D8D]" />
+                        ) : null}
+                      </Link>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+
+              {/* Drawer Footer / Call To Actions */}
+              <div className="p-3.5 sm:p-4 border-t border-gray-100/90 bg-white/80 backdrop-blur-md space-y-2.5">
+                {/* Explore Platform CTA */}
+                <Link 
+                  href={getLinkHref('#courses')} 
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowMobileLoginOpts(false)
+                  }} 
+                  className="block w-full"
+                >
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full py-2.5 border border-[#FF2D8D]/35 hover:border-[#FF2D8D] rounded-xl text-xs font-bold text-gray-800 bg-white/90 hover:bg-pink-50/40 transition-all shadow-sm flex items-center justify-center gap-1.5 group"
                   >
-                    {link.name}
-                  </Link>
-                ))}
-              </div>
-
-              <div className="p-6 border-t border-gray-50 space-y-3">
-                <Link href={getLinkHref('#courses')} onClick={() => setIsOpen(false)} className="block w-full">
-                  <button className="w-full py-3 border border-[#FF2D8D]/30 hover:border-[#FF2D8D]/80 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 transition-all flex items-center justify-center gap-2">
+                    <Sparkles size={13} className="text-[#FF2D8D] group-hover:rotate-12 transition-transform" />
                     Explore Platform
-                  </button>
+                  </motion.button>
                 </Link>
                 
-                <Link href="/login" onClick={() => setIsOpen(false)} className="block w-full">
-                  <button className="w-full py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                    Login to LMS
-                    <ArrowRight size={15} />
-                  </button>
-                </Link>
+                {/* Login Expandable Box */}
+                <div className="w-full space-y-1.5">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setShowMobileLoginOpts(!showMobileLoginOpts)}
+                    className="w-full py-2.5 bg-gradient-to-r from-[#FF2D8D] via-[#9C27FF] to-[#7B1FA2] hover:brightness-105 text-white font-bold text-xs rounded-xl shadow-md shadow-[#FF2D8D]/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>Login to LMS</span>
+                    <motion.span 
+                      animate={{ rotate: showMobileLoginOpts ? 180 : 0 }} 
+                      transition={{ duration: 0.2 }}
+                      className="inline-block"
+                    >
+                      <ChevronDown size={14} />
+                    </motion.span>
+                  </motion.button>
+
+                  {/* Expandable Role Options for Mobile */}
+                  <AnimatePresence>
+                    {showMobileLoginOpts && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.22, ease: 'easeInOut' }}
+                        className="overflow-hidden flex flex-col gap-1 pt-1"
+                      >
+                        <Link
+                          href="/login"
+                          onClick={() => {
+                            setIsOpen(false)
+                            setShowMobileLoginOpts(false)
+                          }}
+                          className="flex items-center gap-2.5 p-2 rounded-lg bg-pink-50/60 hover:bg-pink-50 text-gray-800 transition-colors group text-left"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-[#FF2D8D] text-white flex items-center justify-center shrink-0">
+                            <Shield size={12} />
+                          </div>
+                          <span className="text-[11px] font-bold group-hover:text-[#FF2D8D] transition-colors">Admin Portal</span>
+                        </Link>
+
+                        <Link
+                          href="/login"
+                          onClick={() => {
+                            setIsOpen(false)
+                            setShowMobileLoginOpts(false)
+                          }}
+                          className="flex items-center gap-2.5 p-2 rounded-lg bg-purple-50/60 hover:bg-purple-50 text-gray-800 transition-colors group text-left"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-[#9C27FF] text-white flex items-center justify-center shrink-0">
+                            <GraduationCap size={12} />
+                          </div>
+                          <span className="text-[11px] font-bold group-hover:text-[#9C27FF] transition-colors">Student Portal</span>
+                        </Link>
+
+                        <Link
+                          href="/school-portal/login"
+                          onClick={() => {
+                            setIsOpen(false)
+                            setShowMobileLoginOpts(false)
+                          }}
+                          className="flex items-center gap-2.5 p-2 rounded-lg bg-emerald-50/60 hover:bg-emerald-50 text-gray-800 transition-colors group text-left"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                            <Briefcase size={12} />
+                          </div>
+                          <span className="text-[11px] font-bold group-hover:text-emerald-700 transition-colors">School Partner Portal</span>
+                        </Link>
+
+                        <Link
+                          href="/superadmin/login"
+                          onClick={() => {
+                            setIsOpen(false)
+                            setShowMobileLoginOpts(false)
+                          }}
+                          className="flex items-center gap-2.5 p-2 rounded-lg bg-rose-50/60 hover:bg-rose-50 text-gray-800 transition-colors group text-left"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-[#C81E4E] text-white flex items-center justify-center shrink-0">
+                            <Shield size={12} />
+                          </div>
+                          <span className="text-[11px] font-bold group-hover:text-[#C81E4E] transition-colors">Super Admin</span>
+                        </Link>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </motion.div>
           </>

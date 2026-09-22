@@ -31,6 +31,7 @@ import {
 interface SchoolItem {
   id: string
   school_id: string
+  institution_type?: 'school' | 'coaching' | string
   name: string
   udise_code?: string
   school_type: string
@@ -64,6 +65,7 @@ interface ScholarshipScheme {
 export default function SuperadminSchoolsPage() {
   const [schools, setSchools] = useState<SchoolItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [boardFilter, setBoardFilter] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -88,6 +90,7 @@ export default function SuperadminSchoolsPage() {
   // Temporary credentials display state
   const [credentials, setCredentials] = useState<{
     school_id: string
+    institution_type?: string
     login_email: string
     temporary_password?: string
     login_url?: string
@@ -97,6 +100,7 @@ export default function SuperadminSchoolsPage() {
   // Form State for Add / Edit
   const [formData, setFormData] = useState({
     name: '',
+    institution_type: 'school' as 'school' | 'coaching',
     udise_code: '',
     school_type: 'Private',
     board: 'CBSE',
@@ -131,7 +135,7 @@ export default function SuperadminSchoolsPage() {
     setLoading(true)
     try {
       const token = await getToken()
-      let url = `/api/superadmin/schools?status=${statusFilter}&board=${boardFilter}`
+      let url = `/api/superadmin/schools?status=${statusFilter}&board=${boardFilter}&category=${categoryFilter}`
       if (searchQuery) url += `&query=${encodeURIComponent(searchQuery)}`
 
       const res = await fetch(url, {
@@ -167,26 +171,27 @@ export default function SuperadminSchoolsPage() {
   useEffect(() => {
     fetchSchools()
     fetchSchemes()
-  }, [statusFilter, boardFilter])
+  }, [statusFilter, boardFilter, categoryFilter])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     fetchSchools()
   }
 
-  // Open Add School Modal
-  const handleOpenAdd = () => {
+  // Open Add Partner Modal
+  const handleOpenAdd = (defaultType: 'school' | 'coaching' = 'school') => {
     setFormData({
       name: '',
+      institution_type: defaultType,
       udise_code: '',
-      school_type: 'Private',
-      board: 'CBSE',
+      school_type: defaultType === 'coaching' ? 'Competitive Exam Institute (JEE/NEET)' : 'Private',
+      board: defaultType === 'coaching' ? 'JEE & NEET Foundation' : 'CBSE',
       address: '',
       city: '',
       state: '',
       pincode: '',
       contact_person_name: '',
-      designation: 'Principal',
+      designation: defaultType === 'coaching' ? 'Director / Center Head' : 'Principal',
       official_email: '',
       mobile: '',
       status: 'ACTIVE',
@@ -198,7 +203,7 @@ export default function SuperadminSchoolsPage() {
     setShowAddModal(true)
   }
 
-  // Create School Submit
+  // Create Partner (School / Coaching) Submit
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -215,18 +220,20 @@ export default function SuperadminSchoolsPage() {
         setShowCredentialsModal(true)
         fetchSchools()
       } else {
-        alert(data.error || 'Failed to create school')
+        alert(data.error || 'Failed to create institution partner')
       }
     } catch (err: any) {
-      alert(err.message || 'Error creating school')
+      alert(err.message || 'Error creating institution partner')
     }
   }
 
-  // Open Edit School Modal
+  // Open Edit School / Coaching Modal
   const handleOpenEdit = (school: SchoolItem) => {
     setSelectedSchool(school)
+    const isCoaching = school.institution_type === 'coaching' || school.school_id?.startsWith('CCH')
     setFormData({
       name: school.name,
+      institution_type: isCoaching ? 'coaching' : 'school',
       udise_code: school.udise_code || '',
       school_type: school.school_type,
       board: school.board,
@@ -247,7 +254,7 @@ export default function SuperadminSchoolsPage() {
     setShowEditModal(true)
   }
 
-  // Update School Submit
+  // Update Partner Submit
   const handleUpdateSchool = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedSchool) return
@@ -263,10 +270,10 @@ export default function SuperadminSchoolsPage() {
         setShowEditModal(false)
         fetchSchools()
       } else {
-        alert(data.error || 'Failed to update school')
+        alert(data.error || 'Failed to update partner details')
       }
     } catch (err: any) {
-      alert(err.message || 'Error updating school')
+      alert(err.message || 'Error updating partner')
     }
   }
 
@@ -291,9 +298,9 @@ export default function SuperadminSchoolsPage() {
     }
   }
 
-  // Delete School Partner Tie-up
+  // Delete Partner Tie-up
   const handleDeleteSchool = async (school: SchoolItem) => {
-    if (!confirm(`⚠️ ARE YOU SURE YOU WANT TO PERMANENTLY DELETE THIS SCHOOL TIE-UP?\n\nSchool Name: ${school.name}\nSchool ID: ${school.school_id}\n\nThis will permanently delete the school account, assigned schemes, and tie-up credentials.`)) {
+    if (!confirm(`⚠️ ARE YOU SURE YOU WANT TO PERMANENTLY DELETE THIS PARTNER TIE-UP?\n\nPartner Name: ${school.name}\nPartner ID: ${school.school_id}\n\nThis will permanently delete the account, assigned schemes, and tie-up credentials.`)) {
       return
     }
 
@@ -305,15 +312,15 @@ export default function SuperadminSchoolsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        alert(`School "${school.name}" deleted successfully.`)
+        alert(`Partner "${school.name}" deleted successfully.`)
         setShowDetailsDrawer(false)
         setShowEditModal(false)
         fetchSchools()
       } else {
-        alert(data.error || 'Failed to delete school.')
+        alert(data.error || 'Failed to delete partner.')
       }
     } catch (err: any) {
-      alert(err.message || 'Error deleting school.')
+      alert(err.message || 'Error deleting partner.')
     }
   }
 
@@ -452,10 +459,10 @@ export default function SuperadminSchoolsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FiMapPin className="text-[#C81E4E]" />
-            School Tie-up Management
+            School & Coaching Tie-up Management
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage authorized partner schools, credentials, scholarship tie-ups, student registrations, and incentive disbursements
+            Manage authorized partner schools, coaching institutes, login credentials, scholarship tie-ups, student enrollments, and incentive payouts
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -466,27 +473,32 @@ export default function SuperadminSchoolsPage() {
             <FiRefreshCw className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
-          <button
-            onClick={handleOpenAdd}
-            className="px-4 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-sm font-semibold transition-all shadow-md flex items-center gap-2"
-          >
-            <FiPlus />
-            Add New School
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleOpenAdd('school')}
+              className="px-4 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-sm font-semibold transition-all shadow-md flex items-center gap-2"
+            >
+              <FiPlus />
+              Add Partner
+            </button>
+          </div>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium">Total Schools</p>
+          <p className="text-xs text-gray-500 font-medium">Total Partners</p>
           <p className="text-2xl font-extrabold text-gray-900 mt-1">{summary.total_schools || schools.length}</p>
-          <span className="text-[10px] text-gray-400">Institutional network</span>
+          <span className="text-[10px] text-gray-400 font-medium">
+            🏫 {summary.total_pure_schools || schools.filter(s => s.institution_type !== 'coaching').length} Schools • 🎓 {summary.total_coaching || schools.filter(s => s.institution_type === 'coaching').length} Coaching
+          </span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
           <p className="text-xs text-emerald-600 font-medium">Active Tie-ups</p>
           <p className="text-2xl font-extrabold text-emerald-700 mt-1">{summary.active_schools || 0}</p>
-          <span className="text-[10px] text-emerald-500">Live school portals</span>
+          <span className="text-[10px] text-emerald-500">Live partner portals</span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
           <p className="text-xs text-amber-600 font-medium">Pending Review</p>
@@ -494,7 +506,7 @@ export default function SuperadminSchoolsPage() {
           <span className="text-[10px] text-amber-500">Awaiting approval</span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-xs text-purple-600 font-medium">School Registrations</p>
+          <p className="text-xs text-purple-600 font-medium">Partner Registrations</p>
           <p className="text-2xl font-extrabold text-purple-700 mt-1">{summary.total_school_registrations || 0}</p>
           <span className="text-[10px] text-purple-500">Verified: {summary.total_verified_school_registrations || 0}</span>
         </div>
@@ -517,7 +529,7 @@ export default function SuperadminSchoolsPage() {
             <FiSearch className="absolute left-3.5 top-3 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by school name, School ID (e.g. SCH000101), city, UDISE code, or contact..."
+              placeholder="Search by school/coaching name, ID (e.g. SCH000101, CCH000101), city, UDISE/Center code, or contact..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF2D8D]"
@@ -528,13 +540,27 @@ export default function SuperadminSchoolsPage() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Institution Category Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500">Type:</span>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700 bg-white"
+            >
+              <option value="ALL">All Partners</option>
+              <option value="school">🏫 Schools Only</option>
+              <option value="coaching">🎓 Coaching Only</option>
+            </select>
+          </div>
+
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-500">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700"
+              className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700 bg-white"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -545,38 +571,39 @@ export default function SuperadminSchoolsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">Board:</span>
+            <span className="text-xs font-semibold text-gray-500">Board / Stream:</span>
             <select
               value={boardFilter}
               onChange={(e) => setBoardFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700"
+              className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700 bg-white"
             >
-              <option value="ALL">All Boards</option>
+              <option value="ALL">All Boards & Streams</option>
               <option value="CBSE">CBSE</option>
               <option value="ICSE">ICSE</option>
               <option value="STATE BOARD">State Board</option>
+              <option value="JEE & NEET Foundation">JEE & NEET</option>
               <option value="OTHER">Other</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Schools Table */}
+      {/* Schools & Coaching Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-gray-400">Loading partner schools...</div>
+          <div className="p-12 text-center text-gray-400">Loading partner institutions...</div>
         ) : schools.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <p className="text-base font-semibold text-gray-600">No partner schools found matching criteria.</p>
-            <p className="text-xs mt-1">Click "Add New School" above to register a new school tie-up.</p>
+          <div className="p-12 text-center text-gray-400 space-y-2">
+            <p className="text-base font-semibold text-gray-600">No partner institutions found matching criteria.</p>
+            <p className="text-xs">Click "Add Partner" above to register a new school or coaching tie-up.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50/75 border-b border-gray-100 text-gray-600 uppercase font-bold tracking-wider">
                 <tr>
-                  <th className="px-4 py-3.5">School ID & Name</th>
-                  <th className="px-4 py-3.5">Board / Type</th>
+                  <th className="px-4 py-3.5">Partner ID & Name</th>
+                  <th className="px-4 py-3.5">Category & Board / Stream</th>
                   <th className="px-4 py-3.5">Location</th>
                   <th className="px-4 py-3.5">Authorized Contact</th>
                   <th className="px-4 py-3.5">Status</th>
@@ -587,144 +614,162 @@ export default function SuperadminSchoolsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {schools.map((sch) => (
-                  <tr key={sch.id || sch.school_id} className="hover:bg-pink-50/30 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div>
-                        <span className="font-mono text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
-                          {sch.school_id}
+                {schools.map((sch) => {
+                  const isCoaching = sch.institution_type === 'coaching' || sch.school_id?.startsWith('CCH')
+                  return (
+                    <tr key={sch.id || sch.school_id} className="hover:bg-pink-50/30 transition-colors">
+                      <td className="px-4 py-3.5">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${
+                              isCoaching 
+                                ? 'text-amber-800 bg-amber-50 border-amber-200' 
+                                : 'text-purple-700 bg-purple-50 border-purple-100'
+                            }`}>
+                              {sch.school_id}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isCoaching 
+                                ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                                : 'bg-blue-50 text-blue-700 border border-blue-100'
+                            }`}>
+                              {isCoaching ? '🎓 Coaching' : '🏫 School'}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-gray-900 text-sm mt-1">{sch.name}</h4>
+                          {sch.udise_code && (
+                            <p className="text-[10px] text-gray-400">
+                              {isCoaching ? 'Center Code' : 'UDISE'}: {sch.udise_code}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <span className="font-semibold text-gray-800">{sch.board}</span>
+                        <p className="text-[11px] text-gray-400">{sch.school_type}</p>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <span className="text-gray-800 font-medium">{sch.city}</span>
+                        <p className="text-[11px] text-gray-400">{sch.state}</p>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-gray-900">{sch.contact_person_name}</p>
+                          <p className="text-[11px] text-gray-500">{sch.designation}</p>
+                          <p className="text-[11px] text-gray-400 flex items-center gap-1 font-mono">
+                            <FiMail size={10} /> {sch.official_email}
+                          </p>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                            sch.status === 'ACTIVE' || sch.status === 'APPROVED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                              : sch.status === 'PENDING'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                              : 'bg-red-50 text-red-700 border border-red-100'
+                          }`}
+                        >
+                          {sch.status === 'ACTIVE' && <FiCheckCircle size={11} />}
+                          {sch.status === 'PENDING' && <FiAlertCircle size={11} />}
+                          {sch.status === 'SUSPENDED' && <FiXCircle size={11} />}
+                          {sch.status}
                         </span>
-                        <h4 className="font-bold text-gray-900 text-sm mt-1">{sch.name}</h4>
-                        {sch.udise_code && (
-                          <p className="text-[10px] text-gray-400">UDISE: {sch.udise_code}</p>
-                        )}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-3.5">
-                      <span className="font-semibold text-gray-800">{sch.board}</span>
-                      <p className="text-[11px] text-gray-400">{sch.school_type}</p>
-                    </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <button
+                          onClick={() => handleOpenManageScholarships(sch)}
+                          className="px-2.5 py-1 bg-pink-50 text-[#C81E4E] hover:bg-pink-100 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-pink-100"
+                          title="Manage Assigned Scholarships"
+                        >
+                          <FiAward size={12} />
+                          {sch.associated_scholarships_count || 0} Schemes
+                        </button>
+                      </td>
 
-                    <td className="px-4 py-3.5">
-                      <span className="text-gray-800 font-medium">{sch.city}</span>
-                      <p className="text-[11px] text-gray-400">{sch.state}</p>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-gray-900">{sch.contact_person_name}</p>
-                        <p className="text-[11px] text-gray-500">{sch.designation}</p>
-                        <p className="text-[11px] text-gray-400 flex items-center gap-1 font-mono">
-                          <FiMail size={10} /> {sch.official_email}
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="font-bold text-gray-900 text-sm">
+                          {sch.total_students_registered || 0}
+                        </span>
+                        <p className="text-[10px] text-emerald-600 font-semibold">
+                          {sch.total_verified_registrations || 0} verified
                         </p>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                          sch.status === 'ACTIVE' || sch.status === 'APPROVED'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                            : sch.status === 'PENDING'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                            : 'bg-red-50 text-red-700 border border-red-100'
-                        }`}
-                      >
-                        {sch.status === 'ACTIVE' && <FiCheckCircle size={11} />}
-                        {sch.status === 'PENDING' && <FiAlertCircle size={11} />}
-                        {sch.status === 'SUSPENDED' && <FiXCircle size={11} />}
-                        {sch.status}
-                      </span>
-                    </td>
+                      <td className="px-4 py-3.5">
+                        <span className="font-bold text-gray-900 text-sm">
+                          ₹{(sch.total_incentive_earned || 0).toLocaleString()}
+                        </span>
+                        <p className="text-[10px] text-gray-400">
+                          Pending: ₹{(sch.total_incentive_pending || 0).toLocaleString()}
+                        </p>
+                      </td>
 
-                    <td className="px-4 py-3.5 text-center">
-                      <button
-                        onClick={() => handleOpenManageScholarships(sch)}
-                        className="px-2.5 py-1 bg-pink-50 text-[#C81E4E] hover:bg-pink-100 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-pink-100"
-                        title="Manage Assigned Scholarships"
-                      >
-                        <FiAward size={12} />
-                        {sch.associated_scholarships_count || 0} Schemes
-                      </button>
-                    </td>
-
-                    <td className="px-4 py-3.5 text-center">
-                      <span className="font-bold text-gray-900 text-sm">
-                        {sch.total_students_registered || 0}
-                      </span>
-                      <p className="text-[10px] text-emerald-600 font-semibold">
-                        {sch.total_verified_registrations || 0} verified
-                      </p>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span className="font-bold text-gray-900 text-sm">
-                        ₹{(sch.total_incentive_earned || 0).toLocaleString()}
-                      </span>
-                      <p className="text-[10px] text-amber-600 font-medium">
-                        ₹{(sch.total_incentive_pending || 0).toLocaleString()} pending
-                      </p>
-                    </td>
-
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleOpenDetails(sch)}
-                          className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="View Complete School Details"
-                        >
-                          <FiEye size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEdit(sch)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit School Information"
-                        >
-                          <FiEdit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenReset(sch)}
-                          className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="Reset Temporary Password"
-                        >
-                          <FiKey size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSchool(sch)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete School Tie-up"
-                        >
-                          <FiTrash2 size={15} />
-                        </button>
-                        {sch.status === 'PENDING' && (
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleQuickStatusChange(sch, 'ACTIVE')}
-                            className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition-colors shadow-xs"
+                            onClick={() => handleOpenDetails(sch)}
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="View Full Dashboard & Analytics"
                           >
-                            Approve
+                            <FiEye size={15} />
                           </button>
-                        )}
-                        {sch.status === 'ACTIVE' && (
                           <button
-                            onClick={() => handleQuickStatusChange(sch, 'SUSPENDED')}
-                            className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition-colors"
+                            onClick={() => handleOpenEdit(sch)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit Partner Information"
                           >
-                            Suspend
+                            <FiEdit2 size={15} />
                           </button>
-                        )}
-                        {sch.status === 'SUSPENDED' && (
                           <button
-                            onClick={() => handleQuickStatusChange(sch, 'ACTIVE')}
-                            className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-colors"
+                            onClick={() => handleOpenReset(sch)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Reset Temporary Password"
                           >
-                            Activate
+                            <FiKey size={15} />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            onClick={() => handleDeleteSchool(sch)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Partner Tie-up"
+                          >
+                            <FiTrash2 size={15} />
+                          </button>
+                          {sch.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(sch, 'ACTIVE')}
+                              className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition-colors shadow-xs"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {sch.status === 'ACTIVE' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(sch, 'SUSPENDED')}
+                              className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition-colors"
+                            >
+                              Suspend
+                            </button>
+                          )}
+                          {sch.status === 'SUSPENDED' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(sch, 'ACTIVE')}
+                              className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-colors"
+                            >
+                              Activate
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -732,16 +777,20 @@ export default function SuperadminSchoolsPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL 1: ADD SCHOOL MODAL                                                 */}
+      {/* MODAL 1: ADD PARTNER MODAL (SCHOOL & COACHING)                            */}
       {/* ========================================================================= */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Add New Partner School</h3>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {formData.institution_type === 'coaching' ? 'Add New Partner Coaching Center' : 'Add New Partner School'}
+                </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  School ID & initial login credentials will be generated automatically upon creation.
+                  {formData.institution_type === 'coaching' 
+                    ? 'Coaching ID (CCH...) & initial login credentials will be generated automatically.' 
+                    : 'School ID (SCH...) & initial login credentials will be generated automatically.'}
                 </p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
@@ -750,20 +799,63 @@ export default function SuperadminSchoolsPage() {
             </div>
 
             <form onSubmit={handleCreateSchool} className="space-y-6">
-              {/* Section 1: Basic School Information */}
+              {/* Section 1: Basic Partner Information */}
               <div className="space-y-4">
                 <h4 className="text-xs font-bold text-[#C81E4E] uppercase tracking-wider">
-                  1. School Basic Information
+                  1. Institution Basic Information
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Institution Category Dropdown */}
+                  <div className="md:col-span-2 bg-pink-50/40 p-3.5 rounded-2xl border border-pink-100">
+                    <label className="block text-xs font-bold text-purple-900 uppercase mb-1">
+                      Institution Category *
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          institution_type: 'school',
+                          designation: 'Principal',
+                          school_type: 'Private',
+                          board: 'CBSE'
+                        })}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
+                          formData.institution_type === 'school'
+                            ? 'bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white border-transparent shadow-md'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        🏫 Partner School
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          institution_type: 'coaching',
+                          designation: 'Director / Center Head',
+                          school_type: 'Competitive Exam Institute (JEE/NEET)',
+                          board: 'JEE & NEET Foundation'
+                        })}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
+                          formData.institution_type === 'coaching'
+                            ? 'bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white border-transparent shadow-md'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        🎓 Coaching Center / Academy
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      School Name *
+                      {formData.institution_type === 'coaching' ? 'Coaching / Institute Name *' : 'School Name *'}
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. ABC Public School"
+                      placeholder={formData.institution_type === 'coaching' ? 'e.g. Allen Career Institute, Resonance, Physics Wallah, Career Point' : 'e.g. ABC Public School'}
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#FF2D8D]"
@@ -772,11 +864,11 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      UDISE Code
+                      {formData.institution_type === 'coaching' ? 'Center / Registration Code' : 'UDISE Code'}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 09012345678"
+                      placeholder={formData.institution_type === 'coaching' ? 'e.g. CCH-DEL-01 or Reg. No.' : 'e.g. 09012345678'}
                       value={formData.udise_code}
                       onChange={(e) => setFormData({ ...formData, udise_code: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
@@ -785,33 +877,59 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      School Type *
+                      {formData.institution_type === 'coaching' ? 'Coaching Model / Category *' : 'School Type *'}
                     </label>
                     <select
                       value={formData.school_type}
                       onChange={(e) => setFormData({ ...formData, school_type: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
                     >
-                      <option value="Private">Private</option>
-                      <option value="Government">Government</option>
-                      <option value="Government Aided">Government Aided</option>
-                      <option value="Other">Other</option>
+                      {formData.institution_type === 'coaching' ? (
+                        <>
+                          <option value="Competitive Exam Institute (JEE/NEET)">Competitive Exam Institute (JEE/NEET)</option>
+                          <option value="Foundation & Integrated Academy">Foundation & Integrated Academy</option>
+                          <option value="Private Coaching Center">Private Coaching Center</option>
+                          <option value="Test Prep / Tutorial Classes">Test Prep / Tutorial Classes</option>
+                          <option value="Other">Other Coaching / Academy</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Private">Private</option>
+                          <option value="Government">Government</option>
+                          <option value="Government Aided">Government Aided</option>
+                          <option value="International / Other">International / Other</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      Affiliation Board *
+                      {formData.institution_type === 'coaching' ? 'Exam Stream / Target Board *' : 'Affiliation Board *'}
                     </label>
                     <select
                       value={formData.board}
                       onChange={(e) => setFormData({ ...formData, board: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
                     >
-                      <option value="CBSE">CBSE</option>
-                      <option value="ICSE">ICSE</option>
-                      <option value="State Board">State Board</option>
-                      <option value="Other">Other</option>
+                      {formData.institution_type === 'coaching' ? (
+                        <>
+                          <option value="JEE & NEET Foundation">JEE & NEET Foundation</option>
+                          <option value="CBSE & State Board Prep">CBSE & State Board Prep</option>
+                          <option value="UPSC / State PCS / SSC">UPSC / State PCS / SSC</option>
+                          <option value="Olympiad / NTSE / KVPY">Olympiad / NTSE / KVPY</option>
+                          <option value="Multiple Streams / General">Multiple Streams / General</option>
+                          <option value="Other">Other Exam Stream</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="CBSE">CBSE</option>
+                          <option value="ICSE">ICSE</option>
+                          <option value="State Board">State Board</option>
+                          <option value="IB / Cambridge">IB / Cambridge</option>
+                          <option value="Other">Other</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -836,7 +954,7 @@ export default function SuperadminSchoolsPage() {
                     <input
                       type="text"
                       required
-                      placeholder="Street address, campus locality"
+                      placeholder="Street address, center / campus locality"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
@@ -881,7 +999,7 @@ export default function SuperadminSchoolsPage() {
                 </div>
               </div>
 
-              {/* Section 2: Authorized School Contact & Login Email */}
+              {/* Section 2: Authorized Contact & Login Email */}
               <div className="space-y-4 pt-4 border-t border-gray-100">
                 <h4 className="text-xs font-bold text-[#C81E4E] uppercase tracking-wider">
                   2. Authorized Contact Person & Credentials
@@ -889,12 +1007,12 @@ export default function SuperadminSchoolsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      Contact Person Name *
+                      {formData.institution_type === 'coaching' ? 'Director / Center Head Name *' : 'Contact Person Name *'}
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Dr. Ramesh Chandra"
+                      placeholder={formData.institution_type === 'coaching' ? 'e.g. Er. Rajesh Bansal' : 'e.g. Dr. Ramesh Chandra'}
                       value={formData.contact_person_name}
                       onChange={(e) => setFormData({ ...formData, contact_person_name: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
@@ -910,21 +1028,36 @@ export default function SuperadminSchoolsPage() {
                       onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
                     >
-                      <option value="Principal">Principal</option>
-                      <option value="School Administrator">School Administrator</option>
-                      <option value="Scholarship Coordinator">Scholarship Coordinator</option>
-                      <option value="Other">Other</option>
+                      {formData.institution_type === 'coaching' ? (
+                        <>
+                          <option value="Director / Center Head">Director / Center Head</option>
+                          <option value="Managing Director">Managing Director</option>
+                          <option value="Branch Manager">Branch Manager</option>
+                          <option value="Scholarship Coordinator">Scholarship Coordinator</option>
+                          <option value="Faculty Head / Incharge">Faculty Head / Incharge</option>
+                          <option value="Admin">Admin</option>
+                          <option value="Other">Other</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Principal">Principal</option>
+                          <option value="School Administrator">School Administrator</option>
+                          <option value="Scholarship Coordinator">Scholarship Coordinator</option>
+                          <option value="Vice Principal">Vice Principal</option>
+                          <option value="Other">Other</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      Official School Email (Login ID) *
+                      {formData.institution_type === 'coaching' ? 'Official Coaching Email (Login ID) *' : 'Official School Email (Login ID) *'}
                     </label>
                     <input
                       type="email"
                       required
-                      placeholder="abcschool@gmail.com"
+                      placeholder={formData.institution_type === 'coaching' ? 'coaching.branch@gmail.com' : 'abcschool@gmail.com'}
                       value={formData.official_email}
                       onChange={(e) => setFormData({ ...formData, official_email: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono"
@@ -933,7 +1066,7 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      Official Mobile Number *
+                      Official Contact Mobile *
                     </label>
                     <input
                       type="text"
@@ -955,7 +1088,7 @@ export default function SuperadminSchoolsPage() {
                       3. Assign Scholarship Scheme Tie-ups ({formData.scholarship_ids.length} Selected)
                     </h4>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Selected schemes will be instantly accessible on the school's dashboard.
+                      Selected schemes will be instantly accessible on the partner's dashboard.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -1041,7 +1174,7 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      School Incentive per Verified (₹)
+                      {formData.institution_type === 'coaching' ? 'Coaching Incentive per Verified (₹)' : 'School Incentive per Verified (₹)'}
                     </label>
                     <input
                       type="number"
@@ -1065,7 +1198,7 @@ export default function SuperadminSchoolsPage() {
                   type="submit"
                   className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] shadow-md"
                 >
-                  Create School & Generate Credentials
+                  {formData.institution_type === 'coaching' ? 'Create Coaching & Generate Credentials' : 'Create School & Generate Credentials'}
                 </button>
               </div>
             </form>
@@ -1074,15 +1207,17 @@ export default function SuperadminSchoolsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 1B: EDIT SCHOOL MODAL                                               */}
+      {/* MODAL 1B: EDIT PARTNER MODAL                                              */}
       {/* ========================================================================= */}
       {showEditModal && selectedSchool && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Edit School Partner</h3>
-                <p className="text-xs text-gray-500 mt-0.5">School ID: {selectedSchool.school_id}</p>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {formData.institution_type === 'coaching' ? 'Edit Coaching Partner' : 'Edit School Partner'}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">Partner ID: {selectedSchool.school_id}</p>
               </div>
               <button onClick={() => setShowEditModal(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
                 ✕
@@ -1092,12 +1227,27 @@ export default function SuperadminSchoolsPage() {
             <form onSubmit={handleUpdateSchool} className="space-y-6">
               <div className="space-y-4">
                 <h4 className="text-xs font-bold text-[#C81E4E] uppercase tracking-wider">
-                  School Information & Status
+                  Partner Information & Status
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category */}
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      School Name *
+                      Institution Category *
+                    </label>
+                    <select
+                      value={formData.institution_type}
+                      onChange={(e) => setFormData({ ...formData, institution_type: e.target.value as any })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold"
+                    >
+                      <option value="school">🏫 School</option>
+                      <option value="coaching">🎓 Coaching Center / Academy</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      {formData.institution_type === 'coaching' ? 'Coaching / Institute Name *' : 'School Name *'}
                     </label>
                     <input
                       type="text"
@@ -1110,7 +1260,7 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      UDISE Code
+                      {formData.institution_type === 'coaching' ? 'Center / Reg Code' : 'UDISE Code'}
                     </label>
                     <input
                       type="text"
@@ -1122,19 +1272,15 @@ export default function SuperadminSchoolsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                      Affiliation Board *
+                      {formData.institution_type === 'coaching' ? 'Exam Stream / Target Board *' : 'Affiliation Board *'}
                     </label>
-                    <select
+                    <input
+                      type="text"
                       value={formData.board}
                       onChange={(e) => setFormData({ ...formData, board: e.target.value })}
+                      placeholder={formData.institution_type === 'coaching' ? 'e.g. JEE & NEET Foundation' : 'e.g. CBSE'}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
-                    >
-                      <option value="CBSE">CBSE</option>
-                      <option value="ICSE">ICSE</option>
-                      <option value="State Board">State Board</option>
-                      <option value="IB/Cambridge">IB/Cambridge</option>
-                      <option value="Other">Other</option>
-                    </select>
+                    />
                   </div>
 
                   <div>
@@ -1212,7 +1358,7 @@ export default function SuperadminSchoolsPage() {
                   onClick={() => handleDeleteSchool(selectedSchool)}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 flex items-center gap-1.5 transition-colors"
                 >
-                  <FiTrash2 size={14} /> Delete School
+                  <FiTrash2 size={14} /> Delete Partner
                 </button>
 
                 <div className="flex items-center gap-3">
@@ -1247,15 +1393,17 @@ export default function SuperadminSchoolsPage() {
             </div>
 
             <div>
-              <h3 className="text-xl font-bold text-gray-900">School Credentials Generated</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                {credentials.institution_type === 'coaching' ? 'Coaching Partner Credentials Generated' : 'School Partner Credentials Generated'}
+              </h3>
               <p className="text-xs text-gray-500 mt-1">
-                Please copy and securely share these login credentials with the school's authorized contact. The password is encrypted in the database and will not be displayed again.
+                Please copy and securely share these login credentials with the authorized contact. The password is encrypted in the database and will not be displayed again.
               </p>
             </div>
 
             <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/70 font-mono text-xs space-y-2.5">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 font-sans font-bold">School ID:</span>
+                <span className="text-gray-500 font-sans font-bold">Partner ID:</span>
                 <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{credentials.school_id}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -1267,8 +1415,8 @@ export default function SuperadminSchoolsPage() {
                 <span className="text-pink-700 font-bold bg-pink-50 px-2 py-0.5 rounded">{credentials.temporary_password}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                <span className="text-gray-500 font-sans font-bold">School Portal URL:</span>
-                <span className="text-blue-600">/school-portal/login</span>
+                <span className="text-gray-500 font-sans font-bold">Partner Portal URL:</span>
+                <span className="text-blue-600 font-bold">/school-portal/login</span>
               </div>
             </div>
 
@@ -1276,7 +1424,7 @@ export default function SuperadminSchoolsPage() {
               <button
                 onClick={() =>
                   copyToClipboard(
-                    `SCHOOL PARTNER LOGIN CREDENTIALS\nSchool ID: ${credentials.school_id}\nLogin Email: ${credentials.login_email}\nTemporary Password: ${credentials.temporary_password}\nPortal Link: ${window.location.origin}/school-portal/login`
+                    `${credentials.institution_type === 'coaching' ? 'COACHING' : 'SCHOOL'} PARTNER LOGIN CREDENTIALS\nPartner ID: ${credentials.school_id}\nLogin Email: ${credentials.login_email}\nTemporary Password: ${credentials.temporary_password}\nPortal Link: ${window.location.origin}/school-portal/login`
                   )
                 }
                 className="flex-1 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-colors flex items-center justify-center gap-2"

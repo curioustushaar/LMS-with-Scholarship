@@ -26,6 +26,7 @@ import {
   FiUserPlus,
   FiAward,
   FiLogOut,
+  FiBell,
 } from 'react-icons/fi'
 
 interface SuperadminSidebarProps {
@@ -58,18 +59,18 @@ const menuItems: MenuItem[] = [
   { name: 'Internships', icon: FiBriefcase, path: '/superadmin/internships' },
   { name: 'Scholarships', icon: FiAward, path: '/superadmin/scholarships' },
   {
-    name: 'School Tie-up',
+    name: 'School / Coaching Tie-up',
     icon: FiMapPin,
     path: '/superadmin/schools',
     subItems: [
-      { name: 'All Schools', icon: FiMapPin, path: '/superadmin/schools' },
+      { name: 'All Partners (Schools & Coaching)', icon: FiMapPin, path: '/superadmin/schools' },
       { name: 'Incentives & Payouts', icon: FiDollarSign, path: '/superadmin/schools/incentives' },
       { name: 'Tie-up Analytics', icon: FiBarChart2, path: '/superadmin/schools/analytics' },
     ],
   },
   { name: 'Employers', icon: FiUsers, path: '/superadmin/employers' },
   { name: 'Website Partners', icon: FiMapPin, path: '/superadmin/school-partners' },
-  { name: 'Training', icon: FiTarget, path: '/superadmin/training' },
+  { name: 'Notices & Circulars', icon: FiBell, path: '/superadmin/notices' },
 
   // ── Platform Management ──
   { name: 'Contact Messages', icon: FiMail, path: '/superadmin/contact-messages', dividerBefore: true, sectionLabel: 'Platform' },

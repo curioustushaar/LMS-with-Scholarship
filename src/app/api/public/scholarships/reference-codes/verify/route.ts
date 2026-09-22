@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // Query scholarship_reference_codes
     const { data: refCode, error } = await supabaseAdmin
       .from('scholarship_reference_codes')
-      .select('id, name, code, status')
+      .select('id, name, code, status, discount_percent')
       .eq('code', cleanCode)
       .maybeSingle()
 
@@ -64,6 +64,8 @@ export async function GET(request: Request) {
       })
     }
 
+    const discountPercent = Math.max(0, Math.min(100, Number(refCode.discount_percent) || 0))
+
     return NextResponse.json({
       success: true,
       valid: true,
@@ -71,8 +73,11 @@ export async function GET(request: Request) {
         code: refCode.code,
         representative_name: refCode.name,
         status: refCode.status,
+        discount_percent: discountPercent,
       },
-      message: `✓ Valid Referral Code (Representative: ${refCode.name})`,
+      message: discountPercent > 0
+        ? `✓ Valid Referral Code (${refCode.name} - ${discountPercent}% Discount Applied)`
+        : `✓ Valid Referral Code (Representative: ${refCode.name})`,
     })
   } catch (err: any) {
     console.error('Exception verifying referral code:', err)

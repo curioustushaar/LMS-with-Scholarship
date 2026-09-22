@@ -17,8 +17,8 @@ export default function Footer() {
           
           {/* Logo & Student Credit Card (lg:col-span-5) */}
           <div className="lg:col-span-5 space-y-6">
-            <Link href="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="GRAVITY by AAGAJ Foundation" className="h-14 sm:h-16 w-auto object-contain" />
+            <Link href="/" className="flex items-center gap-2 shrink-0">
+              <img src="/logo.png" alt="GRAVITY by AAGAJ Foundation" className="h-10 sm:h-12 w-auto object-contain" />
             </Link>
 
             <p className="text-xs text-gray-400 font-normal max-w-sm leading-relaxed">
@@ -74,7 +74,7 @@ export default function Footer() {
               Ecosystem
             </h4>
             <ul className="space-y-2.5 text-xs text-gray-400 font-semibold">
-              {['Employers', 'School Partners', 'Training', 'Contact'].map((item) => (
+              {['Employers', 'School Partners', 'Notices', 'Contact'].map((item) => (
                 <li key={item}>
                   <Link href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-[#FF2D8D] transition-colors flex items-center gap-0.5">
                     {item}
@@ -104,8 +104,8 @@ export default function Footer() {
               </li>
               <li className="flex gap-2 items-start">
                 <Phone size={13} className="text-[#FF2D8D] shrink-0 mt-0.5" />
-                <a href="tel:+919608369002" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors">
-                  +91 9608369002
+                <a href="tel:+919431430464" className="text-gray-500 font-normal hover:text-[#FF2D8D] transition-colors">
+                  +91 9431430464
                 </a>
               </li>
             </ul>

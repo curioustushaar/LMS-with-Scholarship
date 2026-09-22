@@ -130,7 +130,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Logo/Brand */}
         <div className="p-6 border-b border-gray-700">
-          <img src="/logo.png" alt="Gravity Logo" className="h-14 w-auto object-contain mb-2" />
+          <img src="/logo.png" alt="Gravity Logo" className="h-9 w-auto object-contain mb-2 bg-white/95 p-1 rounded-lg" />
           <h1 className="text-xl font-bold bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] bg-clip-text text-transparent">
             LMS ADMIN
           </h1>

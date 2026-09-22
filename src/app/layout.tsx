@@ -97,7 +97,7 @@ const jsonLd = {
       },
       'contactPoint': {
         '@type': 'ContactPoint',
-        'telephone': '+91-9608369002',
+        'telephone': '+91-9431430464',
         'contactType': 'customer service',
         'email': 'aagajfoundationpaliganj@gmail.com',
         'areaServed': 'IN',

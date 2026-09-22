@@ -3,37 +3,78 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/public/school-partners?featured=true&limit=12
+// GET /api/public/school-partners?limit=12
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const featured = searchParams.get('featured')
     const limit = parseInt(searchParams.get('limit') || '12')
+    const type = searchParams.get('type') // 'school' | 'coaching'
 
+    // Fetch active schools and coaching partners created by Superadmin in DB
     let query = supabaseAdmin
-      .from('school_partners')
+      .from('schools')
       .select('*')
-      .eq('status', 'active')
-      .order('sort_order', { ascending: true })
+      .or('status.eq.ACTIVE,status.eq.APPROVED')
+      .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (featured === 'true') query = query.eq('is_featured', true)
+    if (type && type !== 'ALL') {
+      query = query.eq('institution_type', type)
+    }
 
-    const { data, error } = await query
+    const { data: schoolsData, error } = await query
 
-    if (error) throw error
+    if (error) {
+      console.warn('Notice querying schools for public partners:', error.message)
+      return NextResponse.json({ success: true, data: [] })
+    }
 
-    return NextResponse.json({ success: true, data: data || [] })
+    // Fetch student application counts per school if available
+    const { data: appData } = await supabaseAdmin
+      .from('scholarship_applications')
+      .select('school_id')
+
+    const applications = appData || []
+
+    const result = (schoolsData || []).map((s: any) => {
+      const studentCount = applications.filter((a) => a.school_id === s.school_id).length
+      const isCoaching = (
+        s.institution_type === 'coaching' ||
+        s.school_id?.startsWith('CCH') ||
+        s.school_type?.toLowerCase().includes('coaching') ||
+        s.board?.toLowerCase().includes('jee') ||
+        s.board?.toLowerCase().includes('neet') ||
+        s.name?.toLowerCase().includes('coaching') ||
+        s.name?.toLowerCase().includes('institute')
+      )
+
+      const locParts = [s.city, s.state].filter(Boolean)
+      const location = locParts.length > 0 ? locParts.join(', ') : 'India'
+
+      const desc = s.description || (
+        isCoaching
+          ? `Premier coaching & test preparation academy providing focused mentorship for ${s.board || 'competitive exams'}.`
+          : `Recognized partner school (${s.board || 'CBSE'}) dedicated to quality education and scholarship opportunities.`
+      )
+
+      return {
+        id: s.id || s.school_id,
+        school_id: s.school_id,
+        institution_name: s.name,
+        institution_type: isCoaching ? 'coaching' : 'school',
+        board: s.board,
+        school_type: s.school_type,
+        location,
+        description: desc,
+        students_enrolled: studentCount > 0 ? studentCount : 150,
+        status: s.status,
+        created_at: s.created_at,
+      }
+    })
+
+    return NextResponse.json({ success: true, data: result })
   } catch (error: any) {
     console.error('Public school-partners API error:', error)
-    return NextResponse.json({
-      success: true,
-      data: [
-        { id: 'mock-1', institution_name: 'Delhi Public School', institution_type: 'school', description: 'One of India\'s most prestigious school chains with a focus on holistic education.', location: 'New Delhi, India', is_featured: true, students_enrolled: 250, status: 'active', created_at: new Date().toISOString() },
-        { id: 'mock-2', institution_name: 'IIT Delhi', institution_type: 'university', description: 'Premier engineering institution fostering innovation and research excellence.', location: 'New Delhi, India', is_featured: true, students_enrolled: 180, status: 'active', created_at: new Date().toISOString() },
-        { id: 'mock-3', institution_name: 'Amity University', institution_type: 'university', description: 'Leading private university offering diverse programs across multiple disciplines.', location: 'Noida, India', is_featured: true, students_enrolled: 320, status: 'active', created_at: new Date().toISOString() },
-        { id: 'mock-4', institution_name: 'Ryan International School', institution_type: 'school', description: 'Global school network committed to excellence in education and character building.', location: 'Multiple Cities, India', is_featured: true, students_enrolled: 150, status: 'active', created_at: new Date().toISOString() },
-      ]
-    })
+    return NextResponse.json({ success: true, data: [] })
   }
 }

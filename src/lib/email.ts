@@ -95,7 +95,7 @@ export async function sendContactFormEmails(data: {
         <p>We have received your message regarding <strong>"${subject || 'General Inquiry'}"</strong>. Our academic counselors and support team will review your message and get back to you shortly.</p>
         <div style="background: #fdf2f8; border-left: 4px solid #FF2D8D; padding: 15px; margin: 20px 0; border-radius: 4px;">
           <p style="margin: 0; font-size: 14px; color: #be185d;"><strong>Need immediate assistance?</strong></p>
-          <p style="margin: 5px 0 0 0; font-size: 13px; color: #475569;">Call our support helpline at <strong>+91 9608369002</strong> or email us at <a href="mailto:aagajfoundationpaliganj@gmail.com">aagajfoundationpaliganj@gmail.com</a>.</p>
+          <p style="margin: 5px 0 0 0; font-size: 13px; color: #475569;">Call our support helpline at <strong>+91 9431430464</strong> or email us at <a href="mailto:aagajfoundationpaliganj@gmail.com">aagajfoundationpaliganj@gmail.com</a>.</p>
         </div>
         <p>Best Regards,<br /><strong>Academic & Support Team</strong><br />GRAVITY by AAGAJ Foundation<br /><a href="https://aagajfoundation.in">https://aagajfoundation.in</a></p>
       </div>
@@ -170,7 +170,7 @@ export async function sendScholarshipPaymentEmail(data: {
           </p>
         </div>
 
-        <p>For any queries, reach out to <a href="mailto:aagajfoundationpaliganj@gmail.com">aagajfoundationpaliganj@gmail.com</a> or call <strong>+91 9608369002</strong>.</p>
+        <p>For any queries, reach out to <a href="mailto:aagajfoundationpaliganj@gmail.com">aagajfoundationpaliganj@gmail.com</a> or call <strong>+91 9431430464</strong>.</p>
         <p>Best of Luck,<br /><strong>Scholarship Examination Authority</strong><br />GRAVITY by AAGAJ Foundation</p>
       </div>
     </div>

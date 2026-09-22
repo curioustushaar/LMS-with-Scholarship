@@ -28,6 +28,7 @@ async function ensureReferenceCodesTable() {
             email TEXT NOT NULL,
             code TEXT NOT NULL UNIQUE,
             status TEXT NOT NULL DEFAULT 'active',
+            discount_percent NUMERIC NOT NULL DEFAULT 0,
             notes TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -116,6 +117,7 @@ export async function GET(request: Request) {
       const students = referredStudentsMap[codeKey] || []
       return {
         ...rc,
+        discount_percent: Number(rc.discount_percent) || 0,
         students_count: students.length,
         referred_students: students,
       }
@@ -147,7 +149,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { name, phone, email, code: customCode, notes } = body
+    const { name, phone, email, code: customCode, notes, discount_percent } = body
 
     // 1. Production Validation
     const nameVal = validateName(name, 'Representative Name')
@@ -164,6 +166,9 @@ export async function POST(request: Request) {
     if (!emailVal.isValid) {
       return NextResponse.json({ success: false, error: emailVal.message }, { status: 400 })
     }
+
+    // Validate Discount Percentage (0 to 100)
+    const parsedDiscount = Math.max(0, Math.min(100, Number(discount_percent) || 0))
 
     await ensureReferenceCodesTable()
 
@@ -191,6 +196,7 @@ export async function POST(request: Request) {
       phone: phoneVal.cleanPhone,
       email: emailVal.cleanEmail,
       code: formattedCode,
+      discount_percent: parsedDiscount,
       status: 'active',
       notes: notes?.trim() || '',
       created_at: new Date().toISOString(),
@@ -208,7 +214,7 @@ export async function POST(request: Request) {
       if (insertErr.code === 'PGRST205' || insertErr.message?.includes('schema cache')) {
         return NextResponse.json({
           success: false,
-          error: 'Table scholarship_reference_codes does not exist in Supabase database yet. Please run the SQL file "migrations/20260212_create_scholarship_reference_codes.sql" in your Supabase SQL Editor.'
+          error: 'Table scholarship_reference_codes does not exist in Supabase database yet. Please run the SQL file "migrations/20260222_add_discount_to_reference_codes.sql" in your Supabase SQL Editor.'
         }, { status: 500 })
       }
       return NextResponse.json({ success: false, error: insertErr.message }, { status: 500 })
@@ -216,9 +222,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Reference Code "${formattedCode}" generated successfully!`,
+      message: `Reference Code "${formattedCode}" generated successfully with ${parsedDiscount}% discount!`,
       data: {
         ...inserted,
+        discount_percent: parsedDiscount,
         students_count: 0,
         referred_students: [],
       }
@@ -236,7 +243,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json()
-    const { id, status, name, phone, email, notes, code: updatedCode } = body
+    const { id, status, name, phone, email, notes, code: updatedCode, discount_percent } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Reference Code ID is required.' }, { status: 400 })
@@ -258,6 +265,9 @@ export async function PUT(request: Request) {
     if (email?.trim()) updatePayload.email = email.trim().toLowerCase()
     if (notes !== undefined) updatePayload.notes = notes.trim()
     if (updatedCode?.trim()) updatePayload.code = updatedCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '')
+    if (discount_percent !== undefined) {
+      updatePayload.discount_percent = Math.max(0, Math.min(100, Number(discount_percent) || 0))
+    }
 
     const { data: updated, error: updateErr } = await supabaseAdmin
       .from('scholarship_reference_codes')

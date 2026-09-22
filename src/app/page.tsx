@@ -14,7 +14,7 @@ const Internships = dynamic(() => import('@/components/landing/Internships'))
 const Scholarships = dynamic(() => import('@/components/landing/Scholarships'))
 const Employers = dynamic(() => import('@/components/landing/Employers'))
 const SchoolPartners = dynamic(() => import('@/components/landing/SchoolPartners'))
-const Training = dynamic(() => import('@/components/landing/Training'))
+const NoticeBoard = dynamic(() => import('@/components/landing/NoticeBoard'))
 const Marquee = dynamic(() => import('@/components/landing/Marquee'))
 const Testimonials = dynamic(() => import('@/components/landing/Testimonials'))
 const Newsletter = dynamic(() => import('@/components/landing/Newsletter'))
@@ -78,8 +78,8 @@ export default function HomePage() {
       {/* 13. School & Institutional Partners (#school-partners) */}
       <SchoolPartners />
 
-      {/* 14. Professional Training Programs (#training) */}
-      <Training />
+      {/* 14. Official Notice Board & Announcements (#notices) */}
+      <NoticeBoard />
 
       {/* 15. Infinite Client/Partner Marquee */}
       <Marquee />

@@ -4,29 +4,31 @@ import { verifySuperadminAccess, errorResponse, successResponse } from '@/lib/su
 
 export const dynamic = 'force-dynamic'
 
-function generateTemporaryPassword(): string {
+function generateTemporaryPassword(type: string = 'school'): string {
+  const prefix = type === 'coaching' ? 'Coaching' : 'School'
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let code = ''
   for (let i = 0; i < 4; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   const digits = Math.floor(1000 + Math.random() * 9000)
-  return `School@${code}${digits}`
+  return `${prefix}@${code}${digits}`
 }
 
-async function getNextSchoolId(): Promise<string> {
+async function getNextPartnerId(type: string = 'school'): Promise<string> {
+  const prefix = type === 'coaching' ? 'CCH' : 'SCH'
   try {
     const { data, error } = await supabaseAdmin
       .from('schools')
       .select('school_id')
 
     if (error || !data || data.length === 0) {
-      return 'SCH000101'
+      return `${prefix}000101`
     }
 
     let maxNum = 100
     data.forEach((row: any) => {
-      if (row.school_id) {
+      if (row.school_id && row.school_id.toUpperCase().startsWith(prefix)) {
         const match = row.school_id.match(/\d+/)
         if (match) {
           const num = parseInt(match[0], 10)
@@ -35,9 +37,9 @@ async function getNextSchoolId(): Promise<string> {
       }
     })
 
-    return `SCH${String(maxNum + 1).padStart(6, '0')}`
+    return `${prefix}${String(maxNum + 1).padStart(6, '0')}`
   } catch (err) {
-    return `SCH${Math.floor(100100 + Math.random() * 899000)}`
+    return `${prefix}${Math.floor(100100 + Math.random() * 899000)}`
   }
 }
 
@@ -46,6 +48,7 @@ const DEFAULT_FALLBACK_SCHOOLS = [
   {
     id: 'sch-inst-001',
     school_id: 'SCH000101',
+    institution_type: 'school',
     name: 'ABC Public School',
     udise_code: '09012345678',
     school_type: 'Private',
@@ -72,6 +75,7 @@ const DEFAULT_FALLBACK_SCHOOLS = [
   {
     id: 'sch-inst-002',
     school_id: 'SCH000102',
+    institution_type: 'school',
     name: 'Delhi Public School (DPS) Greater Noida',
     udise_code: '09023456789',
     school_type: 'Private',
@@ -96,23 +100,30 @@ const DEFAULT_FALLBACK_SCHOOLS = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'sch-inst-003',
-    school_id: 'SCH000103',
-    name: 'St. Xavier High School',
-    udise_code: '09034567890',
-    school_type: 'Private',
-    board: 'ICSE',
-    address: 'Park Street Campus',
-    city: 'Patna',
-    state: 'Bihar',
-    pincode: '800001',
-    contact_person_name: 'Father Joseph Mathew',
-    designation: 'Principal',
-    official_email: 'stxavier.patna@edu.in',
-    mobile: '+91 9876500103',
-    status: 'PENDING',
-    bank_details: {},
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    id: 'cch-inst-001',
+    school_id: 'CCH000101',
+    institution_type: 'coaching',
+    name: 'Allen Career Institute & Foundation',
+    udise_code: 'CCH-DEL-8821',
+    school_type: 'Competitive Exam Institute (JEE/NEET)',
+    board: 'JEE & NEET Foundation',
+    address: 'A-10, Preet Vihar',
+    city: 'New Delhi',
+    state: 'Delhi',
+    pincode: '110092',
+    contact_person_name: 'Er. Rajesh Bansal',
+    designation: 'Center Head / Director',
+    official_email: 'allen.preetvihar@allenprep.ac.in',
+    mobile: '+91 9876500104',
+    status: 'ACTIVE',
+    bank_details: {
+      beneficiary_name: 'Allen Career Foundation Educational Society',
+      account_number: '77281002882711',
+      ifsc_code: 'SBIN0001192',
+      bank_name: 'State Bank of India',
+      is_verified: true,
+    },
+    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
 ]
@@ -127,6 +138,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')
     const board = searchParams.get('board')
     const type = searchParams.get('type')
+    const institutionType = searchParams.get('institution_type') || searchParams.get('category')
     const query = searchParams.get('query')?.toLowerCase().trim()
 
     // 1. Fetch schools, school_scholarships, applications, payouts
@@ -141,21 +153,20 @@ export async function GET(request: Request) {
     const assignments = assignmentsRes.data || [
       { school_id: 'SCH000101', scholarship_id: 'sch-1', incentive_per_verified_registration: 20, status: 'ACTIVE' },
       { school_id: 'SCH000102', scholarship_id: 'sch-1', incentive_per_verified_registration: 25, status: 'ACTIVE' },
+      { school_id: 'CCH000101', scholarship_id: 'sch-1', incentive_per_verified_registration: 30, status: 'ACTIVE' },
     ]
     const applications = appsRes.data || []
     const payouts = payoutsRes.data || []
 
-    // 2. Aggregate statistics for each school
+    // 2. Aggregate statistics for each school/coaching
     let enrichedSchools = schoolsList.map((sch) => {
       const schAssignments = assignments.filter((a) => a.school_id === sch.school_id && a.status === 'ACTIVE')
       const schApps = applications.filter((app) => app.school_id === sch.school_id)
       
-      // Verified registrations: payment_status = 'paid' or 'free' / confirmed
       const verifiedApps = schApps.filter(
         (app) => app.payment_status === 'paid' || app.payment_status === 'free' || app.status === 'confirmed'
       )
 
-      // Calculate incentive: sum of (verified count for each scholarship * incentive rate)
       let totalEarned = 0
       schAssignments.forEach((assn) => {
         const matchingVerified = applications.filter(
@@ -165,13 +176,23 @@ export async function GET(request: Request) {
         totalEarned += matchingVerified * (Number(assn.incentive_per_verified_registration) || 0)
       })
 
-      // Payouts
       const schPayouts = payouts.filter((p) => p.school_id === sch.school_id && p.status === 'PAID')
       const totalPaid = schPayouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
       const totalPending = Math.max(0, totalEarned - totalPaid)
 
+      const isCoaching = (
+        sch.institution_type === 'coaching' ||
+        sch.school_id?.startsWith('CCH') ||
+        sch.school_type?.toLowerCase().includes('coaching') ||
+        sch.board?.toLowerCase().includes('jee') ||
+        sch.board?.toLowerCase().includes('neet') ||
+        sch.name?.toLowerCase().includes('coaching') ||
+        sch.name?.toLowerCase().includes('institute')
+      )
+
       return {
         ...sch,
+        institution_type: isCoaching ? 'coaching' : (sch.institution_type || 'school'),
         associated_scholarships_count: schAssignments.length,
         assigned_scholarships: schAssignments,
         total_students_registered: schApps.length,
@@ -183,6 +204,9 @@ export async function GET(request: Request) {
     })
 
     // 3. Filter by search params
+    if (institutionType && institutionType !== 'ALL') {
+      enrichedSchools = enrichedSchools.filter((s) => s.institution_type?.toLowerCase() === institutionType.toLowerCase())
+    }
     if (status && status !== 'ALL') {
       enrichedSchools = enrichedSchools.filter((s) => s.status?.toUpperCase() === status.toUpperCase())
     }
@@ -207,6 +231,8 @@ export async function GET(request: Request) {
     // Platform KPI summary
     const summary = {
       total_schools: schoolsList.length,
+      total_pure_schools: enrichedSchools.filter((s) => s.institution_type === 'school').length,
+      total_coaching: enrichedSchools.filter((s) => s.institution_type === 'coaching').length,
       active_schools: schoolsList.filter((s) => s.status === 'ACTIVE' || s.status === 'APPROVED').length,
       pending_schools: schoolsList.filter((s) => s.status === 'PENDING').length,
       suspended_schools: schoolsList.filter((s) => s.status === 'SUSPENDED').length,
@@ -238,6 +264,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       name,
+      institution_type = 'school',
       udise_code,
       school_type = 'Private',
       board = 'CBSE',
@@ -256,17 +283,19 @@ export async function POST(request: Request) {
     } = body
 
     if (!name?.trim() || !official_email?.trim() || !contact_person_name?.trim() || !mobile?.trim()) {
-      return errorResponse('School name, official email, contact person name, and mobile number are required.', 400)
+      return errorResponse('Institution name, official email, contact person name, and mobile number are required.', 400)
     }
 
+    const isCoaching = institution_type?.toLowerCase() === 'coaching'
+    const targetType = isCoaching ? 'coaching' : 'school'
     const cleanEmail = official_email.trim().toLowerCase()
-    const autoSchoolId = await getNextSchoolId()
-    const tempPassword = generateTemporaryPassword()
-    const schoolUuid = `sch-inst-${Date.now()}`
+    const autoPartnerId = await getNextPartnerId(targetType)
+    const tempPassword = generateTemporaryPassword(targetType)
+    const partnerUuid = `${targetType === 'coaching' ? 'cch' : 'sch'}-inst-${Date.now()}`
 
     let authUserId: string | null = null
 
-    // 1. Create Supabase Auth user for the school
+    // 1. Create Supabase Auth user for the institution partner
     try {
       const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
         email: cleanEmail,
@@ -275,19 +304,26 @@ export async function POST(request: Request) {
         user_metadata: {
           full_name: name.trim(),
           role: 'school',
-          school_id: autoSchoolId,
+          school_id: autoPartnerId,
+          institution_type: targetType,
         },
       })
 
       if (authErr) {
-        // If user already exists in auth, retrieve existing user ID
         console.warn('Auth user creation warning:', authErr.message)
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
         const match = existingUsers?.users?.find((u) => u.email?.toLowerCase() === cleanEmail)
         if (match) {
           authUserId = match.id
-          // Update password to the new temporary password
-          await supabaseAdmin.auth.admin.updateUserById(match.id, { password: tempPassword })
+          await supabaseAdmin.auth.admin.updateUserById(match.id, { 
+            password: tempPassword,
+            user_metadata: {
+              full_name: name.trim(),
+              role: 'school',
+              school_id: autoPartnerId,
+              institution_type: targetType,
+            }
+          })
         }
       } else if (authUser?.user) {
         authUserId = authUser.user.id
@@ -303,20 +339,21 @@ export async function POST(request: Request) {
         email: cleanEmail,
         full_name: `${name.trim()} (${contact_person_name.trim()})`,
         role: 'school',
-        school_id: autoSchoolId,
+        school_id: autoPartnerId,
         account_status: status === 'ACTIVE' || status === 'APPROVED' ? 'active' : 'pending',
         updated_at: new Date().toISOString(),
       })
     }
 
     // 3. Insert record into public.schools
-    const newSchoolRecord = {
-      id: schoolUuid,
-      school_id: autoSchoolId,
+    const newPartnerRecord = {
+      id: partnerUuid,
+      school_id: autoPartnerId,
+      institution_type: targetType,
       name: name.trim(),
       udise_code: udise_code?.trim() || null,
-      school_type,
-      board,
+      school_type: isCoaching && !school_type ? 'Coaching Academy' : school_type,
+      board: isCoaching && !board ? 'Competitive Exams' : board,
       address: address?.trim() || '',
       city: city?.trim() || '',
       state: state?.trim() || '',
@@ -339,14 +376,24 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
+    let insertedRecord = null
     const { data: insertedSchool, error: insertErr } = await supabaseAdmin
       .from('schools')
-      .insert(newSchoolRecord)
+      .insert(newPartnerRecord)
       .select()
       .maybeSingle()
 
     if (insertErr) {
-      console.warn('Database insert into public.schools error (will return payload):', insertErr.message)
+      console.warn('Database insert notice (retrying without optional institution_type if column pending):', insertErr.message)
+      const { institution_type: _, ...fallbackRecord } = newPartnerRecord
+      const { data: retryData } = await supabaseAdmin
+        .from('schools')
+        .insert(fallbackRecord)
+        .select()
+        .maybeSingle()
+      insertedRecord = retryData || newPartnerRecord
+    } else {
+      insertedRecord = insertedSchool
     }
 
     // 4. If scholarship(s) selected, assign all of them
@@ -360,7 +407,7 @@ export async function POST(request: Request) {
     if (targetScholarshipIds.length > 0) {
       const assignmentsToInsert = targetScholarshipIds.map((schId, idx) => ({
         id: `ss-${Date.now()}-${idx}`,
-        school_id: autoSchoolId,
+        school_id: autoPartnerId,
         scholarship_id: schId,
         registration_fee: Number(registration_fee) || 100,
         incentive_per_verified_registration: Number(incentive_rate) || 20,
@@ -377,20 +424,24 @@ export async function POST(request: Request) {
       }
     }
 
+    const partnerTypeLabel = targetType === 'coaching' ? 'Coaching Center' : 'School'
+
     return NextResponse.json({
       success: true,
-      message: 'School created successfully! Login credentials generated.',
-      data: insertedSchool || newSchoolRecord,
+      message: `${partnerTypeLabel} created successfully! Login credentials generated.`,
+      data: insertedRecord || newPartnerRecord,
       credentials: {
-        school_id: autoSchoolId,
+        school_id: autoPartnerId,
+        institution_type: targetType,
         login_email: cleanEmail,
         temporary_password: tempPassword,
         login_url: '/school-portal/login',
-        note: 'Share these credentials securely with the authorized school contact. The school will be prompted to change their temporary password upon initial login.',
+        note: `Share these credentials securely with the authorized ${partnerTypeLabel} contact. They will use this to access their portal dashboard.`,
       },
     })
   } catch (error: any) {
-    console.error('Superadmin school POST exception:', error)
+    console.error('Superadmin partner POST exception:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
+
