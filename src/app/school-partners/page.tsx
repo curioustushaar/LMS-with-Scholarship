@@ -19,49 +19,19 @@ export default function SchoolPartnersPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/public/school-partners?limit=20')
+    fetch('/api/public/school-partners?limit=50')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.data && data.data.length > 0) {
+        if (data.success && Array.isArray(data.data)) {
           setPartners(data.data)
         } else {
-          setPartners([
-            {
-              id: '1',
-              institution_name: 'Delhi Public School Network',
-              institution_type: 'school',
-              location: 'New Delhi, India',
-              students_enrolled: 250,
-              description: 'National K-12 education leader pioneering AI foundational labs and STEM coursework with Gravity.',
-            },
-            {
-              id: '2',
-              institution_name: 'IIT Delhi Innovation & Incubation Hub',
-              institution_type: 'university',
-              location: 'New Delhi, India',
-              students_enrolled: 180,
-              description: 'Technical innovation partner collaborating on student hackathons, open-source grants, and incubation.',
-            },
-            {
-              id: '3',
-              institution_name: 'Amity University Higher Education',
-              institution_type: 'university',
-              location: 'Noida, India',
-              students_enrolled: 320,
-              description: 'Higher education partner integrating credit transfers and hybrid semester bootcamps with industry certifications.',
-            },
-            {
-              id: '4',
-              institution_name: 'Ryan International Schools',
-              institution_type: 'school',
-              location: 'Multiple Campuses, India',
-              students_enrolled: 150,
-              description: 'K-12 school network conducting coding olympiads and digital literacy programs for senior students.',
-            },
-          ])
+          setPartners([])
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error('Failed to fetch school partners:', err)
+        setPartners([])
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -73,13 +43,13 @@ export default function SchoolPartnersPage() {
       <section className="pt-32 pb-16 bg-gradient-to-b from-pink-50/40 to-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <span className="text-xs font-bold text-[#FF2D8D] uppercase tracking-widest px-3 py-1 bg-pink-50 rounded-full border border-pink-100">
-            Institutional Network
+            Institutional & Academy Network
           </span>
           <h1 className="text-4xl sm:text-5xl font-heading font-extrabold text-gray-900 tracking-tight">
-            School & <span className="text-gradient">University Partnerships</span>
+            School & <span className="text-gradient">Coaching Partners</span>
           </h1>
           <p className="text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Collaborating with forward-thinking academic institutions to bring industry-grade technical learning, labs, and certification pipelines to classrooms.
+            Collaborating with verified schools, coaching institutes, and academic centers to deliver accredited hybrid learning and scholarship programs.
           </p>
         </div>
       </section>
@@ -88,32 +58,58 @@ export default function SchoolPartnersPage() {
       <section className="py-12 pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="p-16 text-center text-gray-400">Loading partner directory...</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm animate-pulse space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-pink-50" />
+                  <div className="h-5 bg-gray-100 rounded w-3/4" />
+                  <div className="h-4 bg-gray-50 rounded w-1/2" />
+                  <div className="h-12 bg-gray-50 rounded w-full" />
+                </div>
+              ))}
+            </div>
+          ) : partners.length === 0 ? (
+            <div className="p-16 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
+              <School className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 font-semibold">Institutional Partners Directory</p>
+              <p className="text-xs text-gray-400 mt-1">Verified partner schools and coaching centers will appear here once onboarded.</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {partners.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:border-pink-200 transition-all flex flex-col justify-between"
+                  className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:border-pink-200 transition-all flex flex-col justify-between group"
                 >
                   <div className="space-y-4">
-                    <div className="w-12 h-12 rounded-2xl bg-pink-50 text-[#FF2D8D] flex items-center justify-center">
-                      <School size={24} />
+                    <div className="flex items-center justify-between">
+                      <div className="w-12 h-12 rounded-2xl bg-pink-50 text-[#FF2D8D] flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <School size={24} />
+                      </div>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        p.institution_type === 'coaching'
+                          ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                          : 'bg-purple-50 text-purple-600 border border-purple-200'
+                      }`}>
+                        {p.institution_type === 'coaching' ? '🎓 Coaching Partner' : '🏫 School Partner'}
+                      </span>
                     </div>
 
                     <div>
                       <h3 className="font-heading font-bold text-lg text-gray-900 leading-snug">{p.institution_name}</h3>
                       <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin size={12} /> {p.location || 'India'}
+                        <MapPin size={12} /> {p.location || 'Pan-India'}
                       </p>
                     </div>
 
-                    <p className="text-xs text-gray-500 leading-relaxed">{p.description}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{p.description || 'Official academic partner integrated with Gravity hybrid scholarship and skill programs.'}</p>
                   </div>
 
                   <div className="pt-6 mt-4 border-t border-gray-50 flex items-center justify-between text-xs">
-                    <span className="text-gray-400">Enrolled:</span>
-                    <span className="font-bold text-emerald-600">{p.students_enrolled || 100}+ students</span>
+                    <span className="text-gray-400">Status:</span>
+                    <span className="font-bold text-emerald-600 flex items-center gap-1">
+                      <ShieldCheck size={14} /> Verified Partner
+                    </span>
                   </div>
                 </div>
               ))}

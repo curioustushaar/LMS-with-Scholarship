@@ -10,7 +10,7 @@ const DEFAULT_NAVBAR_ITEMS = [
   { id: 'nav-6', name: 'Scholarships', href: '/scholarships', sort_order: 6, is_visible: true, is_external: false },
   { id: 'nav-7', name: 'Employers', href: '/employers', sort_order: 7, is_visible: true, is_external: false },
   { id: 'nav-8', name: 'School Partners', href: '/school-partners', sort_order: 8, is_visible: true, is_external: false },
-  { id: 'nav-9', name: 'Training', href: '/training', sort_order: 9, is_visible: true, is_external: false },
+  { id: 'nav-9', name: 'Notice', href: '#notices', sort_order: 9, is_visible: true, is_external: false },
   { id: 'nav-10', name: 'Contact', href: '/contact', sort_order: 10, is_visible: true, is_external: false },
 ]
 
@@ -30,7 +30,14 @@ export async function GET() {
       throw error
     }
 
-    return NextResponse.json({ success: true, data: (data && data.length > 0) ? data : DEFAULT_NAVBAR_ITEMS })
+    const items = (data && data.length > 0) ? data.map((item: any) => {
+      if (item.name?.toLowerCase() === 'training' || item.href?.includes('training')) {
+        return { ...item, name: 'Notice', href: '#notices' }
+      }
+      return item
+    }) : DEFAULT_NAVBAR_ITEMS
+
+    return NextResponse.json({ success: true, data: items })
   } catch (error: any) {
     return NextResponse.json({
       success: true,

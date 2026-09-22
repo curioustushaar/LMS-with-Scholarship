@@ -86,13 +86,22 @@ export async function PUT(
     if (updates.level) {
       updates.level = updates.level.toLowerCase()
     }
-    if (updates.status) {
+    if (updates.is_active !== undefined) {
+      updates.is_active = !!updates.is_active
+      if (updates.status === undefined) {
+        updates.status = updates.is_active ? 'active' : 'draft'
+      }
+    }
+    if (updates.status !== undefined) {
       if (typeof updates.status === 'string') {
         updates.status = updates.status.toLowerCase()
       } else if (updates.status === true) {
         updates.status = 'active'
       } else if (updates.status === false) {
         updates.status = 'draft'
+      }
+      if (updates.is_active === undefined) {
+        updates.is_active = updates.status === 'active'
       }
     }
 

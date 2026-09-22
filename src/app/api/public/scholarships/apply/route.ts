@@ -110,11 +110,13 @@ export async function POST(request: Request) {
     const cleanPhone = phoneVal.cleanPhone
     const cleanRefCode = reference_code ? reference_code.toString().trim().toUpperCase() : null
 
+    let refDiscountPercent = 0
+
     // 0. Server-Side Referral Code Re-Validation
     if (cleanRefCode) {
       const { data: refRecord, error: refErr } = await supabaseAdmin
         .from('scholarship_reference_codes')
-        .select('id, code, status')
+        .select('id, code, status, discount_percent')
         .eq('code', cleanRefCode)
         .maybeSingle()
 
@@ -125,6 +127,8 @@ export async function POST(request: Request) {
           { success: false, error: `The provided referral code "${cleanRefCode}" is invalid or inactive.` },
           { status: 400 }
         )
+      } else if (refRecord) {
+        refDiscountPercent = Math.max(0, Math.min(100, Number(refRecord.discount_percent) || 0))
       }
     }
 
@@ -140,8 +144,9 @@ export async function POST(request: Request) {
     if (existingApp) {
       return NextResponse.json({
         success: false,
-        error: `Candidate is already registered for this scholarship with Application No: ${existingApp.application_no}. Duplicate registrations are not allowed.`,
-        existing_application_no: existingApp.application_no,
+        duplicate: true,
+        error: `An application with email "${cleanEmail}" is already registered for this scholarship scheme!`,
+        application_no: existingApp.application_no,
         registration_code: existingApp.registration_code,
       }, { status: 409 })
     }
@@ -158,9 +163,11 @@ export async function POST(request: Request) {
     }
 
     const schemeTitle = targetScheme.title || 'National Scholarship Program'
-    const feeAmount = targetScheme.application_fee || 0
-    const paymentStatus = feeAmount === 0 ? 'free' : (payment_reference ? 'paid' : 'paid')
-    const finalPaymentRef = payment_reference || (feeAmount > 0 ? `PAY_TXN_${Date.now().toString().slice(-8)}` : 'FREE_TIER')
+    const originalFee = targetScheme.application_fee || 0
+    const discountAmount = Math.round((originalFee * refDiscountPercent) / 100)
+    const effectiveFee = Math.max(0, originalFee - discountAmount)
+    const paymentStatus = effectiveFee === 0 ? 'free' : (payment_reference ? 'paid' : 'paid')
+    const finalPaymentRef = payment_reference || (effectiveFee > 0 ? `PAY_TXN_${Date.now().toString().slice(-8)}` : (refDiscountPercent === 100 ? 'REF_100_DISCOUNT_FREE' : 'FREE_TIER'))
 
     const applicationNo = generateAppNumber()
     const regCode = generateRegistrationCode()
@@ -195,8 +202,7 @@ export async function POST(request: Request) {
       preference_state: selectedPrefState,
       preference_district_1: selectedPrefDist1,
       preference_district_2: selectedPrefDist2,
-      exam_city_preference: `${selectedPrefDist1} (Pref 1) / ${selectedPrefDist2} (Pref 2)`,
-      school_college_name: inputSchoolName?.trim() || school_college_name?.trim() || '',
+      exam_city_preference: exam_city_preference || `${selectedPrefDist1} (Pref 1) / ${selectedPrefDist2} (Pref 2)`,
       school_name: inputSchoolName?.trim() || school_college_name?.trim() || '',
       school_roll_number: school_roll_no?.trim() || '',
       school_class: school_class?.trim() || qualification || '',
@@ -224,13 +230,17 @@ export async function POST(request: Request) {
         school_section: school_section || null,
         school_approval_status: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? 'PENDING' : 'NOT_APPLICABLE',
         reference_code: cleanRefCode,
+        referral_discount_percent: refDiscountPercent,
+        referral_discount_amount: discountAmount,
+        original_fee: originalFee,
+        effective_fee: effectiveFee,
       },
       status: 'confirmed',
       registration_source: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? 'SCHOOL' : 'DIRECT',
       school_id: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? inputSchoolId : null,
       payment_status: paymentStatus,
       payment_reference: finalPaymentRef,
-      payment_amount: feeAmount,
+      payment_amount: effectiveFee,
       admit_card_status: 'provisional',
       document_status: (application_type === 'SCHOOL_PARTNER' || inputSchoolId) ? 'pending_school_verification' : 'pending',
       award_status: 'none',

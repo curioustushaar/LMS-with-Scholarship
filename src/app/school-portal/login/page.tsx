@@ -63,17 +63,17 @@ export default function SchoolPortalLoginPage() {
       <div className="max-w-md w-full">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-white/10 backdrop-blur-md rounded-3xl mb-4 shadow-2xl">
-            <img src="/logo.png" alt="Gravity Logo" className="h-20 w-auto object-contain" />
+          <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl mb-4 shadow-xl">
+            <img src="/logo.png" alt="Gravity Logo" className="h-10 w-auto object-contain" />
           </div>
           <span className="text-xs font-bold text-pink-400 uppercase tracking-widest block mb-1">
             Institutional Partner Access
           </span>
           <h1 className="text-3xl font-extrabold text-white">
-            School Partner Portal
+            School & Coaching Portal
           </h1>
           <p className="text-purple-200 text-xs mt-1.5">
-            Log in to manage scholarship enrollments, view student results, and track school incentives
+            Log in to manage scholarship enrollments, view student results, and track partner incentives
           </p>
         </div>
 
@@ -89,14 +89,14 @@ export default function SchoolPortalLoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Official School Email or School ID
+                Official Email or Partner ID (SCH / CCH)
               </label>
               <div className="relative">
                 <FiMail className="absolute left-3.5 top-3.5 text-gray-400 text-base" />
                 <input
                   type="text"
                   required
-                  placeholder="abcschool@gmail.com or SCH000101"
+                  placeholder="e.g. abcschool@gmail.com, SCH000101, or CCH000101"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF2D8D] font-mono text-gray-900"
@@ -139,7 +139,7 @@ export default function SchoolPortalLoginPage() {
                 <span>Authenticating...</span>
               ) : (
                 <>
-                  <span>Access School Dashboard</span>
+                  <span>Access Partner Dashboard</span>
                   <FiArrowRight />
                 </>
               )}

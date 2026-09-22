@@ -202,7 +202,7 @@ export default function ScholarshipsPage() {
 
   // Referral Code Verification State
   const [refCodeVerifying, setRefCodeVerifying] = useState(false)
-  const [refCodeVerifiedData, setRefCodeVerifiedData] = useState<{ representative_name: string; code: string } | null>(null)
+  const [refCodeVerifiedData, setRefCodeVerifiedData] = useState<{ representative_name: string; code: string; discount_percent?: number } | null>(null)
   const [refCodeVerifyError, setRefCodeVerifyError] = useState<string | null>(null)
 
   const handleVerifyRefCode = async (overrideCode?: string) => {
@@ -882,6 +882,12 @@ export default function ScholarshipsPage() {
     setFormSection('documents')
   }
 
+  // Computed Referral Discount & Payable Amount
+  const baseFormFee = selectedScheme?.application_fee || 0
+  const referralDiscountPercent = Math.max(0, Math.min(100, Number(refCodeVerifiedData?.discount_percent) || 0))
+  const referralDiscountAmount = Math.round((baseFormFee * referralDiscountPercent) / 100)
+  const payableFormFee = Math.max(0, baseFormFee - referralDiscountAmount)
+
   // Submit Application Form -> Move to Payment or Instant Free Submission
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault()
@@ -892,8 +898,8 @@ export default function ScholarshipsPage() {
       return
     }
 
-    if (selectedScheme.application_fee === 0) {
-      executeSubmitApplication('FREE_CONFIRMED')
+    if (payableFormFee === 0) {
+      executeSubmitApplication(selectedScheme.application_fee === 0 ? 'FREE_CONFIRMED' : 'REF_100_DISCOUNT_FREE')
     } else {
       setApplyStep('payment')
     }
@@ -925,7 +931,7 @@ export default function ScholarshipsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: selectedScheme.application_fee,
+          amount: payableFormFee,
           scholarship_id: selectedScheme.id,
           applicant_name: applicantForm.applicant_name,
           applicant_email: applicantForm.applicant_email,
@@ -1061,7 +1067,7 @@ export default function ScholarshipsPage() {
           razorpay_details: razorpayDetails || null,
         },
         payment_reference: paymentRef || `PAY_MOCK_${Date.now().toString().slice(-8)}`,
-        payment_amount: selectedScheme.application_fee,
+        payment_amount: payableFormFee,
       }
 
       const res = await fetch('/api/public/scholarships/apply', {
@@ -3288,9 +3294,17 @@ export default function ScholarshipsPage() {
 
                             {/* Verification Result Badges */}
                             {refCodeVerifiedData && (
-                              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900 flex items-center gap-2 animate-in fade-in duration-150">
-                                <span className="text-sm">✅</span>
-                                <span>Verified Partner Code: <strong className="text-emerald-950 uppercase">{refCodeVerifiedData.code}</strong> (Representative: <strong className="text-emerald-900">{refCodeVerifiedData.representative_name}</strong>)</span>
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1 animate-in fade-in duration-150">
+                                <div className="flex items-center gap-2 font-bold text-emerald-950">
+                                  <span className="text-base">✅</span>
+                                  <span>Verified Partner Code: <strong className="text-emerald-950 uppercase">{refCodeVerifiedData.code}</strong> (Representative: <strong className="text-emerald-900">{refCodeVerifiedData.representative_name}</strong>)</span>
+                                </div>
+                                {referralDiscountPercent > 0 && (
+                                  <div className="flex items-center gap-2 pl-6 text-[11px] font-extrabold text-emerald-700">
+                                    <span>🎉 {referralDiscountPercent}% Referral Discount Applied!</span>
+                                    <span>(You save ₹{referralDiscountAmount} on this scholarship application fee)</span>
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -3867,7 +3881,11 @@ export default function ScholarshipsPage() {
                           type="submit"
                           className="px-8 py-3 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                         >
-                          {selectedScheme.application_fee === 0 ? 'Submit Free Application (₹0)' : `Proceed to Payment (₹${selectedScheme.application_fee})`}
+                          {payableFormFee === 0
+                            ? (referralDiscountPercent === 100 ? 'Submit 100% Free Application (₹0)' : 'Submit Free Application (₹0)')
+                            : referralDiscountPercent > 0
+                            ? `Proceed to Discounted Payment (₹${payableFormFee})`
+                            : `Proceed to Payment (₹${payableFormFee})`}
                           <ArrowRight size={14} />
                         </button>
                       </div>
@@ -3879,12 +3897,27 @@ export default function ScholarshipsPage() {
               {/* STEP 2: RAZORPAY PRODUCTION PAYMENT GATEWAY */}
               {applyStep === 'payment' && (
                 <div className="space-y-6 max-w-2xl mx-auto py-2">
-                  <div className="p-5 bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 rounded-2xl border border-purple-100 flex justify-between items-center text-xs shadow-sm">
+                  <div className="p-5 bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 rounded-2xl border border-purple-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3 text-xs shadow-sm">
                     <div>
                       <div className="font-bold text-purple-950 text-sm">Payment for {selectedScheme.title}</div>
                       <div className="text-purple-600 text-xs">Examination Processing & Hall Ticket Fee</div>
+                      {referralDiscountPercent > 0 && (
+                        <div className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                          ✓ Referral Code Applied: <span className="uppercase font-mono font-black">{refCodeVerifiedData?.code}</span> ({referralDiscountPercent}% OFF)
+                        </div>
+                      )}
                     </div>
-                    <div className="text-2xl font-black text-[#FF2D8D]">₹{selectedScheme.application_fee}</div>
+                    <div className="text-right">
+                      {referralDiscountPercent > 0 && (
+                        <div className="text-xs text-gray-400 line-through font-semibold">₹{baseFormFee}</div>
+                      )}
+                      <div className="text-2xl font-black text-[#FF2D8D]">₹{payableFormFee}</div>
+                      {referralDiscountPercent > 0 && (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Saved ₹{referralDiscountAmount}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Razorpay Information Box */}
@@ -3926,7 +3959,7 @@ export default function ScholarshipsPage() {
                       className="flex-1 py-4 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white font-extrabold text-sm rounded-xl shadow-lg hover:shadow-pink-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
                     >
                       <CreditCard size={18} />
-                      {submitting ? 'Connecting to Razorpay...' : `Pay & Submit Application (₹${selectedScheme.application_fee})`}
+                      {submitting ? 'Connecting to Razorpay...' : `Pay & Submit Application (₹${payableFormFee})`}
                     </button>
                   </div>
                 </div>

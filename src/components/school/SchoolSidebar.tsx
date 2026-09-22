@@ -90,9 +90,9 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Pa
         </button>
 
         {/* Brand Header */}
-        <div className="p-6 border-b border-gray-800">
+        <div className="p-5 border-b border-gray-800">
           <div className="flex items-center space-x-3">
-            <img src="/logo.png" alt="Gravity Logo" className="h-14 w-auto object-contain" />
+            <img src="/logo.png" alt="Gravity Logo" className="h-8 w-auto object-contain bg-white/95 p-1 rounded-lg shrink-0" />
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">
                 School Portal

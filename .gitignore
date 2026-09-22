@@ -28,8 +28,11 @@ yarn-error.log*
 .env*.local
 .env
 
-# SQL files (database scripts - sensitive)
+# SQL files (sensitive scripts, but keep migrations)
 *.sql
+!migrations/*.sql
+*.log
+
 
 # vercel
 .vercel

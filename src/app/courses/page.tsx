@@ -35,98 +35,35 @@ export default function CoursesCatalogPage() {
   const categories = ['All', 'Development', 'Design', 'Data Science', 'Cloud & DevOps', 'Business']
 
   useEffect(() => {
-    fetch('/api/public/courses?limit=20')
+    fetch('/api/public/courses?limit=30')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.data && data.data.length > 0) {
+        if (data.success && data.data && Array.isArray(data.data)) {
           const mapped = data.data.map((c: any) => ({
             id: c.id,
             title: c.title,
-            category: c.category || 'Development',
-            image: c.thumbnail_url || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=400&q=80',
-            instructor_name: c.instructor_name || 'Expert Mentor',
+            category: c.category || (c.level ? `${c.level.charAt(0).toUpperCase() + c.level.slice(1)}` : 'Development'),
+            image: c.image || c.thumbnail_url || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=600&q=80',
+            instructor_name: c.instructor_name || 'Academic Mentor',
             instructor_avatar: c.instructor_avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80',
-            duration: c.duration_weeks ? `${c.duration_weeks} Weeks` : '8 Weeks',
-            rating: c.rating || 4.8,
-            reviews_count: c.reviews_count || 140,
+            duration: c.duration_weeks ? `${c.duration_weeks} Weeks` : (c.duration || '4 Weeks'),
+            rating: c.rating || 4.9,
+            reviews_count: c.reviews_count || 120,
             students_count: c.students_count ? `${c.students_count}` : '1.2k',
-            price: c.price || '₹5,999',
-            description: c.description || 'Master practical concepts with hands-on coding and project evaluations.',
+            price: c.price || 'Free / Included',
+            description: c.description || 'Master practical concepts with hands-on learning and evaluations.',
             level: c.level || 'Intermediate',
             badgeColor:
-              c.category === 'Design'
+              (c.category?.toLowerCase() === 'design' || c.title?.toLowerCase().includes('design'))
                 ? 'bg-pink-50 text-[#FF2D8D] border-pink-100'
-                : c.category === 'Data Science'
+                : (c.category?.toLowerCase() === 'data science' || c.title?.toLowerCase().includes('data'))
                 ? 'bg-blue-50 text-blue-600 border-blue-100'
                 : 'bg-purple-50 text-[#9C27FF] border-purple-100',
           }))
           setCourses(mapped)
-        } else {
-          setCourses([
-            {
-              id: '1',
-              title: 'UI/UX Design Management & Prototyping',
-              category: 'Design',
-              image: 'https://images.unsplash.com/photo-1561070791-26c113006238?auto=format&fit=crop&w=400&q=80',
-              instructor_name: 'John Doe',
-              duration: '6 Weeks',
-              rating: 4.8,
-              reviews_count: 142,
-              students_count: '1.2k',
-              price: '₹5,999',
-              level: 'Intermediate',
-              description: 'Learn modern UI/UX design workflows, design systems, Figma components, and user testing.',
-              badgeColor: 'bg-pink-50 text-[#FF2D8D] border-pink-100',
-            },
-            {
-              id: '2',
-              title: 'Full Stack Engineering (React, Node, Supabase)',
-              category: 'Development',
-              image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=400&q=80',
-              instructor_name: 'Jane Smith',
-              duration: '12 Weeks',
-              rating: 4.9,
-              reviews_count: 310,
-              students_count: '3.4k',
-              price: '₹12,499',
-              level: 'Advanced',
-              description: 'Build enterprise-grade full-stack applications with Next.js App Router, auth, and automated testing.',
-              badgeColor: 'bg-purple-50 text-[#9C27FF] border-purple-100',
-            },
-            {
-              id: '3',
-              title: 'Data Science & Machine Learning with Python',
-              category: 'Data Science',
-              image: 'https://images.unsplash.com/photo-1527474305487-b87b222841cc?auto=format&fit=crop&w=400&q=80',
-              instructor_name: 'John Brown',
-              duration: '10 Weeks',
-              rating: 4.7,
-              reviews_count: 189,
-              students_count: '2.1k',
-              price: '₹9,999',
-              level: 'Beginner',
-              description: 'Statistical modeling, pandas pipelines, regression models, and deep learning architectures.',
-              badgeColor: 'bg-blue-50 text-blue-600 border-blue-100',
-            },
-            {
-              id: '4',
-              title: 'AWS Cloud Solutions Architect Certification',
-              category: 'Cloud & DevOps',
-              image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80',
-              instructor_name: 'Priya Sharma',
-              duration: '8 Weeks',
-              rating: 4.9,
-              reviews_count: 220,
-              students_count: '1.8k',
-              price: '₹8,499',
-              level: 'Intermediate',
-              description: 'Deploy resilient cloud infrastructure with EC2, S3, RDS, Lambda, and CI/CD pipelines.',
-              badgeColor: 'bg-amber-50 text-amber-700 border-amber-100',
-            },
-          ])
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => console.error('Error loading public courses:', err))
       .finally(() => setLoading(false))
   }, [])
 
