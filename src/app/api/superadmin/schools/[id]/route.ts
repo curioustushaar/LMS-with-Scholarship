@@ -4,6 +4,8 @@ import { verifySuperadminAccess, errorResponse, successResponse } from '@/lib/su
 
 export const dynamic = 'force-dynamic'
 
+import { sanitizeSchoolRecordForDb, resolveSchoolPartnerFields } from '@/lib/school-auth'
+
 // GET /api/superadmin/schools/[id]
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { authorized } = await verifySuperadminAccess(request)
@@ -19,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       .or(`school_id.eq.${schoolIdentifier},id.eq.${schoolIdentifier}`)
       .maybeSingle()
 
-    const targetSchool = school || {
+    const rawSchool = school || {
       id: 'sch-inst-001',
       school_id: schoolIdentifier,
       name: 'ABC Public School',
@@ -45,6 +47,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+
+    const targetSchool = resolveSchoolPartnerFields(rawSchool)
 
     // 2. Fetch assigned scholarships, registered students, and payouts
     const [assignmentsRes, appsRes, payoutsRes] = await Promise.all([
@@ -112,15 +116,29 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const schoolIdentifier = params.id
     const body = await request.json()
-    const { status, bank_details, ...updates } = body
+    const { status, bank_details, board, school_type, designation, institution_type, ...updates } = body
+
+    // Sanitize for DB constraints
+    const sanitized = sanitizeSchoolRecordForDb({
+      institution_type: institution_type || (schoolIdentifier.startsWith('CCH') ? 'coaching' : 'school'),
+      school_id: schoolIdentifier,
+      board,
+      school_type,
+      designation,
+      bank_details: bank_details || {},
+    })
 
     // 1. Update public.schools
     const updatePayload: Record<string, any> = {
       ...updates,
+      board: sanitized.dbBoard,
+      school_type: sanitized.dbSchoolType,
+      designation: sanitized.dbDesignation,
+      bank_details: sanitized.mergedBankDetails,
+      institution_type: sanitized.institutionType,
       updated_at: new Date().toISOString(),
     }
     if (status) updatePayload.status = status
-    if (bank_details) updatePayload.bank_details = bank_details
 
     const { data: updatedSchool, error: updateErr } = await supabaseAdmin
       .from('schools')
@@ -140,10 +158,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         .eq('school_id', updatedSchool.school_id)
     }
 
+    const resolved = resolveSchoolPartnerFields(updatedSchool || { school_id: schoolIdentifier, ...updatePayload })
+
     return NextResponse.json({
       success: true,
-      message: 'School details updated successfully!',
-      data: updatedSchool || { school_id: schoolIdentifier, ...updatePayload },
+      message: `${resolved.institution_type === 'coaching' ? 'Coaching Center' : 'School'} details updated successfully!`,
+      data: resolved,
     })
   } catch (error: any) {
     console.error('Superadmin update school exception:', error)

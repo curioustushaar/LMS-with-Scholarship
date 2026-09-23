@@ -205,24 +205,49 @@ export async function POST(request: Request) {
       console.warn('Auth sync exception:', authSyncErr.message)
     }
 
+    const isCoaching = (
+      school.institution_type === 'coaching' ||
+      school.school_id?.startsWith('CCH') ||
+      school.school_type?.toLowerCase().includes('coaching') ||
+      school.board?.toLowerCase().includes('jee') ||
+      school.board?.toLowerCase().includes('neet') ||
+      school.name?.toLowerCase().includes('coaching') ||
+      school.name?.toLowerCase().includes('institute') ||
+      school.bank_details?.institution_type === 'coaching'
+    )
+
+    const rawBoard = school.bank_details?.display_board || (isCoaching && school.board === 'Other' ? 'JEE & NEET Foundation' : school.board) || (isCoaching ? 'JEE & NEET Foundation' : 'CBSE')
+    const rawSchoolType = school.bank_details?.display_school_type || (isCoaching && school.school_type === 'Other' ? 'Competitive Exam Institute (JEE/NEET)' : school.school_type) || (isCoaching ? 'Competitive Exam Institute (JEE/NEET)' : 'Private')
+    const rawDesignation = school.bank_details?.display_designation || (isCoaching && school.designation === 'Other' ? 'Director / Center Head' : school.designation) || (isCoaching ? 'Director / Center Head' : 'Principal')
+
+    const resolvedSchool = {
+      ...school,
+      institution_type: isCoaching ? 'coaching' : (school.institution_type || 'school'),
+      board: rawBoard,
+      school_type: rawSchoolType,
+      designation: rawDesignation,
+    }
+
     const sessionToken = generateSchoolToken({
-      school_id: school.school_id,
+      school_id: resolvedSchool.school_id,
       email: targetEmail,
-      userId: authUserId || `sch-user-${school.school_id}`,
-      school_name: school.name,
+      userId: authUserId || `sch-user-${resolvedSchool.school_id}`,
+      school_name: resolvedSchool.name,
     })
+
+    const partnerTypeLabel = isCoaching ? 'Coaching Center' : 'School'
 
     return NextResponse.json({
       success: true,
       token: sessionToken,
       resolved_email: targetEmail,
-      school_id: school.school_id,
-      school_name: school.name,
-      school: school,
-      message: 'School credentials verified and session established successfully.',
+      school_id: resolvedSchool.school_id,
+      school_name: resolvedSchool.name,
+      school: resolvedSchool,
+      message: `${partnerTypeLabel} credentials verified and session established successfully.`,
     })
   } catch (error: any) {
     console.error('School login API exception:', error)
-    return schoolErrorResponse(error.message || 'An unexpected error occurred during school login.', 500)
+    return schoolErrorResponse(error.message || 'An unexpected error occurred during partner login.', 500)
   }
 }

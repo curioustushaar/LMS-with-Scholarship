@@ -1079,12 +1079,18 @@ export default function ScholarshipsPage() {
       if (data.success && data.data) {
         setGeneratedApplication(data)
         setApplyStep('success')
+        setShowReceiptModal(true)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('last_scholarship_app', JSON.stringify(data))
+          } catch (e) {}
+        }
       } else {
         alert(data.error || 'Failed to submit application.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Apply submit error', err)
-      alert('Error submitting application. Please try again.')
+      alert(err.message || 'Error submitting application. Please try again.')
     } finally {
       setSubmitting(false)
     }

@@ -22,11 +22,13 @@ interface SchoolSidebarProps {
   onClose: () => void
   schoolName?: string
   schoolId?: string
+  institutionType?: string
 }
 
-export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Partner', schoolId = 'SCH000101' }: SchoolSidebarProps) {
+export default function SchoolSidebar({ isOpen, onClose, schoolName = 'Institutional Partner', schoolId = 'SCH000101', institutionType }: SchoolSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const isCoaching = institutionType === 'coaching' || schoolId?.startsWith('CCH')
 
   const navItems = [
     { name: 'Dashboard', icon: FiHome, path: '/school-portal/dashboard' },
@@ -35,11 +37,11 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Pa
     { name: 'Exam Results', icon: FiCheckSquare, path: '/school-portal/results' },
     { name: 'Incentives & Earnings', icon: FiDollarSign, path: '/school-portal/incentives' },
     { name: 'Download Reports', icon: FiFileText, path: '/school-portal/reports' },
-    { name: 'School Profile & KYC', icon: FiUser, path: '/school-portal/profile' },
+    { name: isCoaching ? 'Coaching Profile & KYC' : 'School Profile & KYC', icon: FiUser, path: '/school-portal/profile' },
   ]
 
   const handleLogout = async () => {
-    if (confirm('Are you sure you want to sign out of the School Portal?')) {
+    if (confirm(`Are you sure you want to sign out of the ${isCoaching ? 'Coaching' : 'School'} Portal?`)) {
       try {
         await supabase.auth.signOut()
       } catch (e) {
@@ -95,7 +97,7 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'School Pa
             <img src="/logo.png" alt="Gravity Logo" className="h-8 w-auto object-contain bg-white/95 p-1 rounded-lg shrink-0" />
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">
-                School Portal
+                {isCoaching ? 'Coaching Portal' : 'School Portal'}
               </span>
               <h1 className="text-sm font-bold text-white truncate max-w-[140px]" title={schoolName}>
                 {schoolName}

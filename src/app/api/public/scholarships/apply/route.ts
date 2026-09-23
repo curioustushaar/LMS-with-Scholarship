@@ -133,23 +133,13 @@ export async function POST(request: Request) {
     }
 
 
-    // 0. Duplicate Registration Check
+    // 0. Duplicate Registration & Paid Re-attempt Handling
     const { data: existingApp } = await supabaseAdmin
       .from('scholarship_applications')
-      .select('id, application_no, registration_code, registration_source, school_name')
+      .select('*')
       .eq('scholarship_id', scholarship_id)
       .eq('applicant_email', cleanEmail)
       .maybeSingle()
-
-    if (existingApp) {
-      return NextResponse.json({
-        success: false,
-        duplicate: true,
-        error: `An application with email "${cleanEmail}" is already registered for this scholarship scheme!`,
-        application_no: existingApp.application_no,
-        registration_code: existingApp.registration_code,
-      }, { status: 409 })
-    }
 
     // 1. Fetch target scholarship scheme details from Supabase
     const { data: targetScheme, error: schemeErr } = await supabaseAdmin
@@ -166,16 +156,92 @@ export async function POST(request: Request) {
     const originalFee = targetScheme.application_fee || 0
     const discountAmount = Math.round((originalFee * refDiscountPercent) / 100)
     const effectiveFee = Math.max(0, originalFee - discountAmount)
-    const paymentStatus = effectiveFee === 0 ? 'free' : (payment_reference ? 'paid' : 'paid')
+    const paymentStatus = effectiveFee === 0 ? 'free' : 'paid'
     const finalPaymentRef = payment_reference || (effectiveFee > 0 ? `PAY_TXN_${Date.now().toString().slice(-8)}` : (refDiscountPercent === 100 ? 'REF_100_DISCOUNT_FREE' : 'FREE_TIER'))
-
-    const applicationNo = generateAppNumber()
-    const regCode = generateRegistrationCode()
-    const applicantId = `app-${Date.now()}`
 
     const selectedPrefState = preference_state || state || 'Bihar'
     const selectedPrefDist1 = preference_district_1 || district || city || 'Patna'
     const selectedPrefDist2 = preference_district_2 || 'Gaya'
+
+    // If application already exists:
+    if (existingApp) {
+      // If user provided payment or if the existing application was unpaid/pending:
+      const updatedDocs = {
+        ...(existingApp.documents || {}),
+        ...(typeof documents === 'object' && documents ? documents : {}),
+        academic_records: academic_records || existingApp.documents?.academic_records || [],
+        reference_code: cleanRefCode || existingApp.reference_code,
+        payment_reference: finalPaymentRef,
+        payment_amount: effectiveFee,
+        updated_via: 'paid_confirmation',
+      }
+
+      const updatePayload: Record<string, any> = {
+        applicant_name: applicant_name?.trim() || existingApp.applicant_name,
+        applicant_phone: applicant_phone?.trim() || existingApp.applicant_phone,
+        status: 'confirmed',
+        payment_status: paymentStatus,
+        payment_reference: finalPaymentRef,
+        payment_amount: effectiveFee,
+        documents: updatedDocs,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (photo_url) updatePayload.photo_url = photo_url
+      if (signature_url) updatePayload.signature_url = signature_url
+      if (aadhaar_url) updatePayload.aadhaar_url = aadhaar_url
+      if (marksheet_url) updatePayload.marksheet_url = marksheet_url
+
+      const { data: updatedApp, error: updateErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .update(updatePayload)
+        .eq('id', existingApp.id)
+        .select()
+        .single()
+
+      const finalRecord = updatedApp || { ...existingApp, ...updatePayload }
+
+      // Send email
+      if (finalRecord?.applicant_email) {
+        sendScholarshipPaymentEmail({
+          applicant_name: finalRecord.applicant_name,
+          applicant_email: finalRecord.applicant_email,
+          application_no: finalRecord.application_no,
+          registration_code: finalRecord.registration_code,
+          scholarship_title: finalRecord.scholarship_title || schemeTitle,
+          father_name: finalRecord.father_name,
+          payment_reference: finalPaymentRef,
+          amount: effectiveFee,
+        }).catch((err) => console.error('Error sending confirmation email on update:', err))
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Payment verified and scholarship application confirmed successfully!',
+        data: finalRecord,
+        provisional_admit_card: {
+          application_no: finalRecord.application_no,
+          registration_code: finalRecord.registration_code,
+          applicant_name: finalRecord.applicant_name,
+          scholarship_title: finalRecord.scholarship_title || schemeTitle,
+          photo_url: finalRecord.photo_url,
+          preference_district_1: selectedPrefDist1,
+          preference_district_2: selectedPrefDist2,
+          preference_state: selectedPrefState,
+          exam_mode: targetScheme?.exam_mode || 'online',
+          exam_date: targetScheme?.exam_date || '2026-09-20',
+          exam_time: targetScheme?.exam_time || '10:00 AM - 12:30 PM',
+          exam_venue: 'To be designated across approved centers in your preferred district upon Official Admit Card Release',
+          admit_card_release_date: targetScheme?.admit_card_release_date || '2026-09-10',
+          status: 'PROVISIONAL REGISTRATION ACKNOWLEDGMENT - VENUE ALLOCATION PENDING',
+          note: 'Keep your Registration Code and Application Number safe. Your Official Hall Ticket containing your exact Center Address and Roll Number will be available for download once Superadmin publishes Admit Cards.',
+        },
+      })
+    }
+
+    const applicationNo = generateAppNumber()
+    const regCode = generateRegistrationCode()
+    const applicantId = `app-${Date.now()}`
 
     const newApplicant = {
       id: applicantId,
