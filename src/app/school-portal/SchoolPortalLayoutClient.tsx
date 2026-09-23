@@ -137,6 +137,7 @@ export default function SchoolPortalLayoutClient({ children }: { children: React
         onClose={() => setIsSidebarOpen(false)}
         schoolName={schoolData?.name}
         schoolId={schoolData?.school_id}
+        institutionType={schoolData?.institution_type}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySuperadminAccess, errorResponse, successResponse } from '@/lib/superadmin-auth'
+import { sanitizeSchoolRecordForDb, resolveSchoolPartnerFields } from '@/lib/school-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,8 +159,9 @@ export async function GET(request: Request) {
     const applications = appsRes.data || []
     const payouts = payoutsRes.data || []
 
-    // 2. Aggregate statistics for each school/coaching
-    let enrichedSchools = schoolsList.map((sch) => {
+    // 2. Aggregate statistics for each school/coaching & resolve fields
+    let enrichedSchools = schoolsList.map((rawSch) => {
+      const sch = resolveSchoolPartnerFields(rawSch)
       const schAssignments = assignments.filter((a) => a.school_id === sch.school_id && a.status === 'ACTIVE')
       const schApps = applications.filter((app) => app.school_id === sch.school_id)
       
@@ -180,19 +182,8 @@ export async function GET(request: Request) {
       const totalPaid = schPayouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
       const totalPending = Math.max(0, totalEarned - totalPaid)
 
-      const isCoaching = (
-        sch.institution_type === 'coaching' ||
-        sch.school_id?.startsWith('CCH') ||
-        sch.school_type?.toLowerCase().includes('coaching') ||
-        sch.board?.toLowerCase().includes('jee') ||
-        sch.board?.toLowerCase().includes('neet') ||
-        sch.name?.toLowerCase().includes('coaching') ||
-        sch.name?.toLowerCase().includes('institute')
-      )
-
       return {
         ...sch,
-        institution_type: isCoaching ? 'coaching' : (sch.institution_type || 'school'),
         associated_scholarships_count: schAssignments.length,
         assigned_scholarships: schAssignments,
         total_students_registered: schApps.length,
@@ -345,24 +336,13 @@ export async function POST(request: Request) {
       })
     }
 
-    // 3. Insert record into public.schools
-    const newPartnerRecord = {
-      id: partnerUuid,
-      school_id: autoPartnerId,
+    // 3. Sanitize record for Postgres check constraint compliance and prepare JSON metadata
+    const sanitized = sanitizeSchoolRecordForDb({
       institution_type: targetType,
-      name: name.trim(),
-      udise_code: udise_code?.trim() || null,
-      school_type: isCoaching && !school_type ? 'Coaching Academy' : school_type,
-      board: isCoaching && !board ? 'Competitive Exams' : board,
-      address: address?.trim() || '',
-      city: city?.trim() || '',
-      state: state?.trim() || '',
-      pincode: pincode?.trim() || '',
-      contact_person_name: contact_person_name.trim(),
-      designation,
-      official_email: cleanEmail,
-      mobile: mobile.trim(),
-      status: status || 'ACTIVE',
+      school_id: autoPartnerId,
+      board: board || (isCoaching ? 'JEE & NEET Foundation' : 'CBSE'),
+      school_type: school_type || (isCoaching ? 'Competitive Exam Institute (JEE/NEET)' : 'Private'),
+      designation: designation || (isCoaching ? 'Director / Center Head' : 'Principal'),
       bank_details: {
         beneficiary_name: '',
         account_number: '',
@@ -370,6 +350,26 @@ export async function POST(request: Request) {
         bank_name: '',
         is_verified: false,
       },
+    })
+
+    const newPartnerRecord = {
+      id: partnerUuid,
+      school_id: autoPartnerId,
+      institution_type: targetType,
+      name: name.trim(),
+      udise_code: udise_code?.trim() || null,
+      school_type: sanitized.dbSchoolType,
+      board: sanitized.dbBoard,
+      address: address?.trim() || 'Main Campus',
+      city: city?.trim() || 'New Delhi',
+      state: state?.trim() || 'Delhi',
+      pincode: pincode?.trim() || '110001',
+      contact_person_name: contact_person_name.trim(),
+      designation: sanitized.dbDesignation,
+      official_email: cleanEmail,
+      mobile: mobile.trim(),
+      status: status || 'ACTIVE',
+      bank_details: sanitized.mergedBankDetails,
       user_id: authUserId,
       is_first_login: true,
       created_at: new Date().toISOString(),
@@ -384,17 +384,25 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (insertErr) {
-      console.warn('Database insert notice (retrying without optional institution_type if column pending):', insertErr.message)
+      console.error('Database insert error:', insertErr.message)
+      // Retry without optional institution_type if column pending
       const { institution_type: _, ...fallbackRecord } = newPartnerRecord
-      const { data: retryData } = await supabaseAdmin
+      const { data: retryData, error: retryErr } = await supabaseAdmin
         .from('schools')
         .insert(fallbackRecord)
         .select()
         .maybeSingle()
-      insertedRecord = retryData || newPartnerRecord
+
+      if (retryErr) {
+        console.error('Database retry insert error:', retryErr.message)
+        return errorResponse(`Database Error: ${retryErr.message}`, 500)
+      }
+      insertedRecord = retryData
     } else {
       insertedRecord = insertedSchool
     }
+
+    const resolvedRecord = resolveSchoolPartnerFields(insertedRecord || newPartnerRecord)
 
     // 4. If scholarship(s) selected, assign all of them
     const targetScholarshipIds: string[] = []
@@ -429,7 +437,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: `${partnerTypeLabel} created successfully! Login credentials generated.`,
-      data: insertedRecord || newPartnerRecord,
+      data: resolvedRecord,
       credentials: {
         school_id: autoPartnerId,
         institution_type: targetType,

@@ -137,10 +137,14 @@ export async function POST(request: Request) {
     const feeAmount = assignment?.registration_fee ?? scheme?.application_fee ?? 0
     const paymentStatus = 'paid' // School-registered students are pre-verified / batch paid
 
-    const effectiveClass = school_class?.trim() || qualification
-    const effectiveExamCenter = exam_city_preference || `${school.name} Proctored Lab / Assessment Hub`
+    const selectedPrefDist1 = body.preference_district_1 || city || 'Patna'
+    const selectedPrefDist2 = body.preference_district_2 || 'Gaya'
+    const selectedPrefState = body.preference_state || state || 'Bihar'
 
-    const newStudent = {
+    const effectiveClass = school_class?.trim() || qualification
+    const effectiveExamCenter = exam_city_preference || `${selectedPrefDist1} (Pref 1) / ${selectedPrefDist2} (Pref 2)`
+
+    const newStudent: any = {
       id: applicantId,
       application_no: applicationNo,
       registration_code: regCode,
@@ -160,9 +164,13 @@ export async function POST(request: Request) {
       address: address?.trim() || school.address || '',
       state: state?.trim() || school.state || '',
       city: city?.trim() || school.city || '',
+      district: body.district || selectedPrefDist1,
       pincode: pincode?.trim() || school.pincode || '',
       school_college_name: school.name,
       passing_year: passing_year || '2026',
+      preference_district_1: selectedPrefDist1,
+      preference_district_2: selectedPrefDist2,
+      preference_state: selectedPrefState,
       exam_city_preference: effectiveExamCenter,
       photo_url: photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face',
       signature_url: signature_url || '',
@@ -179,6 +187,10 @@ export async function POST(request: Request) {
         income_cert_url: body.income_cert_url || '',
         college_id_url: college_id_url || '',
         exam_center: effectiveExamCenter,
+        preference_district_1: selectedPrefDist1,
+        preference_district_2: selectedPrefDist2,
+        preference_state: selectedPrefState,
+        district: body.district || selectedPrefDist1,
         registered_by_school_id: school.school_id,
         registered_by_school_name: school.name,
         school_approval_status: 'APPROVED',
@@ -193,8 +205,8 @@ export async function POST(request: Request) {
       school_class: effectiveClass,
       school_section: school_section?.trim() || 'A',
       payment_status: paymentStatus,
-      payment_reference: `SCH_PAY_${school.school_id}_${Date.now().toString().slice(-6)}`,
-      payment_amount: feeAmount,
+      payment_reference: body.payment_reference || body.razorpay_payment_id || `SCH_PAY_${school.school_id}_${Date.now().toString().slice(-6)}`,
+      payment_amount: body.payment_amount !== undefined ? body.payment_amount : feeAmount,
       admit_card_status: 'provisional',
       roll_number: null,
       exam_center: effectiveExamCenter,
@@ -207,14 +219,42 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
-    const { data: inserted, error: insErr } = await supabaseAdmin
+    let inserted = null
+    const { data: firstTry, error: insErr } = await supabaseAdmin
       .from('scholarship_applications')
       .insert(newStudent)
       .select()
       .maybeSingle()
 
     if (insErr) {
-      console.warn('Insert into scholarship_applications error:', insErr.message)
+      console.warn('Initial insert notice (possible missing column in DB schema):', insErr.message)
+      const safeDocuments = {
+        ...(newStudent.documents || {}),
+        district: newStudent.district,
+        preference_state: newStudent.preference_state,
+        preference_district_1: newStudent.preference_district_1,
+        preference_district_2: newStudent.preference_district_2,
+      }
+      const fallbackApplicant = { ...newStudent }
+      delete fallbackApplicant.district
+      delete fallbackApplicant.preference_state
+      delete fallbackApplicant.preference_district_1
+      delete fallbackApplicant.preference_district_2
+      fallbackApplicant.documents = safeDocuments
+
+      const { data: retryData, error: retryErr } = await supabaseAdmin
+        .from('scholarship_applications')
+        .insert(fallbackApplicant)
+        .select()
+        .maybeSingle()
+
+      if (retryErr) {
+        console.warn('Fallback insert notice:', retryErr.message)
+      } else {
+        inserted = retryData
+      }
+    } else {
+      inserted = firstTry
     }
 
     return NextResponse.json({

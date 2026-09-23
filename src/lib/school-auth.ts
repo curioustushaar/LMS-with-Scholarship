@@ -242,3 +242,66 @@ export function schoolSuccessResponse(data: any, message?: string) {
     headers: { 'Content-Type': 'application/json' },
   })
 }
+
+// Helper for Postgres check constraint compliance
+export const VALID_DB_BOARDS = ['CBSE', 'ICSE', 'State Board', 'IB', 'Cambridge', 'Other']
+export const VALID_DB_SCHOOL_TYPES = ['Private', 'Government', 'Other']
+export const VALID_DB_DESIGNATIONS = ['Principal', 'Scholarship Coordinator', 'Other']
+
+export function sanitizeSchoolRecordForDb(input: any) {
+  const isCoaching = input.institution_type === 'coaching' || input.school_id?.startsWith('CCH')
+  
+  const rawBoard = input.board || (isCoaching ? 'JEE & NEET Foundation' : 'CBSE')
+  const rawSchoolType = input.school_type || (isCoaching ? 'Competitive Exam Institute (JEE/NEET)' : 'Private')
+  const rawDesignation = input.designation || (isCoaching ? 'Director / Center Head' : 'Principal')
+
+  const dbBoard = VALID_DB_BOARDS.includes(rawBoard) ? rawBoard : 'Other'
+  const dbSchoolType = VALID_DB_SCHOOL_TYPES.includes(rawSchoolType) ? rawSchoolType : 'Other'
+  const dbDesignation = VALID_DB_DESIGNATIONS.includes(rawDesignation) ? rawDesignation : 'Other'
+
+  const existingBank = typeof input.bank_details === 'object' && input.bank_details !== null ? input.bank_details : {}
+
+  const mergedBankDetails = {
+    ...existingBank,
+    display_board: rawBoard,
+    display_school_type: rawSchoolType,
+    display_designation: rawDesignation,
+    institution_type: isCoaching ? 'coaching' : 'school',
+  }
+
+  return {
+    dbBoard,
+    dbSchoolType,
+    dbDesignation,
+    mergedBankDetails,
+    rawBoard,
+    rawSchoolType,
+    rawDesignation,
+    institutionType: isCoaching ? 'coaching' : 'school',
+  }
+}
+
+export function resolveSchoolPartnerFields(sch: any) {
+  const isCoaching = (
+    sch.institution_type === 'coaching' ||
+    sch.school_id?.startsWith('CCH') ||
+    sch.school_type?.toLowerCase().includes('coaching') ||
+    sch.board?.toLowerCase().includes('jee') ||
+    sch.board?.toLowerCase().includes('neet') ||
+    sch.name?.toLowerCase().includes('coaching') ||
+    sch.name?.toLowerCase().includes('institute') ||
+    sch.bank_details?.institution_type === 'coaching'
+  )
+
+  const rawBoard = sch.bank_details?.display_board || (isCoaching && sch.board === 'Other' ? 'JEE & NEET Foundation' : sch.board) || (isCoaching ? 'JEE & NEET Foundation' : 'CBSE')
+  const rawSchoolType = sch.bank_details?.display_school_type || (isCoaching && sch.school_type === 'Other' ? 'Competitive Exam Institute (JEE/NEET)' : sch.school_type) || (isCoaching ? 'Competitive Exam Institute (JEE/NEET)' : 'Private')
+  const rawDesignation = sch.bank_details?.display_designation || (isCoaching && sch.designation === 'Other' ? 'Director / Center Head' : sch.designation) || (isCoaching ? 'Director / Center Head' : 'Principal')
+
+  return {
+    ...sch,
+    institution_type: isCoaching ? 'coaching' : (sch.institution_type || 'school'),
+    board: rawBoard,
+    school_type: rawSchoolType,
+    designation: rawDesignation,
+  }
+}
