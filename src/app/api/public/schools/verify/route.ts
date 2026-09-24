@@ -52,22 +52,19 @@ export async function GET(request: Request) {
       }, { status: 400 })
     }
 
-    // 3. If scholarship_id provided, verify if this school has tie-up for this scheme
-    let isSchemeAssociated = true
-    let tieUpDetails = null
+    // 3. Fetch tie-up details for custom registration fee and incentive
+    let tieUpQuery = supabaseAdmin
+      .from('school_scholarships')
+      .select('*')
+      .eq('school_id', school.school_id)
+      .eq('status', 'ACTIVE')
 
     if (scholarshipId) {
-      const { data: tieUp } = await supabaseAdmin
-        .from('school_scholarships')
-        .select('*')
-        .eq('school_id', school.school_id)
-        .eq('scholarship_id', scholarshipId)
-        .maybeSingle()
-
-      if (tieUp) {
-        tieUpDetails = tieUp
-      }
+      tieUpQuery = tieUpQuery.eq('scholarship_id', scholarshipId)
     }
+
+    const { data: tieUpList } = await tieUpQuery.limit(1)
+    const tieUpDetails = tieUpList && tieUpList.length > 0 ? tieUpList[0] : null
 
     return NextResponse.json({
       success: true,
@@ -85,6 +82,8 @@ export async function GET(request: Request) {
         contact_person_name: school.contact_person_name,
         designation: school.designation,
         status: school.status,
+        registration_fee: tieUpDetails?.registration_fee ?? 100,
+        incentive_rate: tieUpDetails?.incentive_per_verified_registration ?? 20,
       },
       tie_up: tieUpDetails,
       message: `Verified: ${school.name} (${school.school_id}) is an official active partner institution.`,

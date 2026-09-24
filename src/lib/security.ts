@@ -22,7 +22,12 @@ export const SecurityConfig = {
 
   // CORS settings
   cors: {
-    allowedOrigins: process.env.NEXT_PUBLIC_ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'],
+    allowedOrigins: process.env.NEXT_PUBLIC_ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || [
+      'http://localhost:3001',
+      'http://localhost:3000',
+      'https://www.aagajfoundation.in',
+      'https://aagajfoundation.in',
+    ],
     allowedMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
   },

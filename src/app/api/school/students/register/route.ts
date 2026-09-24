@@ -2,23 +2,25 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifySchoolAccess, schoolErrorResponse } from '@/lib/school-auth'
 import { validateName, validatePhone, validateEmail, validatePincode, validatePercentage } from '@/lib/scholarship-validation'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+
 function generateAppNumber(): string {
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000)
+  const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
   return `SCH-2026-${randomSuffix}`
 }
 
 function generateRegistrationCode(): string {
-  const randomCode = Math.floor(1000 + Math.random() * 9000)
-  return `REG-CODE-${randomCode}`
+  const randomCode = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
+  return `REG-${randomCode}`
 }
 
 function generateRollNumber(schoolId: string): string {
-  const shortSchool = schoolId.replace('SCH', '')
-  const randomDigits = Math.floor(1000 + Math.random() * 9000)
-  return `TS2026${shortSchool}${randomDigits}`
+  const shortSchool = schoolId.replace('SCH', '').slice(0, 4)
+  const randomHex = crypto.randomBytes(2).toString('hex').toUpperCase()
+  return `TS2026${shortSchool}${randomHex}`
 }
 
 // POST /api/school/students/register
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
     const applicationNo = generateAppNumber()
     const regCode = generateRegistrationCode()
     const rollNumber = generateRollNumber(school.school_id)
-    const applicantId = `app-sch-${Date.now()}`
+    const applicantId = `app-sch-${crypto.randomUUID()}`
 
     const feeAmount = assignment?.registration_fee ?? scheme?.application_fee ?? 0
     const paymentStatus = 'paid' // School-registered students are pre-verified / batch paid

@@ -3,7 +3,13 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 
-function getRazorpaySecret() {
+// Cache key_secret at module load time — ONE disk read, not one per request.
+// Under 50+ concurrent payments, per-request .env reads cause I/O contention.
+let _cachedSecret: string | null = null
+
+function getRazorpaySecret(): string | null {
+  if (_cachedSecret) return _cachedSecret
+
   let key_secret = process.env.RAZORPAY_KEY_SECRET
 
   if (!key_secret) {
@@ -25,7 +31,11 @@ function getRazorpaySecret() {
     }
   }
 
-  return key_secret
+  if (key_secret) {
+    _cachedSecret = key_secret
+  }
+
+  return key_secret || null
 }
 
 export async function POST(request: Request) {

@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server'
 import Razorpay from 'razorpay'
+import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 
+// Cache credentials at module level — reads .env once, not on every request.
+// Under concurrent payment load, per-request disk reads cause I/O contention.
+let _cachedKeyId: string | null = null
+let _cachedKeySecret: string | null = null
+
 function getRazorpayCredentials() {
+  // Return cached values if already loaded
+  if (_cachedKeyId && _cachedKeySecret) {
+    return { key_id: _cachedKeyId, key_secret: _cachedKeySecret }
+  }
+
   let key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
   let key_secret = process.env.RAZORPAY_KEY_SECRET
 
@@ -30,9 +41,13 @@ function getRazorpayCredentials() {
         }
       }
     } catch (e) {
-      console.error('Failed to read .env fallback:', e)
+      console.error('Failed to read .env fallback in create-order:', e)
     }
   }
+
+  // Cache for all subsequent requests
+  if (key_id) _cachedKeyId = key_id
+  if (key_secret) _cachedKeySecret = key_secret
 
   return { key_id, key_secret }
 }
@@ -67,7 +82,7 @@ export async function POST(request: Request) {
     const options = {
       amount: Math.round(Number(amount) * 100), // amount in paise (INR)
       currency: 'INR',
-      receipt: `sch_rec_${Date.now().toString().slice(-10)}`,
+      receipt: `sch_${crypto.randomBytes(8).toString('hex')}`, // collision-proof under concurrent load
       notes: {
         scholarship_id: scholarship_id || '',
         applicant_name: applicant_name || '',

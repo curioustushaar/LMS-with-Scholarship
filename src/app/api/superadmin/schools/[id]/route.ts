@@ -158,6 +158,65 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         .eq('school_id', updatedSchool.school_id)
     }
 
+    // 3. Sync registration_fee and incentive_rate to assigned school_scholarships
+    const targetSchoolId = updatedSchool?.school_id || schoolIdentifier
+    const rawRegFee = body.registration_fee !== undefined ? Number(body.registration_fee) : undefined
+    const rawIncentive = body.incentive_rate !== undefined ? Number(body.incentive_rate) : undefined
+
+    if (rawRegFee !== undefined || rawIncentive !== undefined) {
+      const assnUpdates: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      }
+      if (rawRegFee !== undefined && !isNaN(rawRegFee)) {
+        assnUpdates.registration_fee = rawRegFee
+      }
+      if (rawIncentive !== undefined && !isNaN(rawIncentive)) {
+        assnUpdates.incentive_per_verified_registration = rawIncentive
+      }
+
+      await supabaseAdmin
+        .from('school_scholarships')
+        .update(assnUpdates)
+        .eq('school_id', targetSchoolId)
+    }
+
+    // 4. If scholarship_ids array is provided, sync assigned schemes
+    if (Array.isArray(body.scholarship_ids) && body.scholarship_ids.length > 0) {
+      const targetIds: string[] = body.scholarship_ids
+      const fee = rawRegFee !== undefined && !isNaN(rawRegFee) ? rawRegFee : 100
+      const inc = rawIncentive !== undefined && !isNaN(rawIncentive) ? rawIncentive : 20
+
+      const { data: existingAssns } = await supabaseAdmin
+        .from('school_scholarships')
+        .select('*')
+        .eq('school_id', targetSchoolId)
+
+      const existingMap = new Map((existingAssns || []).map((a: any) => [a.scholarship_id, a]))
+
+      const upsertRows = targetIds.map((schId, idx) => {
+        const exist = existingMap.get(schId)
+        return {
+          id: exist?.id || `ss-${Date.now()}-${idx}`,
+          school_id: targetSchoolId,
+          scholarship_id: schId,
+          registration_fee: fee,
+          incentive_per_verified_registration: inc,
+          status: exist?.status || 'ACTIVE',
+          start_date: exist?.start_date || new Date().toISOString().split('T')[0],
+          created_at: exist?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      })
+
+      try {
+        await supabaseAdmin
+          .from('school_scholarships')
+          .upsert(upsertRows, { onConflict: 'school_id,scholarship_id' })
+      } catch (upsertErr: any) {
+        console.warn('Upsert school_scholarships notice:', upsertErr.message)
+      }
+    }
+
     const resolved = resolveSchoolPartnerFields(updatedSchool || { school_id: schoolIdentifier, ...updatePayload })
 
     return NextResponse.json({

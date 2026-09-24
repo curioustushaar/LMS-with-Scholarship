@@ -21,8 +21,13 @@ export function middleware(request: NextRequest) {
   // CORS restriction for API routes
   if (isApiRoute) {
     const origin = request.headers.get('origin')
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001']
-    if (origin && allowedOrigins.includes(origin)) {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || [
+      'http://localhost:3001',
+      'http://localhost:3000',
+      'https://www.aagajfoundation.in',
+      'https://aagajfoundation.in',
+    ]
+    if (origin && (allowedOrigins.includes(origin) || origin.includes('aagajfoundation.in') || origin.includes('localhost'))) {
       response.headers.set('Access-Control-Allow-Origin', origin)
       response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
       response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')

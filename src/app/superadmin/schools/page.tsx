@@ -52,6 +52,7 @@ interface SchoolItem {
   total_incentive_earned?: number
   total_incentive_paid?: number
   total_incentive_pending?: number
+  assigned_scholarships?: any[]
   created_at: string
 }
 
@@ -231,6 +232,11 @@ export default function SuperadminSchoolsPage() {
   const handleOpenEdit = (school: SchoolItem) => {
     setSelectedSchool(school)
     const isCoaching = school.institution_type === 'coaching' || school.school_id?.startsWith('CCH')
+    
+    const currentAssignments = school.assigned_scholarships || []
+    const currentAssn = currentAssignments[0]
+    const assignedIds = currentAssignments.map((a: any) => a.scholarship_id).filter(Boolean)
+
     setFormData({
       name: school.name,
       institution_type: isCoaching ? 'coaching' : 'school',
@@ -246,10 +252,10 @@ export default function SuperadminSchoolsPage() {
       official_email: school.official_email,
       mobile: school.mobile,
       status: school.status,
-      scholarship_ids: [],
-      initial_scholarship_id: '',
-      incentive_rate: 20,
-      registration_fee: 100,
+      scholarship_ids: assignedIds.length > 0 ? assignedIds : schemesList.map((s) => s.id),
+      initial_scholarship_id: currentAssn?.scholarship_id || schemesList[0]?.id || '',
+      incentive_rate: currentAssn?.incentive_per_verified_registration !== undefined ? Number(currentAssn.incentive_per_verified_registration) : 20,
+      registration_fee: currentAssn?.registration_fee !== undefined ? Number(currentAssn.registration_fee) : 100,
     })
     setShowEditModal(true)
   }
@@ -1348,6 +1354,118 @@ export default function SuperadminSchoolsPage() {
                       <option value="SUSPENDED">SUSPENDED (Temporarily Blocked)</option>
                       <option value="PENDING">PENDING (Approval Awaited)</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SCHOLARSHIP SCHEMES, FORM FEE & INCENTIVE SETTINGS */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[#C81E4E] uppercase tracking-wider">
+                    Tie-up Schemes, Form Fee & Incentive Settings
+                  </h4>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Net Intake: ₹{Math.max(0, formData.registration_fee - formData.incentive_rate)} / student
+                  </span>
+                </div>
+
+                {/* Form Fee & Incentive Inputs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/80 p-4 rounded-2xl border border-gray-200/80">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 uppercase mb-1">
+                      Student Form Fee (₹) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-500">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formData.registration_fee}
+                        onChange={(e) => setFormData({ ...formData, registration_fee: Number(e.target.value) })}
+                        placeholder="e.g. 100"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold text-gray-900 bg-white focus:ring-2 focus:ring-[#FF2D8D] focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      This fee will be charged to candidates registering under this partner.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 uppercase mb-1">
+                      {formData.institution_type === 'coaching' ? 'Coaching Incentive per Student (₹) *' : 'School Incentive per Student (₹) *'}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-500">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formData.incentive_rate}
+                        onChange={(e) => setFormData({ ...formData, incentive_rate: Number(e.target.value) })}
+                        placeholder="e.g. 20"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold text-emerald-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Payout credited to the institution for each verified student registration.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Assigned Schemes Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1.5">
+                    Assigned Scholarship Schemes ({formData.scholarship_ids.length} Selected)
+                  </label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {schemesList.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No scholarship schemes found in database.</p>
+                    ) : (
+                      schemesList.map((s) => {
+                        const isSelected = formData.scholarship_ids.includes(s.id)
+                        return (
+                          <label
+                            key={s.id}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-pink-50/70 border-pink-200 shadow-sm'
+                                : 'bg-white border-gray-100 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormData({ ...formData, scholarship_ids: [...formData.scholarship_ids, s.id] })
+                                  } else {
+                                    setFormData({
+                                      ...formData,
+                                      scholarship_ids: formData.scholarship_ids.filter((id) => id !== s.id),
+                                    })
+                                  }
+                                }}
+                                className="w-4 h-4 text-[#FF2D8D] rounded border-gray-300 focus:ring-[#FF2D8D]"
+                              />
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">{s.title}</p>
+                                <p className="text-[10px] text-gray-400">ID: {s.id} • Standard Scheme Fee: ₹{s.application_fee || 100}</p>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                isSelected ? 'bg-pink-200 text-pink-800' : 'bg-gray-100 text-gray-500'
+                              }`}
+                            >
+                              {isSelected ? 'Assigned' : 'Unassigned'}
+                            </span>
+                          </label>
+                        )
+                      })
+                    )}
                   </div>
                 </div>
               </div>
