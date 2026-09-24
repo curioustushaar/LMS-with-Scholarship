@@ -281,6 +281,20 @@ export async function POST(request: Request) {
     const targetType = isCoaching ? 'coaching' : 'school'
     const cleanEmail = official_email.trim().toLowerCase()
     const autoPartnerId = await getNextPartnerId(targetType)
+    // Pre-check for duplicate email in schools table
+    const { data: existingSchool } = await supabaseAdmin
+      .from('schools')
+      .select('id, school_id, name, official_email')
+      .eq('official_email', cleanEmail)
+      .maybeSingle()
+
+    if (existingSchool) {
+      return errorResponse(
+        `An institution partner with official email "${cleanEmail}" is already registered (Partner ID: ${existingSchool.school_id}, Name: ${existingSchool.name}). Duplicate registration prevented.`,
+        409
+      )
+    }
+
     const tempPassword = generateTemporaryPassword(targetType)
     const partnerUuid = `${targetType === 'coaching' ? 'cch' : 'sch'}-inst-${Date.now()}`
 

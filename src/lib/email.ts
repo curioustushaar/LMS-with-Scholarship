@@ -16,7 +16,14 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  pool: true,          // Use connection pool — reuse SMTP connections instead of open/close per email
+  maxConnections: 3,   // Max 3 simultaneous SMTP connections (safe for Gmail)
+  maxMessages: 50,     // Max messages per connection before reconnect
 } as any)
+
+// Increase listener limit to prevent MaxListenersExceededWarning under concurrent payments
+// (each sendMail attaches listeners; default Node.js limit is 10)
+transporter.setMaxListeners(30)
 
 interface SendEmailParams {
   to: string | string[]
@@ -159,7 +166,7 @@ export async function sendScholarshipPaymentEmail(data: {
             ${father_name ? `<tr><td style="padding: 6px 0; color: #4b5563;">Father's Name:</td><td>${father_name}</td></tr>` : ''}
             <tr><td style="padding: 6px 0; color: #4b5563;">Scholarship Scheme:</td><td>${scholarship_title}</td></tr>
             ${payment_reference ? `<tr><td style="padding: 6px 0; color: #4b5563;">Transaction Ref:</td><td style="font-family: monospace;">${payment_reference}</td></tr>` : ''}
-            ${amount ? `<tr><td style="padding: 6px 0; color: #4b5563;">Fee Amount Paid:</td><td style="font-weight: bold; color: #059669;">₹${amount}</td></tr>` : ''}
+            ${amount !== undefined && amount !== null && amount !== '' ? `<tr><td style="padding: 6px 0; color: #4b5563;">Fee Amount Paid:</td><td style="font-weight: bold; color: #059669;">${Number(amount) === 0 ? '₹0.00 (Exempted / Free)' : `₹${amount}`}</td></tr>` : ''}
           </table>
         </div>
 

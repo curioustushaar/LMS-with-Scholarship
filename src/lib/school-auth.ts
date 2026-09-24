@@ -10,7 +10,7 @@ export function generateSchoolToken(payload: { school_id: string; email: string;
       ...payload,
       role: 'school',
       exp: Math.floor(Date.now() / 1000) + 30 * 86400, // 30 days
-      iat: Math.floor(Date.now() / 1000),
+      iat: Math.floor(Date.now() / 1000) - 60, // 60-second clock skew tolerance to prevent PGRST303
     })
   ).toString('base64url')
   const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url')
