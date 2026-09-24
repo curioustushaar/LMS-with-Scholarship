@@ -939,10 +939,10 @@ export default function ScholarshipsPage() {
   }
 
   // Computed Referral Discount & Payable Amount
-  const baseFormFee = selectedScheme?.application_fee || 0
+  const baseFormFee = selectedScheme?.application_fee !== undefined && selectedScheme?.application_fee !== null ? Number(selectedScheme.application_fee) : 0
   const referralDiscountPercent = Math.max(0, Math.min(100, Number(refCodeVerifiedData?.discount_percent) || 0))
   const referralDiscountAmount = Math.round((baseFormFee * referralDiscountPercent) / 100)
-  const payableFormFee = (selectedScheme?.application_fee || 0) === 0 ? 0 : 1 // Temporarily set to ₹1 for live testing
+  const payableFormFee = Math.max(0, baseFormFee - referralDiscountAmount)
 
   // Submit Application Form -> Move to Payment or Instant Free Submission
   const handleProceedToPayment = (e: React.FormEvent) => {
