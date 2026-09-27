@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { getSchoolClientAuthToken } from '@/lib/auth-helpers'
+import { getIndianStates, getDistrictsForState } from '@/lib/india-locations'
 import {
   FiUsers,
   FiPlus,
@@ -21,6 +22,8 @@ import {
   FiCheck,
   FiX,
   FiShield,
+  FiEdit2,
+  FiMapPin,
 } from 'react-icons/fi'
 
 export default function SchoolStudentsPage() {
@@ -49,6 +52,36 @@ export default function SchoolStudentsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectingIds, setRejectingIds] = useState<string[]>([])
   const [rejectionReason, setRejectionReason] = useState('')
+
+  // Edit Student Modal State (School Portal)
+  const [showEditStudentModal, setShowEditStudentModal] = useState(false)
+  const [editingStudent, setEditingStudent] = useState<any>(null)
+  const [editStudentSaving, setEditStudentSaving] = useState(false)
+  const [editStudentForm, setEditStudentForm] = useState({
+    applicant_name: '',
+    father_name: '',
+    mother_name: '',
+    applicant_phone: '',
+    applicant_email: '',
+    dob: '',
+    gender: 'male',
+    category: 'General',
+    school_class: '',
+    qualification: '',
+    school_roll_number: '',
+    school_section: '',
+    school_admission_no: '',
+    percentage: 0,
+    annual_family_income: 0,
+    address: '',
+    city: '',
+    district: '',
+    state: 'Bihar',
+    pincode: '',
+    preference_state: 'Bihar',
+    preference_district_1: 'Patna',
+    preference_district_2: 'Gaya',
+  })
 
   const getToken = async () => await getSchoolClientAuthToken()
 
@@ -169,6 +202,85 @@ export default function SchoolStudentsPage() {
       alert(err.message || 'Error rejecting students')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  // Open Edit Student Modal
+  const handleOpenEditStudent = (st: any) => {
+    setEditingStudent(st)
+    const docs = (typeof st.documents === 'object' && st.documents) ? st.documents : {}
+    setEditStudentForm({
+      applicant_name: st.applicant_name || '',
+      father_name: st.father_name || docs.father_name || '',
+      mother_name: docs.mother_name || '',
+      applicant_phone: st.applicant_phone || '',
+      applicant_email: st.applicant_email || '',
+      dob: st.dob || docs.dob || '',
+      gender: docs.gender || 'male',
+      category: st.category || docs.category || 'General',
+      school_class: st.school_class || st.qualification || docs.school_class || 'Class 10th',
+      qualification: st.school_class || st.qualification || docs.school_class || 'Class 10th',
+      school_roll_number: st.school_roll_number || docs.school_roll_no || '',
+      school_section: st.school_section || docs.school_section || '',
+      school_admission_no: docs.school_admission_no || docs.admission_no || '',
+      percentage: st.percentage != null ? Number(st.percentage) : (Number(docs.percentage) || 0),
+      annual_family_income: st.annual_family_income != null ? Number(st.annual_family_income) : (Number(docs.annual_family_income) || 0),
+      address: st.address || docs.address || '',
+      city: st.city || docs.city || '',
+      district: st.district || docs.district || '',
+      state: st.state || docs.state || 'Bihar',
+      pincode: st.pincode || docs.pincode || '',
+      preference_state: st.preference_state || docs.preference_state || 'Bihar',
+      preference_district_1: st.preference_district_1 || docs.preference_district_1 || 'Patna',
+      preference_district_2: st.preference_district_2 || docs.preference_district_2 || 'Gaya',
+    })
+    setShowEditStudentModal(true)
+  }
+
+  // Save Student Edits (School Portal)
+  const handleSaveStudentEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingStudent) return
+
+    if (!editStudentForm.applicant_name?.trim()) {
+      alert('Student Full Name is required.')
+      return
+    }
+    if (!editStudentForm.applicant_phone?.trim()) {
+      alert('Student Phone number is required.')
+      return
+    }
+
+    setEditStudentSaving(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/school/students', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: editingStudent.id,
+          ...editStudentForm,
+          percentage: Number(editStudentForm.percentage) || 0,
+          annual_family_income: Number(editStudentForm.annual_family_income) || 0,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('Student details updated successfully!')
+        setShowEditStudentModal(false)
+        setEditingStudent(null)
+        fetchStudents()
+      } else {
+        alert(data.error || 'Failed to update student details.')
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert('Network error while updating student: ' + (err?.message || err))
+    } finally {
+      setEditStudentSaving(false)
     }
   }
 
@@ -600,6 +712,14 @@ export default function SchoolStudentsPage() {
                             <FiFileText size={15} />
                           </button>
 
+                          <button
+                            onClick={() => handleOpenEditStudent(s)}
+                            className="p-1.5 text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="Edit Student Details"
+                          >
+                            <FiEdit2 size={15} />
+                          </button>
+
                           {status === 'PENDING' && (
                             <>
                               <button
@@ -759,6 +879,19 @@ export default function SchoolStudentsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => {
+                    const st = selectedStudent
+                    setShowInspectionModal(false)
+                    handleOpenEditStudent(st)
+                  }}
+                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                  title="Edit Student Details"
+                >
+                  <FiEdit2 size={13} />
+                  <span>Edit Details</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleOpenReject([selectedStudent.id])}
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-black transition-colors flex items-center gap-1"
@@ -908,6 +1041,349 @@ export default function SchoolStudentsPage() {
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: EDIT STUDENT APPLICATION (SCHOOL PORTAL) */}
+      {showEditStudentModal && editingStudent && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-gray-200 my-8 overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-6 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/30 text-purple-200 border border-purple-400/40">
+                    School Student Editor
+                  </span>
+                  <span className="text-[11px] font-mono text-gray-300">
+                    App: {editingStudent.application_no}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                  <FiEdit2 className="text-purple-400" />
+                  Edit Student Details — {editingStudent.applicant_name}
+                </h3>
+                <p className="text-xs text-purple-200/80">
+                  Correct inaccurate student credentials, class, roll number, or exam preferences.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditStudentModal(false)
+                  setEditingStudent(null)
+                }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 ml-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <form id="edit-school-student-form" onSubmit={handleSaveStudentEdit} className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs text-gray-700 flex-1">
+              {/* Section 1: Student Identity & Contact */}
+              <div className="bg-purple-50/40 rounded-2xl p-4 border border-purple-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-purple-900 font-black text-xs uppercase tracking-wider border-b border-purple-100 pb-2">
+                  <FiUsers size={14} className="text-purple-600" />
+                  <span>1. Student Identity & Contact</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Student Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editStudentForm.applicant_name}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, applicant_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Phone / WhatsApp No *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editStudentForm.applicant_phone}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, applicant_phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={editStudentForm.applicant_email}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, applicant_email: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Father / Guardian Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.father_name}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, father_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Mother Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.mother_name}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, mother_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Date of Birth
+                    </label>
+                    <input
+                      type="date"
+                      value={editStudentForm.dob}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, dob: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Gender
+                    </label>
+                    <select
+                      value={editStudentForm.gender}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, gender: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={editStudentForm.category}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, category: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    >
+                      <option value="General">General</option>
+                      <option value="OBC">OBC</option>
+                      <option value="SC">SC</option>
+                      <option value="ST">ST</option>
+                      <option value="EWS">EWS</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: School Academic Enrollment Details */}
+              <div className="bg-blue-50/40 rounded-2xl p-4 border border-blue-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-wider border-b border-blue-100 pb-2">
+                  <FiFileText size={14} className="text-blue-600" />
+                  <span>2. School Academic Credentials</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Class / Standard *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editStudentForm.school_class}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, school_class: e.target.value, qualification: e.target.value })}
+                      placeholder="e.g. Class 10th"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      School Roll No
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.school_roll_number}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, school_roll_number: e.target.value })}
+                      placeholder="e.g. 24"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Section
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.school_section}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, school_section: e.target.value })}
+                      placeholder="e.g. A"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Admission / S.R. No
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.school_admission_no}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, school_admission_no: e.target.value })}
+                      placeholder="e.g. ADM-2024-889"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Previous Exam Marks (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={editStudentForm.percentage || ''}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, percentage: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Annual Family Income (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editStudentForm.annual_family_income || ''}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, annual_family_income: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Exam Preferences & Address */}
+              <div className="bg-emerald-50/40 rounded-2xl p-4 border border-emerald-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs uppercase tracking-wider border-b border-emerald-100 pb-2">
+                  <FiMapPin size={14} className="text-emerald-600" />
+                  <span>3. Examination Preferences & Residential Address</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam State
+                    </label>
+                    <select
+                      value={editStudentForm.preference_state}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, preference_state: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getIndianStates().map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam District 1 (First Choice) *
+                    </label>
+                    <select
+                      value={editStudentForm.preference_district_1}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, preference_district_1: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getDistrictsForState(editStudentForm.preference_state).map((dist) => (
+                        <option key={dist} value={dist}>{dist}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam District 2 (Second Choice)
+                    </label>
+                    <select
+                      value={editStudentForm.preference_district_2}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, preference_district_2: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getDistrictsForState(editStudentForm.preference_state).map((dist) => (
+                        <option key={dist} value={dist}>{dist}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Residential Address
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.address}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, address: e.target.value })}
+                      placeholder="House/Street/Locality"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Home City / District
+                    </label>
+                    <input
+                      type="text"
+                      value={editStudentForm.district || editStudentForm.city}
+                      onChange={(e) => setEditStudentForm({ ...editStudentForm, district: e.target.value, city: e.target.value })}
+                      placeholder="e.g. Patna"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditStudentModal(false)
+                  setEditingStudent(null)
+                }}
+                disabled={editStudentSaving}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-school-student-form"
+                disabled={editStudentSaving}
+                className="px-6 py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {editStudentSaving ? (
+                  <>
+                    <FiRefreshCw className="animate-spin" size={13} />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiCheck size={14} />
+                    <span>Save & Update Student Details</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -7,15 +7,33 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-function generateAppNumber(): string {
-  // Use crypto random to avoid collisions under concurrent load
-  const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
-  return `SCH-2026-${randomSuffix}`
+async function generateUniqueAppNumber(): Promise<string> {
+  // Check against DB to guarantee uniqueness under load
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
+    const candidate = `SCH-2026-${randomSuffix}`
+    const { data } = await supabaseAdmin
+      .from('scholarship_applications')
+      .select('id')
+      .eq('application_no', candidate)
+      .maybeSingle()
+    if (!data) return candidate
+  }
+  return `SCH-2026-${crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6)}`
 }
 
-function generateRegistrationCode(): string {
-  const randomCode = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
-  return `REG-${randomCode}`
+async function generateUniqueRegistrationCode(): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const randomCode = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5)
+    const candidate = `REG-${randomCode}`
+    const { data } = await supabaseAdmin
+      .from('scholarship_applications')
+      .select('id')
+      .eq('registration_code', candidate)
+      .maybeSingle()
+    if (!data) return candidate
+  }
+  return `REG-${crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6)}`
 }
 
 // POST /api/public/scholarships/apply
@@ -139,14 +157,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── TIMING: T1 = starting parallel DB lookups ─────────────────────────
+    // ── TIMING: T1 = starting DB lookups ─────────────────────────────────
     const T1 = Date.now()
-    console.log(`[${correlationId}] T1 validation done (+${T1 - T0}ms), starting parallel DB lookups`)
+    console.log(`[${correlationId}] T1 validation done (+${T1 - T0}ms), starting DB lookups`)
 
-    // ── FIX 2: Run independent DB queries in PARALLEL ────────────────────
-    // Previously these were 3 serial awaits = 150-450ms wasted
-    // Now all 3 fire simultaneously
-    const [idempotencyResult, duplicateResult, schemeResult] = await Promise.all([
+    // Run idempotency check (by payment reference) and scheme lookup in parallel
+    const [idempotencyResult, schemeResult] = await Promise.all([
       // Query A: Idempotency — if same Razorpay payment_id already processed
       (payment_reference && payment_reference.startsWith('pay_'))
         ? supabaseAdmin
@@ -156,15 +172,7 @@ export async function POST(request: Request) {
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
 
-      // Query B: Duplicate registration check (same email + scholarship)
-      supabaseAdmin
-        .from('scholarship_applications')
-        .select('*')
-        .eq('scholarship_id', scholarship_id)
-        .eq('applicant_email', cleanEmail)
-        .maybeSingle(),
-
-      // Query C: Fetch scholarship scheme details
+      // Query B: Fetch scholarship scheme details
       supabaseAdmin
         .from('scholarships')
         .select('*')
@@ -177,7 +185,6 @@ export async function POST(request: Request) {
     console.log(`[${correlationId}] T2 parallel DB done (+${T2 - T1}ms)`)
 
     const existingByPayment = idempotencyResult.data
-    const existingApp = duplicateResult.data
     const targetScheme = schemeResult.data
     const schemeErr = schemeResult.error
 
@@ -235,98 +242,17 @@ export async function POST(request: Request) {
     }
 
     const paymentStatus = effectiveFee === 0 ? 'free' : 'paid'
-    const finalPaymentRef = payment_reference || (effectiveFee > 0 ? `PAY_TXN_${Date.now().toString().slice(-8)}` : (refDiscountPercent === 100 ? 'REF_100_DISCOUNT_FREE' : 'FREE_TIER'))
+    const finalPaymentRef = payment_reference || (effectiveFee > 0 ? `PAY_TXN_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}` : (refDiscountPercent === 100 ? `REF_100_FREE_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}` : `FREE_TIER_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`))
 
     const selectedPrefState = preference_state || state || 'Bihar'
     const selectedPrefDist1 = preference_district_1 || district || city || 'Patna'
     const selectedPrefDist2 = preference_district_2 || 'Gaya'
 
-    // Handle duplicate / re-attempt (existing application found for same email+scholarship)
-    if (existingApp) {
-      const updatedDocs = {
-        ...(existingApp.documents || {}),
-        ...(typeof documents === 'object' && documents ? documents : {}),
-        academic_records: academic_records || existingApp.documents?.academic_records || [],
-        reference_code: cleanRefCode || existingApp.reference_code,
-        payment_reference: finalPaymentRef,
-        payment_amount: effectiveFee,
-        updated_via: 'paid_confirmation',
-      }
-
-      const updatePayload: Record<string, any> = {
-        applicant_name: applicant_name?.trim() || existingApp.applicant_name,
-        applicant_phone: applicant_phone?.trim() || existingApp.applicant_phone,
-        status: 'confirmed',
-        payment_status: paymentStatus,
-        payment_reference: finalPaymentRef,
-        payment_amount: effectiveFee,
-        documents: updatedDocs,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (photo_url) updatePayload.photo_url = photo_url
-      if (signature_url) updatePayload.signature_url = signature_url
-      if (aadhaar_url) updatePayload.aadhaar_url = aadhaar_url
-      if (marksheet_url) updatePayload.marksheet_url = marksheet_url
-
-      // ── TIMING: T3 = DB update starting ──────────────────────────────
-      const T3 = Date.now()
-      const { data: updatedApp } = await supabaseAdmin
-        .from('scholarship_applications')
-        .update(updatePayload)
-        .eq('id', existingApp.id)
-        .select()
-        .single()
-
-      const T4 = Date.now()
-      console.log(`[${correlationId}] T4 DB update done (+${T4 - T3}ms) total_so_far=${T4 - T0}ms`)
-
-      const finalRecord = updatedApp || { ...existingApp, ...updatePayload }
-
-      // Fire email asynchronously — does NOT block receipt
-      if (finalRecord?.applicant_email) {
-        sendScholarshipPaymentEmail({
-          applicant_name: finalRecord.applicant_name,
-          applicant_email: finalRecord.applicant_email,
-          application_no: finalRecord.application_no,
-          registration_code: finalRecord.registration_code,
-          scholarship_title: finalRecord.scholarship_title || schemeTitle,
-          father_name: finalRecord.father_name,
-          payment_reference: finalPaymentRef,
-          amount: effectiveFee,
-        }).catch((err) => console.error(`[${correlationId}] Email send error on update:`, err))
-      }
-
-      const Tfinal = Date.now()
-      console.log(`[${correlationId}] DONE (update path) total=${Tfinal - T0}ms`)
-
-      return NextResponse.json({
-        success: true,
-        message: 'Payment verified and scholarship application confirmed successfully!',
-        data: finalRecord,
-        provisional_admit_card: {
-          application_no: finalRecord.application_no,
-          registration_code: finalRecord.registration_code,
-          applicant_name: finalRecord.applicant_name,
-          scholarship_title: finalRecord.scholarship_title || schemeTitle,
-          photo_url: finalRecord.photo_url,
-          preference_district_1: selectedPrefDist1,
-          preference_district_2: selectedPrefDist2,
-          preference_state: selectedPrefState,
-          exam_mode: targetScheme?.exam_mode || 'online',
-          exam_date: targetScheme?.exam_date || '2026-09-20',
-          exam_time: targetScheme?.exam_time || '10:00 AM - 12:30 PM',
-          exam_venue: 'To be designated across approved centers in your preferred district upon Official Admit Card Release',
-          admit_card_release_date: targetScheme?.admit_card_release_date || '2026-09-10',
-          status: 'PROVISIONAL REGISTRATION ACKNOWLEDGMENT - VENUE ALLOCATION PENDING',
-          note: 'Keep your Registration Code and Application Number safe. Your Official Hall Ticket containing your exact Center Address and Roll Number will be available for download once Superadmin publishes Admit Cards.',
-        },
-      })
-    }
-
-    // ── New application: generate unique IDs ─────────────────────────────
-    const applicationNo = generateAppNumber()
-    const regCode = generateRegistrationCode()
+    // ── Generate Unique Identifiers (Concurrency-safe and verified against DB) ──
+    const [applicationNo, regCode] = await Promise.all([
+      generateUniqueAppNumber(),
+      generateUniqueRegistrationCode(),
+    ])
     const applicantId = `app-${crypto.randomUUID()}`
 
     const newApplicant = {
@@ -336,8 +262,8 @@ export async function POST(request: Request) {
       scholarship_id: scholarship_id,
       scholarship_title: schemeTitle,
       applicant_name: applicant_name.trim(),
-      applicant_email: applicant_email.trim().toLowerCase(),
-      applicant_phone: applicant_phone?.trim() || '',
+      applicant_email: cleanEmail,
+      applicant_phone: cleanPhone,
       qualification: qualification?.trim() || '12th (PCM)',
       percentage: percentage ? parseFloat(percentage) : 80.0,
       annual_family_income: annual_family_income ? parseFloat(annual_family_income) : 5.0,
@@ -367,7 +293,6 @@ export async function POST(request: Request) {
       college_id_url: college_id_url || '',
       reference_code: cleanRefCode,
       documents: {
-        // NOTE: We do NOT embed full base64 here — they are already stored in top-level URL fields
         aadhaar_uploaded: !!aadhaar_url,
         marksheet_uploaded: !!marksheet_url,
         college_id_uploaded: !!college_id_url,
@@ -401,9 +326,9 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
-    // ── TIMING: T5 = DB insert starting ──────────────────────────────────
-    const T5 = Date.now()
-    console.log(`[${correlationId}] T5 DB insert starting (+${T5 - T0}ms)`)
+    // ── TIMING: T3 = DB insert starting ──────────────────────────────────
+    const T3 = Date.now()
+    console.log(`[${correlationId}] T3 DB insert starting (+${T3 - T0}ms)`)
 
     let insertedData: any = null
     const { data: firstTry, error: insertErr } = await supabaseAdmin
@@ -413,22 +338,68 @@ export async function POST(request: Request) {
       .single()
 
     if (insertErr) {
-      console.warn(`[${correlationId}] Initial insert notice (possible missing column):`, insertErr.message)
+      console.warn(`[${correlationId}] Initial insert notice:`, insertErr.message, insertErr.code)
 
-      // Fallback: embed district/preference/reference_code into documents JSONB and retry
+      // 1. Race condition check on payment_reference (concurrent duplicate submission)
+      if (insertErr.code === '23505' && insertErr.message?.includes('payment_reference')) {
+        const { data: existingAfterRace } = await supabaseAdmin
+          .from('scholarship_applications')
+          .select('*')
+          .eq('payment_reference', finalPaymentRef)
+          .maybeSingle()
+
+        if (existingAfterRace) {
+          console.log(`[${correlationId}] Race condition resolved idempotently for payment_ref=${finalPaymentRef}`)
+          return NextResponse.json({
+            success: true,
+            message: 'Application already confirmed (idempotent race resolution).',
+            data: existingAfterRace,
+            provisional_admit_card: {
+              application_no: existingAfterRace.application_no,
+              registration_code: existingAfterRace.registration_code,
+              applicant_name: existingAfterRace.applicant_name,
+              scholarship_title: existingAfterRace.scholarship_title,
+              photo_url: existingAfterRace.photo_url,
+              preference_district_1: selectedPrefDist1,
+              preference_district_2: selectedPrefDist2,
+              preference_state: selectedPrefState,
+              exam_mode: targetScheme?.exam_mode || 'online',
+              exam_date: targetScheme?.exam_date || '2026-09-20',
+              exam_time: targetScheme?.exam_time || '10:00 AM - 12:30 PM',
+              exam_venue: 'To be designated across approved centers in your preferred district upon Official Admit Card Release',
+              admit_card_release_date: targetScheme?.admit_card_release_date || '2026-09-10',
+              status: 'PROVISIONAL REGISTRATION ACKNOWLEDGMENT - VENUE ALLOCATION PENDING',
+              note: 'Keep your Registration Code and Application Number safe.',
+            },
+          })
+        }
+      }
+
+      // 2. Random identifier collision retry (if application_no or registration_code hit unique constraint)
+      let candidateApplicant = { ...newApplicant }
+      if (insertErr.code === '23505' && (insertErr.message?.includes('application_no') || insertErr.message?.includes('registration_code'))) {
+        const [freshAppNo, freshRegCode] = await Promise.all([
+          generateUniqueAppNumber(),
+          generateUniqueRegistrationCode(),
+        ])
+        candidateApplicant.application_no = freshAppNo
+        candidateApplicant.registration_code = freshRegCode
+      }
+
+      // 3. Fallback: embed district/preference/reference_code into documents JSONB and retry
       const safeDocuments = {
-        ...(newApplicant.documents || {}),
-        district: newApplicant.district,
-        state: newApplicant.state,
-        city: newApplicant.city,
-        pincode: newApplicant.pincode,
-        preference_state: newApplicant.preference_state,
-        preference_district_1: newApplicant.preference_district_1,
-        preference_district_2: newApplicant.preference_district_2,
+        ...(candidateApplicant.documents || {}),
+        district: candidateApplicant.district,
+        state: candidateApplicant.state,
+        city: candidateApplicant.city,
+        pincode: candidateApplicant.pincode,
+        preference_state: candidateApplicant.preference_state,
+        preference_district_1: candidateApplicant.preference_district_1,
+        preference_district_2: candidateApplicant.preference_district_2,
         reference_code: cleanRefCode,
       }
 
-      const fallbackApplicant: any = { ...newApplicant }
+      const fallbackApplicant: any = { ...candidateApplicant }
       delete fallbackApplicant.district
       delete fallbackApplicant.preference_state
       delete fallbackApplicant.preference_district_1
@@ -450,17 +421,33 @@ export async function POST(request: Request) {
         .single()
 
       if (retryErr) {
-        console.error(`[${correlationId}] Insert retry error:`, retryErr)
-        return NextResponse.json({ success: false, error: retryErr.message }, { status: 500 })
+        console.error(`[${correlationId}] Insert failed permanently:`, retryErr)
+        // STRICT RULE: If DB insertion fails:
+        // - DO NOT send an application-success email.
+        // - DO NOT use another student's application data as fallback.
+        // - Return a proper error.
+        // - Log the error safely.
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to record application in database. Please contact support with payment reference: ' + finalPaymentRef
+        }, { status: 500 })
       }
       insertedData = retryData
     } else {
       insertedData = firstTry
     }
 
+    if (!insertedData || !insertedData.id) {
+      console.error(`[${correlationId}] DB insert did not return confirmed record`)
+      return NextResponse.json({
+        success: false,
+        error: 'Application confirmation failed. No record created in database.'
+      }, { status: 500 })
+    }
+
     // ── TIMING: T6 = DB insert done ───────────────────────────────────────
     const T6 = Date.now()
-    console.log(`[${correlationId}] T6 DB insert done (+${T6 - T5}ms) total_so_far=${T6 - T0}ms`)
+    console.log(`[${correlationId}] T6 DB insert done (+${T6 - T3}ms) total_so_far=${T6 - T0}ms`)
 
     // ── Fire email AFTER response is queued — does NOT block receipt ──────
     if (insertedData?.applicant_email) {

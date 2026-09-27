@@ -309,6 +309,37 @@ export default function SuperadminScholarshipsPage() {
   const [activeDocTab, setActiveDocTab] = useState<string>('marksheet')
   const [copiedVoucher, setCopiedVoucher] = useState(false)
 
+  // Candidate Application Edit Modal State (Superadmin)
+  const [showEditApplicantModal, setShowEditApplicantModal] = useState(false)
+  const [editingApplicant, setEditingApplicant] = useState<ScholarshipApplicant | null>(null)
+  const [editApplicantSaving, setEditApplicantSaving] = useState(false)
+  const [editApplicantForm, setEditApplicantForm] = useState({
+    applicant_name: '',
+    father_name: '',
+    mother_name: '',
+    applicant_phone: '',
+    applicant_email: '',
+    dob: '',
+    gender: 'male',
+    category: 'General',
+    school_name: '',
+    school_class: '',
+    qualification: '',
+    school_roll_number: '',
+    school_section: '',
+    admission_no: '',
+    percentage: 0,
+    annual_family_income: 0,
+    address: '',
+    city: '',
+    district: '',
+    state: 'Bihar',
+    pincode: '',
+    preference_state: 'Bihar',
+    preference_district_1: 'Patna',
+    preference_district_2: 'Gaya',
+  })
+
   const [previewAdmitCard, setPreviewAdmitCard] = useState<ScholarshipApplicant | null>(null)
 
   // Center-Wise Candidate Verification Roster Modal State
@@ -877,6 +908,86 @@ export default function SuperadminScholarshipsPage() {
       alert('Error deleting candidate: ' + (err?.message || err))
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  // Open Edit Candidate Details Modal (Superadmin Action)
+  const handleOpenEditApplicant = (app: ScholarshipApplicant) => {
+    setEditingApplicant(app)
+    const docs = (typeof app.documents === 'object' && app.documents) ? app.documents : {}
+    setEditApplicantForm({
+      applicant_name: app.applicant_name || '',
+      father_name: app.father_name || docs.father_name || '',
+      mother_name: docs.mother_name || '',
+      applicant_phone: app.applicant_phone || '',
+      applicant_email: app.applicant_email || '',
+      dob: app.dob || docs.dob || '',
+      gender: docs.gender || 'male',
+      category: app.category || docs.category || 'General',
+      school_name: docs.school_name || docs.school_college_name || '',
+      school_class: app.qualification || docs.school_class || 'Class 10th',
+      qualification: app.qualification || docs.school_class || 'Class 10th',
+      school_roll_number: app.roll_number || docs.school_roll_no || '',
+      school_section: docs.school_section || '',
+      admission_no: docs.school_admission_no || docs.admission_no || '',
+      percentage: app.percentage != null ? Number(app.percentage) : (Number(docs.percentage) || 0),
+      annual_family_income: app.annual_family_income != null ? Number(app.annual_family_income) : (Number(docs.annual_family_income) || 0),
+      address: app.address || docs.address || '',
+      city: app.city || docs.city || '',
+      district: app.district || docs.district || '',
+      state: app.state || docs.state || 'Bihar',
+      pincode: app.pincode || docs.pincode || '',
+      preference_state: app.preference_state || docs.preference_state || 'Bihar',
+      preference_district_1: app.preference_district_1 || docs.preference_district_1 || 'Patna',
+      preference_district_2: app.preference_district_2 || docs.preference_district_2 || 'Gaya',
+    })
+    setShowEditApplicantModal(true)
+  }
+
+  // Save Applicant Edits (Superadmin)
+  const handleSaveApplicantEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingApplicant) return
+
+    if (!editApplicantForm.applicant_name?.trim()) {
+      alert('Student Full Name is required.')
+      return
+    }
+    if (!editApplicantForm.applicant_phone?.trim()) {
+      alert('Student Phone number is required.')
+      return
+    }
+
+    setEditApplicantSaving(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/superadmin/scholarships/applications', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: editingApplicant.id,
+          ...editApplicantForm,
+          percentage: Number(editApplicantForm.percentage) || 0,
+          annual_family_income: Number(editApplicantForm.annual_family_income) || 0,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('Student details updated successfully!')
+        setShowEditApplicantModal(false)
+        setEditingApplicant(null)
+        fetchData()
+      } else {
+        alert(data.error || 'Failed to update student details.')
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert('Network error while updating student: ' + (err?.message || err))
+    } finally {
+      setEditApplicantSaving(false)
     }
   }
 
@@ -3134,6 +3245,16 @@ export default function SuperadminScholarshipsPage() {
                     </span>
                     <button
                       type="button"
+                      onClick={() => handleOpenEditApplicant(app)}
+                      disabled={actionLoading}
+                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
+                      title={`Edit Application for ${app.applicant_name}`}
+                    >
+                      <FiEdit2 size={11} />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDeleteApplicant(app)}
                       disabled={actionLoading}
                       className="px-2.5 py-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
@@ -3250,16 +3371,28 @@ export default function SuperadminScholarshipsPage() {
                         </span>
                       </td>
                       <td className="px-3.5 sm:px-6 py-3 sm:py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteApplicant(app)}
-                          disabled={actionLoading}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 hover:text-red-700 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs disabled:opacity-50"
-                          title={`Delete application for ${app.applicant_name}`}
-                        >
-                          <FiTrash2 size={13} />
-                          <span>Delete</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditApplicant(app)}
+                            disabled={actionLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 hover:text-blue-800 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs disabled:opacity-50"
+                            title={`Edit application details for ${app.applicant_name}`}
+                          >
+                            <FiEdit2 size={13} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteApplicant(app)}
+                            disabled={actionLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 hover:text-red-700 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs disabled:opacity-50"
+                            title={`Delete application for ${app.applicant_name}`}
+                          >
+                            <FiTrash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -6421,7 +6554,21 @@ export default function SuperadminScholarshipsPage() {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex gap-3 pt-3 border-t border-gray-100">
+                <div className="flex gap-2.5 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (inspectingApplicant) {
+                        setShowDossierModal(false)
+                        handleOpenEditApplicant(inspectingApplicant)
+                      }
+                    }}
+                    className="py-2.5 px-4 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center justify-center gap-1.5"
+                    title="Edit Student Information"
+                  >
+                    <FiEdit2 size={13} />
+                    <span>Edit Student</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowDossierModal(false)}
@@ -8556,6 +8703,361 @@ export default function SuperadminScholarshipsPage() {
                 className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL 10: EDIT CANDIDATE INFORMATION (SUPERADMIN) */}
+      {mounted && showEditApplicantModal && editingApplicant && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-gray-200 my-8 overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-6 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-200 border border-blue-400/40">
+                    Candidate Profile Editor
+                  </span>
+                  <span className="text-[11px] font-mono text-gray-300">
+                    App: {editingApplicant.application_no}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                  <FiEdit2 className="text-blue-400" />
+                  Edit Student Details — {editingApplicant.applicant_name}
+                </h3>
+                <p className="text-xs text-blue-200/80">
+                  Update candidate personal, institutional, or exam preferences if details were filled incorrectly.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditApplicantModal(false)
+                  setEditingApplicant(null)
+                }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 ml-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <form id="edit-applicant-form" onSubmit={handleSaveApplicantEdit} className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs text-gray-700 flex-1">
+              {/* Section 1: Personal Credentials */}
+              <div className="bg-blue-50/40 rounded-2xl p-4 border border-blue-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-wider border-b border-blue-100 pb-2">
+                  <FiUsers size={14} className="text-blue-600" />
+                  <span>1. Student Identity & Contact</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Student Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editApplicantForm.applicant_name}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, applicant_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Phone / WhatsApp No *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editApplicantForm.applicant_phone}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, applicant_phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={editApplicantForm.applicant_email}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, applicant_email: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Father / Guardian Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.father_name}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, father_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Mother Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.mother_name}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, mother_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Date of Birth
+                    </label>
+                    <input
+                      type="date"
+                      value={editApplicantForm.dob}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, dob: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Gender
+                    </label>
+                    <select
+                      value={editApplicantForm.gender}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, gender: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={editApplicantForm.category}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, category: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    >
+                      <option value="General">General</option>
+                      <option value="OBC">OBC</option>
+                      <option value="SC">SC</option>
+                      <option value="ST">ST</option>
+                      <option value="EWS">EWS</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: School & Academic Details */}
+              <div className="bg-purple-50/40 rounded-2xl p-4 border border-purple-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-purple-900 font-black text-xs uppercase tracking-wider border-b border-purple-100 pb-2">
+                  <FiFileText size={14} className="text-purple-600" />
+                  <span>2. School & Academic Profile</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      School / Institution Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.school_name}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, school_name: e.target.value })}
+                      placeholder="e.g. D.A.V Public School / Kendriya Vidyalaya"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Class / Standard
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.school_class}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, school_class: e.target.value, qualification: e.target.value })}
+                      placeholder="e.g. Class 10th"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      School Roll No
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.school_roll_number}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, school_roll_number: e.target.value })}
+                      placeholder="e.g. 24"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Section
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.school_section}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, school_section: e.target.value })}
+                      placeholder="e.g. A"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Admission / S.R. No
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.admission_no}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, admission_no: e.target.value })}
+                      placeholder="e.g. ADM-2024-889"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Previous Exam Score (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={editApplicantForm.percentage || ''}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, percentage: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Annual Family Income (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editApplicantForm.annual_family_income || ''}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, annual_family_income: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Exam Preferences & Address */}
+              <div className="bg-emerald-50/40 rounded-2xl p-4 border border-emerald-100/80 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs uppercase tracking-wider border-b border-emerald-100 pb-2">
+                  <FiMapPin size={14} className="text-emerald-600" />
+                  <span>3. Examination Preferences & Residential Address</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam State
+                    </label>
+                    <select
+                      value={editApplicantForm.preference_state}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, preference_state: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getIndianStates().map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam District 1 (First Choice) *
+                    </label>
+                    <select
+                      value={editApplicantForm.preference_district_1}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, preference_district_1: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getDistrictsForState(editApplicantForm.preference_state).map((dist) => (
+                        <option key={dist} value={dist}>{dist}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Exam District 2 (Second Choice)
+                    </label>
+                    <select
+                      value={editApplicantForm.preference_district_2}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, preference_district_2: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {getDistrictsForState(editApplicantForm.preference_state).map((dist) => (
+                        <option key={dist} value={dist}>{dist}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Residential Address
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.address}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, address: e.target.value })}
+                      placeholder="House/Street/Locality"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Home City / District
+                    </label>
+                    <input
+                      type="text"
+                      value={editApplicantForm.district || editApplicantForm.city}
+                      onChange={(e) => setEditApplicantForm({ ...editApplicantForm, district: e.target.value, city: e.target.value })}
+                      placeholder="e.g. Patna"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditApplicantModal(false)
+                  setEditingApplicant(null)
+                }}
+                disabled={editApplicantSaving}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-applicant-form"
+                disabled={editApplicantSaving}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {editApplicantSaving ? (
+                  <>
+                    <FiRefreshCw className="animate-spin" size={13} />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiCheck size={14} />
+                    <span>Save & Update Student Details</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
