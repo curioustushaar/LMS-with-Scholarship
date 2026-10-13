@@ -48,6 +48,7 @@ const menuItems: MenuItem[] = [
   { name: 'Dashboard', icon: FiHome, path: '/superadmin' },
   { name: 'Manage Admins', icon: FiUserCheck, path: '/superadmin/admins' },
   { name: 'Analytics', icon: FiBarChart2, path: '/superadmin/analytics' },
+  { name: 'Payment & Revenue', icon: FiDollarSign, path: '/superadmin/payments' },
 
   // ── Website & Content ──
   { name: 'Website CMS', icon: FiLayout, path: '/superadmin/website', dividerBefore: true, sectionLabel: 'Website & Content' },

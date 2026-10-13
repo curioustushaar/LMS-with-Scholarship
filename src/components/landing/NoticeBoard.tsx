@@ -17,8 +17,12 @@ import {
   ImageIcon,
   AlertCircle,
   CheckCircle2,
-  Share2
+  Share2,
+  Play,
+  Video
 } from 'lucide-react'
+import { FiYoutube as Youtube } from 'react-icons/fi'
+import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '@/lib/notice-utils'
 
 export interface NoticeItem {
   id: string
@@ -27,6 +31,8 @@ export interface NoticeItem {
   badge_text: string
   description: string
   content?: string
+  video_url?: string
+  video_description?: string
   file_url?: string
   file_type?: string
   file_name?: string
@@ -46,6 +52,7 @@ export default function NoticeBoard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null)
   const [previewMediaUrl, setPreviewMediaUrl] = useState<{ url: string; type: string; title: string; filename?: string } | null>(null)
+  const [activeVideoNotice, setActiveVideoNotice] = useState<NoticeItem | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -73,7 +80,8 @@ export default function NoticeBoard() {
       !searchQuery.trim() ||
       item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category?.toLowerCase().includes(searchQuery.toLowerCase())
+      item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.video_description?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
   })
 
@@ -233,6 +241,7 @@ export default function NoticeBoard() {
             {filteredNotices.map((notice, idx) => {
               const isImagePoster = notice.file_type?.startsWith('image/') || (notice.file_url && /\.(jpg|jpeg|png|webp)/i.test(notice.file_url))
               const isPdf = notice.file_type === 'pdf' || (notice.file_url && /\.pdf/i.test(notice.file_url)) || notice.file_name?.toLowerCase().endsWith('.pdf')
+              const hasVideo = !!notice.video_url && !!extractYouTubeId(notice.video_url)
 
               return (
                 <motion.div
@@ -266,6 +275,13 @@ export default function NoticeBoard() {
                             {notice.badge_text}
                           </span>
                         )}
+
+                        {notice.video_url && extractYouTubeId(notice.video_url) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-red-50 text-red-600 border border-red-200">
+                            <Youtube size={10} className="fill-current text-red-600" />
+                            VIDEO
+                          </span>
+                        )}
                       </div>
 
                       <span className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 shrink-0">
@@ -286,6 +302,44 @@ export default function NoticeBoard() {
                     <p className="text-xs text-gray-500 line-clamp-3 mt-2 font-normal leading-relaxed">
                       {notice.description}
                     </p>
+
+                    {/* YouTube Video Action Strip (Option 1) */}
+                    {hasVideo && (
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveVideoNotice(notice);
+                        }}
+                        className="mt-3.5 p-3 rounded-2xl bg-gradient-to-r from-red-50/80 via-rose-50/50 to-pink-50/40 border border-red-100 hover:border-red-200 transition-all cursor-pointer flex items-center justify-between gap-3 group/vidbox shadow-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-600/30 group-hover/vidbox:scale-105 transition-transform">
+                            <Play size={12} className="ml-0.5 fill-current" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-900 truncate" title={notice.video_description || 'Official Video Briefing'}>
+                              {notice.video_description || 'Official Video Briefing'}
+                            </p>
+                            <span className="text-[10px] text-red-600 font-semibold flex items-center gap-1">
+                              <Youtube size={11} className="fill-current text-red-600" />
+                              YouTube Video • Click to Watch
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveVideoNotice(notice);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold shadow-sm shadow-red-600/20 flex items-center gap-1 shrink-0 transition-all group-hover/vidbox:scale-105"
+                        >
+                          <Play size={10} className="fill-current" />
+                          <span>Watch</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Image Poster Preview (if attached) */}
                     {isImagePoster && notice.file_url && (
@@ -357,7 +411,7 @@ export default function NoticeBoard() {
                       <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                     </button>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => handleShare(notice)}
                         className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all text-xs flex items-center gap-1"
@@ -370,13 +424,28 @@ export default function NoticeBoard() {
                         )}
                       </button>
 
+                      {hasVideo && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveVideoNotice(notice);
+                          }}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-red-600/25 flex items-center gap-1.5 shrink-0"
+                          title="Watch official YouTube video"
+                        >
+                          <Play size={11} className="fill-current" />
+                          <span>Watch</span>
+                        </button>
+                      )}
+
                       {notice.file_url && (
                         <a
                           href={notice.file_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           download={notice.file_name || 'Notice'}
-                          className="px-3 py-1.5 bg-gray-100 hover:bg-pink-50 text-gray-700 hover:text-[#FF2D8D] rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-pink-50 text-gray-700 hover:text-[#FF2D8D] rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0"
                         >
                           <Download size={12} />
                           <span>Download</span>
@@ -448,6 +517,53 @@ export default function NoticeBoard() {
                   )}
                 </div>
 
+                {/* Official YouTube Video Walkthrough / Briefing */}
+                {selectedNotice.video_url && extractYouTubeId(selectedNotice.video_url) && (
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center shadow-sm">
+                          <Youtube size={14} className="fill-current" />
+                        </div>
+                        <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                          Official Video Briefing & Walkthrough
+                        </h4>
+                      </div>
+                      <a
+                        href={selectedNotice.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 transition-colors"
+                      >
+                        <span>Open on YouTube</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
+
+                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-200 bg-black shadow-lg">
+                      <iframe
+                        src={getYouTubeEmbedUrl(selectedNotice.video_url) || ''}
+                        title={selectedNotice.title}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+
+                    {selectedNotice.video_description && (
+                      <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-red-50/70 via-rose-50/50 to-pink-50/40 border border-red-100 text-xs text-gray-700 leading-relaxed flex items-start gap-2.5">
+                        <div className="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                          <Play size={11} className="ml-0.5 fill-current" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-red-700 text-[11px] uppercase tracking-wider">Video Overview / Summary</p>
+                          <p className="mt-0.5 text-gray-800">{selectedNotice.video_description}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Poster or PDF Viewer in Modal */}
                 {selectedNotice.file_url && (
                   <div className="mt-6 pt-4 border-t border-gray-100">
@@ -492,7 +608,7 @@ export default function NoticeBoard() {
                 )}
 
                 {/* Footer Modal Actions */}
-                <div className="mt-8 pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="mt-8 pt-4 border-t border-gray-100 flex items-center justify-between flex-wrap gap-3">
                   <button
                     onClick={() => setSelectedNotice(null)}
                     className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all"
@@ -500,18 +616,32 @@ export default function NoticeBoard() {
                     Close
                   </button>
 
-                  {selectedNotice.file_url && (
-                    <a
-                      href={selectedNotice.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download={selectedNotice.file_name || 'Notice'}
-                      className="px-5 py-2.5 bg-gradient-to-r from-[#FF2D8D] via-[#9C27FF] to-[#7B1FA2] text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-2"
-                    >
-                      <Download size={14} />
-                      Download Attachment
-                    </a>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {selectedNotice.video_url && extractYouTubeId(selectedNotice.video_url) && (
+                      <a
+                        href={selectedNotice.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md shadow-red-600/20 flex items-center gap-1.5 transition-all"
+                      >
+                        <Youtube size={14} className="fill-current" />
+                        <span>Watch on YouTube</span>
+                      </a>
+                    )}
+
+                    {selectedNotice.file_url && (
+                      <a
+                        href={selectedNotice.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={selectedNotice.file_name || 'Notice'}
+                        className="px-5 py-2.5 bg-gradient-to-r from-[#FF2D8D] via-[#9C27FF] to-[#7B1FA2] text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-2"
+                      >
+                        <Download size={14} />
+                        Download Attachment
+                      </a>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -559,6 +689,102 @@ export default function NoticeBoard() {
                 className="max-h-[80vh] w-auto object-contain mx-auto"
               />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Video Player Lightbox Modal (Option 1) */}
+      <AnimatePresence>
+        {activeVideoNotice && extractYouTubeId(activeVideoNotice.video_url) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveVideoNotice(null)}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md p-4 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-3xl w-full p-5 sm:p-7 relative overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-4 mb-4 pb-3 border-b border-gray-100">
+                <div className="min-w-0 pr-6">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase tracking-wider flex items-center gap-1">
+                      <Youtube size={11} className="fill-current text-red-600" />
+                      Official Video Briefing
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getCategoryColor(activeVideoNotice.category)}`}>
+                      {activeVideoNotice.category}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-gray-900 leading-snug line-clamp-2">
+                    {activeVideoNotice.title}
+                  </h3>
+                </div>
+
+                <button
+                  onClick={() => setActiveVideoNotice(null)}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500 transition-all shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Responsive Video Player */}
+              <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-gray-200">
+                <iframe
+                  src={`${getYouTubeEmbedUrl(activeVideoNotice.video_url)}?autoplay=1`}
+                  title={activeVideoNotice.title}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+
+              {/* Description & Footer Actions */}
+              <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  {activeVideoNotice.video_description ? (
+                    <p className="text-xs text-gray-700 leading-relaxed font-medium">
+                      <strong className="text-red-700 font-bold mr-1">Overview:</strong>
+                      {activeVideoNotice.video_description}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">
+                      Official circular video walkthrough released by GRAVITY.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={activeVideoNotice.video_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-red-600/20 flex items-center gap-1.5"
+                  >
+                    <Youtube size={13} className="fill-current" />
+                    <span>Open on YouTube</span>
+                  </a>
+                  <button
+                    onClick={() => {
+                      const noticeToOpen = activeVideoNotice
+                      setActiveVideoNotice(null)
+                      setSelectedNotice(noticeToOpen)
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                  >
+                    <span>Full Circular</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

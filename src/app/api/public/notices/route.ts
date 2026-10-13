@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { parseNoticeVideoMetadata } from '@/lib/notice-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,8 @@ export interface PublicNotice {
   badge_text: string
   description: string
   content?: string
+  video_url?: string
+  video_description?: string
   file_url?: string
   file_type?: string
   file_name?: string
@@ -28,6 +31,8 @@ const FALLBACK_NOTICES: PublicNotice[] = [
     badge_text: 'URGENT',
     description: 'Official notice regarding the upcoming offline and computer-based STEM scholarship test dates, reporting instructions, and hall ticket verification.',
     content: 'All registered applicants for the GRAVITY STEM Excellence Scholarship 2026 are hereby informed that the examination will be conducted across 12 designated district test centers. Please ensure you download your verified Admit Card and carry a valid photo ID.',
+    video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    video_description: 'Official examination walkthrough explaining student reporting time, admit card verification, and test instructions.',
     file_url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80',
     file_type: 'image/jpeg',
     file_name: 'Scholarship_Exam_Schedule_2026.jpg',
@@ -129,15 +134,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: filtered, fallback: true })
     }
 
+    const rawList = data && data.length > 0 ? data : FALLBACK_NOTICES
+    const formattedList = rawList.map(parseNoticeVideoMetadata)
+
     return NextResponse.json({
       success: true,
-      data: data && data.length > 0 ? data : FALLBACK_NOTICES,
+      data: formattedList,
     })
   } catch (error: any) {
     console.error('Error fetching public notices:', error)
     return NextResponse.json({
       success: true,
-      data: FALLBACK_NOTICES,
+      data: FALLBACK_NOTICES.map(parseNoticeVideoMetadata),
       error: error.message,
     })
   }

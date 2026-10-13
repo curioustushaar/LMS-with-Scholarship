@@ -19,9 +19,13 @@ import {
   FiCheck, 
   FiAlertCircle, 
   FiX, 
-  FiExternalLink 
+  FiExternalLink,
+  FiYoutube,
+  FiPlay,
+  FiVideo
 } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
+import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '@/lib/notice-utils'
 
 interface Notice {
   id: string
@@ -30,6 +34,8 @@ interface Notice {
   badge_text: string
   description: string
   content?: string
+  video_url?: string
+  video_description?: string
   file_url?: string
   file_type?: string
   file_name?: string
@@ -67,6 +73,8 @@ export default function SuperadminNoticesPage() {
     badge_text: 'NEW',
     description: '',
     content: '',
+    video_url: '',
+    video_description: '',
     file_url: '',
     file_type: '',
     file_name: '',
@@ -116,6 +124,8 @@ export default function SuperadminNoticesPage() {
       badge_text: 'NEW',
       description: '',
       content: '',
+      video_url: '',
+      video_description: '',
       file_url: '',
       file_type: '',
       file_name: '',
@@ -134,6 +144,8 @@ export default function SuperadminNoticesPage() {
       badge_text: notice.badge_text || 'NEW',
       description: notice.description || '',
       content: notice.content || notice.description || '',
+      video_url: notice.video_url || '',
+      video_description: notice.video_description || '',
       file_url: notice.file_url || '',
       file_type: notice.file_type || '',
       file_name: notice.file_name || '',
@@ -355,7 +367,7 @@ export default function SuperadminNoticesPage() {
       </div>
 
       {/* Quick Statistics Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-sm">
           <span className="text-xs font-bold text-gray-400 uppercase">Total Notices</span>
           <p className="text-2xl font-black text-gray-900 mt-1">{notices.length}</p>
@@ -369,8 +381,14 @@ export default function SuperadminNoticesPage() {
           <p className="text-2xl font-black text-amber-600 mt-1">{notices.filter(n => n.is_pinned).length}</p>
         </div>
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <span className="text-xs font-bold text-purple-500 uppercase">With Attachments</span>
+          <span className="text-xs font-bold text-purple-500 uppercase">Attachments</span>
           <p className="text-2xl font-black text-purple-600 mt-1">{notices.filter(n => !!n.file_url).length}</p>
+        </div>
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <span className="text-xs font-bold text-red-500 uppercase flex items-center gap-1">
+            <FiYoutube size={13} /> With Video
+          </span>
+          <p className="text-2xl font-black text-red-600 mt-1">{notices.filter(n => !!n.video_url).length}</p>
         </div>
       </div>
 
@@ -453,7 +471,7 @@ export default function SuperadminNoticesPage() {
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-[11px] font-bold uppercase text-gray-400 tracking-wider">
                   <th className="py-4 px-5">Notice Details</th>
                   <th className="py-4 px-4">Category</th>
-                  <th className="py-4 px-4">Attachment / Poster</th>
+                  <th className="py-4 px-4">Media & Attachments</th>
                   <th className="py-4 px-4">Pinned</th>
                   <th className="py-4 px-4">Status</th>
                   <th className="py-4 px-5 text-right">Actions</th>
@@ -463,6 +481,7 @@ export default function SuperadminNoticesPage() {
                 {filteredNotices.map((notice) => {
                   const isImage = notice.file_type?.startsWith('image/') || (notice.file_url && /\.(jpg|jpeg|png|webp)/i.test(notice.file_url))
                   const isPdf = notice.file_type === 'pdf' || (notice.file_url && /\.pdf/i.test(notice.file_url)) || notice.file_name?.toLowerCase().endsWith('.pdf')
+                  const hasVideo = !!notice.video_url && !!extractYouTubeId(notice.video_url)
 
                   return (
                     <tr key={notice.id} className="hover:bg-pink-50/20 transition-colors">
@@ -478,6 +497,11 @@ export default function SuperadminNoticesPage() {
                               {notice.badge_text && (
                                 <span className="px-1.5 py-0.5 rounded bg-pink-100 text-[#C81E4E] font-extrabold text-[9px]">
                                   {notice.badge_text}
+                                </span>
+                              )}
+                              {hasVideo && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[9px]">
+                                  <FiYoutube size={10} /> Video
                                 </span>
                               )}
                             </div>
@@ -496,38 +520,54 @@ export default function SuperadminNoticesPage() {
                         </span>
                       </td>
 
-                      {/* Attachment Preview */}
+                      {/* Media Preview (Poster, PDF, Video) */}
                       <td className="py-4 px-4">
-                        {notice.file_url ? (
-                          <div className="flex items-center gap-2">
-                            {isImage ? (
-                              <button
-                                onClick={() => setPreviewNotice(notice)}
-                                className="w-10 h-10 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 shrink-0 group relative cursor-pointer"
-                                title="Click to preview poster"
-                              >
-                                <img src={notice.file_url} alt="" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
-                                  <FiEye size={12} />
+                        <div className="space-y-1.5">
+                          {notice.file_url && (
+                            <div className="flex items-center gap-2">
+                              {isImage ? (
+                                <button
+                                  onClick={() => setPreviewNotice(notice)}
+                                  className="w-9 h-9 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 shrink-0 group relative cursor-pointer"
+                                  title="Click to preview poster"
+                                >
+                                  <img src={notice.file_url} alt="" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                    <FiEye size={11} />
+                                  </div>
+                                </button>
+                              ) : (
+                                <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#9C27FF] flex items-center justify-center shrink-0 font-bold border border-purple-100">
+                                  <FiFileText size={15} />
                                 </div>
-                              </button>
-                            ) : (
-                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#9C27FF] flex items-center justify-center shrink-0 font-bold border border-purple-100">
-                                <FiFileText size={16} />
+                              )}
+                              <div className="min-w-0 max-w-[120px]">
+                                <p className="text-[11px] font-bold text-gray-800 truncate" title={notice.file_name || 'Document'}>
+                                  {notice.file_name || (isImage ? 'Poster Image' : 'PDF Circular')}
+                                </p>
+                                <span className="text-[9px] text-gray-400 block">
+                                  {notice.file_size || (isPdf ? 'PDF File' : 'Image')}
+                                </span>
                               </div>
-                            )}
-                            <div className="min-w-0 max-w-[120px]">
-                              <p className="text-[11px] font-bold text-gray-800 truncate" title={notice.file_name || 'Document'}>
-                                {notice.file_name || (isImage ? 'Poster Image' : 'PDF Circular')}
-                              </p>
-                              <span className="text-[9px] text-gray-400 block">
-                                {notice.file_size || (isPdf ? 'PDF File' : 'Image')}
-                              </span>
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-gray-400 italic">No File</span>
-                        )}
+                          )}
+
+                          {hasVideo && (
+                            <button
+                              onClick={() => setPreviewNotice(notice)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 text-[10px] font-bold transition-all shadow-xs"
+                              title="Click to preview YouTube video"
+                            >
+                              <FiYoutube size={13} className="text-red-600" />
+                              <span>YouTube Video</span>
+                              <FiPlay size={9} className="ml-0.5 fill-current" />
+                            </button>
+                          )}
+
+                          {!notice.file_url && !hasVideo && (
+                            <span className="text-[11px] text-gray-400 italic">No Media</span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Pin Toggle */}
@@ -702,6 +742,116 @@ export default function SuperadminNoticesPage() {
                   />
                 </div>
 
+                {/* YouTube Video Section (Optional) */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-red-50/50 via-rose-50/30 to-pink-50/30 border border-red-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-red-600 text-white flex items-center justify-center shadow-sm shadow-red-500/20">
+                        <FiYoutube size={15} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                          YouTube Video Announcement
+                          <span className="text-[10px] font-semibold text-gray-400 font-normal">(Optional)</span>
+                        </h4>
+                        <p className="text-[10px] text-gray-500">
+                          Attach an official YouTube video explanation, webinar, or circular walkthrough.
+                        </p>
+                      </div>
+                    </div>
+                    {formData.video_url && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, video_url: '', video_description: '' }))}
+                        className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:underline"
+                      >
+                        Remove Video
+                      </button>
+                    )}
+                  </div>
+
+                  {/* YouTube URL input */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      YouTube Video Link / URL
+                    </label>
+                    <div className="relative">
+                      <FiYoutube className="absolute left-3.5 top-1/2 -translate-y-1/2 text-red-500 text-sm" />
+                      <input
+                        type="url"
+                        value={formData.video_url}
+                        onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                        placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                        className="w-full pl-9 pr-24 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-red-500"
+                      />
+                      {extractYouTubeId(formData.video_url) ? (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1">
+                          <FiCheck size={11} /> Valid Link
+                        </span>
+                      ) : formData.video_url ? (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold">
+                          Invalid Link
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Supports YouTube Watch links, Shorts, and mobile youtu.be links.
+                    </p>
+                  </div>
+
+                  {/* Short Video Description */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Video Short Description / Overview
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={formData.video_description}
+                      onChange={(e) => setFormData({ ...formData, video_description: e.target.value })}
+                      placeholder="Short 1-2 sentence overview of what is explained in this video (e.g. Detailed walkthrough of exam dates, center list, and admit card verification)..."
+                      className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+
+                  {/* Live YouTube Preview Box */}
+                  {extractYouTubeId(formData.video_url) && (
+                    <div className="p-3 bg-white rounded-xl border border-red-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="relative w-full sm:w-36 aspect-video rounded-lg overflow-hidden bg-black shrink-0 border border-gray-200 group/vid">
+                        <img
+                          src={getYouTubeThumbnailUrl(formData.video_url) || ''}
+                          alt="YouTube preview thumbnail"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg">
+                            <FiPlay size={13} className="ml-0.5 fill-current" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-black text-red-600 uppercase tracking-wider">
+                            Live Video Preview
+                          </span>
+                          <span className="text-[10px] text-gray-400">• Ready to publish</span>
+                        </div>
+                        <p className="text-xs font-bold text-gray-800 truncate mt-0.5">
+                          Video ID: <code className="text-pink-600 bg-pink-50 px-1 py-0.5 rounded font-mono text-[11px]">{extractYouTubeId(formData.video_url)}</code>
+                        </p>
+                        {formData.video_description ? (
+                          <p className="text-[11px] text-gray-500 line-clamp-2 mt-1">
+                            {formData.video_description}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 italic mt-0.5">
+                            Tip: Add a short description above to give public users a quick summary before playing.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* File / Poster Upload Box (JPG, PNG, PDF) */}
                 <div className="p-4 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200">
                   <div className="flex items-center justify-between mb-2">
@@ -860,6 +1010,42 @@ export default function SuperadminNoticesPage() {
               {previewNotice.content && (
                 <div className="mt-4 p-4 rounded-2xl bg-gray-50 text-xs text-gray-600 whitespace-pre-line border border-gray-100">
                   {previewNotice.content}
+                </div>
+              )}
+
+              {/* YouTube Video Section */}
+              {previewNotice.video_url && extractYouTubeId(previewNotice.video_url) && (
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-red-600 uppercase flex items-center gap-1.5">
+                      <FiYoutube size={15} /> Official Video Announcement
+                    </span>
+                    <a
+                      href={previewNotice.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-gray-500 hover:text-red-600 flex items-center gap-1"
+                    >
+                      Watch on YouTube <FiExternalLink size={11} />
+                    </a>
+                  </div>
+
+                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-200 bg-black shadow-inner">
+                    <iframe
+                      src={getYouTubeEmbedUrl(previewNotice.video_url) || ''}
+                      title="Official Notice Video Player"
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+
+                  {previewNotice.video_description && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-red-50/60 border border-red-100 text-xs text-gray-700">
+                      <strong className="text-red-700 font-bold block mb-0.5">Video Highlights / Description:</strong>
+                      {previewNotice.video_description}
+                    </div>
+                  )}
                 </div>
               )}
 
