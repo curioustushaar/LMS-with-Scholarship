@@ -235,8 +235,8 @@ export default function Header() {
                           </div>
                         </Link>
 
-                        <Link 
-                          href="/login" 
+                        <a 
+                          href="https://students.aagajfoundation.in/login" 
                           onClick={() => setShowLoginDropdown(false)}
                           className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#9C27FF]/5 transition-colors group text-left"
                         >
@@ -247,7 +247,7 @@ export default function Header() {
                             <span className="text-xs font-bold text-gray-800 group-hover:text-[#9C27FF] transition-colors leading-tight">Login as a Student</span>
                             <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Courses, tasks & certificates</span>
                           </div>
-                        </Link>
+                        </a>
 
                         <Link 
                           href="/school-portal/login" 
@@ -260,20 +260,6 @@ export default function Header() {
                           <div className="flex flex-col min-w-0">
                             <span className="text-xs font-bold text-gray-800 group-hover:text-emerald-700 transition-colors leading-tight">School Partner Portal</span>
                             <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Enroll students & view results</span>
-                          </div>
-                        </Link>
-
-                        <Link 
-                          href="/superadmin/login" 
-                          onClick={() => setShowLoginDropdown(false)}
-                          className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-red-50 transition-colors group text-left"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-red-50 text-[#C81E4E] flex items-center justify-center shrink-0">
-                            <Shield size={16} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-gray-800 group-hover:text-[#C81E4E] transition-colors leading-tight">Super Admin Panel</span>
-                            <span className="text-[9px] text-gray-400 font-medium mt-0.5 leading-none">Full platform & CMS control</span>
                           </div>
                         </Link>
                       </motion.div>
@@ -459,8 +445,8 @@ export default function Header() {
                           <span className="text-[11px] font-bold group-hover:text-[#FF2D8D] transition-colors">Admin Portal</span>
                         </Link>
 
-                        <Link
-                          href="/login"
+                        <a
+                          href="https://students.aagajfoundation.in/login"
                           onClick={() => {
                             setIsOpen(false)
                             setShowMobileLoginOpts(false)
@@ -471,7 +457,7 @@ export default function Header() {
                             <GraduationCap size={12} />
                           </div>
                           <span className="text-[11px] font-bold group-hover:text-[#9C27FF] transition-colors">Student Portal</span>
-                        </Link>
+                        </a>
 
                         <Link
                           href="/school-portal/login"
@@ -485,20 +471,6 @@ export default function Header() {
                             <Briefcase size={12} />
                           </div>
                           <span className="text-[11px] font-bold group-hover:text-emerald-700 transition-colors">School Partner Portal</span>
-                        </Link>
-
-                        <Link
-                          href="/superadmin/login"
-                          onClick={() => {
-                            setIsOpen(false)
-                            setShowMobileLoginOpts(false)
-                          }}
-                          className="flex items-center gap-2.5 p-2 rounded-lg bg-rose-50/60 hover:bg-rose-50 text-gray-800 transition-colors group text-left"
-                        >
-                          <div className="w-6 h-6 rounded-md bg-[#C81E4E] text-white flex items-center justify-center shrink-0">
-                            <Shield size={12} />
-                          </div>
-                          <span className="text-[11px] font-bold group-hover:text-[#C81E4E] transition-colors">Super Admin</span>
                         </Link>
                       </motion.div>
                     )}

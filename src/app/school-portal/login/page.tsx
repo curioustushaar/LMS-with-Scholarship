@@ -154,9 +154,13 @@ export default function SchoolPortalLoginPage() {
         </div>
 
         {/* Back navigation */}
-        <div className="text-center mt-6 flex justify-center gap-4 text-xs text-purple-300">
+        <div className="text-center mt-6 flex flex-wrap justify-center items-center gap-3 text-xs text-purple-300">
           <a href="/login" className="hover:text-white transition-colors">
-            ← Student & Admin Login
+            ← Admin Login
+          </a>
+          <span>•</span>
+          <a href="https://students.aagajfoundation.in/login" className="hover:text-white font-medium transition-colors">
+            Student LMS Login
           </a>
           <span>•</span>
           <a href="/scholarships" className="hover:text-white transition-colors">

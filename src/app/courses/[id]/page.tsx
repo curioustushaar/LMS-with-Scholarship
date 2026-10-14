@@ -76,12 +76,12 @@ export default function CourseDetailPage() {
       if (data.success) {
         setEnrollSuccess(true)
         setTimeout(() => {
-          router.push('/student/courses')
+          window.location.href = 'https://students.aagajfoundation.in/login'
         }, 1500)
       }
     } catch (err) {
       console.error(err)
-      router.push('/student/courses')
+      window.location.href = 'https://students.aagajfoundation.in/login'
     } finally {
       setEnrolling(false)
     }

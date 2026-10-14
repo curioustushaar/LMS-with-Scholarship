@@ -78,8 +78,8 @@ export default function LoginPage() {
         console.log('✅ Admin verified, redirecting to dashboard')
         router.push('/admin/dashboard')
       } else {
-        console.log('✅ Student verified, redirecting to portal')
-        router.push('/student/videos')
+        console.log('✅ Student verified, redirecting to real Students LMS portal')
+        window.location.href = 'https://students.aagajfoundation.in/login'
       }
     } catch (err: any) {
       console.error('❌ Login error:', err)
@@ -297,19 +297,19 @@ export default function LoginPage() {
 
               <div className="mt-8 text-center space-y-2">
                 <p className="text-sm text-gray-600">Protected by enterprise-grade security</p>
-                <div className="flex justify-center gap-4 text-xs text-gray-400">
+                <div className="flex justify-center items-center flex-wrap gap-4 text-xs text-gray-400">
+                  <a 
+                    href="https://students.aagajfoundation.in/login" 
+                    className="text-[#9C27FF] hover:underline font-bold transition-colors"
+                  >
+                    Student LMS Portal →
+                  </a>
+                  <span>•</span>
                   <a 
                     href="/school-portal/login" 
                     className="hover:text-emerald-600 font-semibold transition-colors"
                   >
                     School Partner Portal →
-                  </a>
-                  <span>•</span>
-                  <a 
-                    href="/superadmin/login" 
-                    className="hover:text-[#FF2D8D] transition-colors"
-                  >
-                    Superadmin Access →
                   </a>
                 </div>
               </div>
