@@ -214,12 +214,12 @@ export default function CoursesCatalogPage() {
                         </span>
                       </div>
 
-                      <Link href="/login">
+                      <a href="https://students.aagajfoundation.in/login">
                         <button className="px-4 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1">
                           Enroll Now
                           <ArrowUpRight size={14} />
                         </button>
-                      </Link>
+                      </a>
                     </div>
                   </div>
                 </motion.div>

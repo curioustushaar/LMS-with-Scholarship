@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import StudentLayoutClient from './StudentLayoutClient'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Student Portal | GRAVITY',
@@ -14,6 +14,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  return <StudentLayoutClient>{children}</StudentLayoutClient>
+export default function StudentLayout() {
+  redirect('https://students.aagajfoundation.in/login')
 }

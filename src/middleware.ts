@@ -4,11 +4,15 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Redirect any internal student routes directly to real production Students LMS
+  if (pathname.startsWith('/student')) {
+    return NextResponse.redirect('https://students.aagajfoundation.in/login', 307)
+  }
+
   // Protected portal route patterns
   const isSuperadminRoute = pathname.startsWith('/superadmin') && pathname !== '/superadmin/login'
   const isSchoolRoute = pathname.startsWith('/school-portal') && pathname !== '/school-portal/login'
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/login'
-  const isStudentRoute = pathname.startsWith('/student') && pathname !== '/login'
   const isApiRoute = pathname.startsWith('/api/')
 
   const response = NextResponse.next()
@@ -40,7 +44,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Apply Strict No-Cache Headers to Protected Routes to prevent browser BFCache restoration after logout
-  if (isSuperadminRoute || isSchoolRoute || isAdminRoute || isStudentRoute) {
+  if (isSuperadminRoute || isSchoolRoute || isAdminRoute) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
     response.headers.set('Pragma', 'no-cache')
     response.headers.set('Expires', '0')
