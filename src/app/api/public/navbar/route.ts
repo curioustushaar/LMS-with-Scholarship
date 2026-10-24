@@ -6,7 +6,7 @@ const DEFAULT_NAVBAR_ITEMS = [
   { id: 'nav-2', name: 'About', href: '/about', sort_order: 2, is_visible: true, is_external: false },
   { id: 'nav-3', name: 'Courses', href: '/courses', sort_order: 3, is_visible: true, is_external: false },
   { id: 'nav-4', name: 'Admissions', href: '/admissions', sort_order: 4, is_visible: true, is_external: false },
-  { id: 'nav-5', name: 'Internships', href: '/internships', sort_order: 5, is_visible: true, is_external: false },
+  { id: 'nav-5', name: 'Training', href: '#training', sort_order: 5, is_visible: true, is_external: false },
   { id: 'nav-6', name: 'Scholarships', href: '/scholarships', sort_order: 6, is_visible: true, is_external: false },
   { id: 'nav-7', name: 'Employers', href: '/employers', sort_order: 7, is_visible: true, is_external: false },
   { id: 'nav-8', name: 'School Partners', href: '/school-partners', sort_order: 8, is_visible: true, is_external: false },
@@ -30,12 +30,28 @@ export async function GET() {
       throw error
     }
 
-    const items = (data && data.length > 0) ? data.map((item: any) => {
-      if (item.name?.toLowerCase() === 'training' || item.href?.includes('training')) {
-        return { ...item, name: 'Notice', href: '#notices' }
+    const seen = new Set<string>()
+    const items: any[] = []
+    const sourceData = (data && data.length > 0) ? data : DEFAULT_NAVBAR_ITEMS
+
+    for (const item of sourceData) {
+      let name = item.name
+      let href = item.href
+
+      if (item.id === 'nav-9') {
+        name = 'Notice'
+        href = '#notices'
+      } else if (item.id === 'nav-5' || name?.toLowerCase().includes('internship') || href?.includes('internship')) {
+        name = 'Training'
+        href = '#training'
       }
-      return item
-    }) : DEFAULT_NAVBAR_ITEMS
+
+      const key = name.toLowerCase().trim()
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      items.push({ ...item, name, href })
+    }
 
     return NextResponse.json({ success: true, data: items })
   } catch (error: any) {

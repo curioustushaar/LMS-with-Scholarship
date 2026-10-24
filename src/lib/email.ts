@@ -235,3 +235,110 @@ export async function sendAnnouncementEmail(data: {
 
   return sendEmail({ to, subject, html })
 }
+
+/**
+ * Send Workshop/Training Registration Confirmation Email
+ */
+export async function sendWorkshopRegistrationEmail(data: {
+  to: string
+  student_name: string
+  student_phone: string
+  workshop_title: string
+  duration_badge?: string
+  timing?: string
+  start_date?: string
+  platform?: string
+  meeting_link: string
+  meeting_id?: string
+  passcode?: string
+}) {
+  const {
+    to,
+    student_name,
+    workshop_title,
+    duration_badge,
+    timing,
+    start_date,
+    platform = 'Google Meet',
+    meeting_link,
+    meeting_id,
+    passcode,
+  } = data
+
+  const subject = `🎉 Confirmed: Your Seat for ${workshop_title} | GRAVITY Training`
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 16px; background-color: #ffffff;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #FF2D8D, #9C27FF); padding: 28px; text-align: center; border-radius: 12px 12px 0 0; color: white;">
+        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+          ${duration_badge || 'Live Workshop'}
+        </span>
+        <h1 style="margin: 12px 0 4px 0; font-size: 22px; font-weight: 800;">Registration Confirmed!</h1>
+        <p style="margin: 0; font-size: 13px; opacity: 0.95;">GRAVITY Workshops & Industry Training</p>
+      </div>
+
+      <!-- Body Content -->
+      <div style="padding: 24px; color: #333333; line-height: 1.6;">
+        <p style="font-size: 15px;">Dear <strong>${student_name}</strong>,</p>
+        <p style="font-size: 14px; color: #475569;">
+          Congratulations! Your seat has been successfully reserved for <strong>${workshop_title}</strong>. Below are your live session credentials and instructions to join:
+        </p>
+
+        <!-- Workshop Credentials Box -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; width: 130px; font-weight: bold;">Workshop:</td>
+              <td style="padding: 6px 0; color: #0f172a; font-weight: bold;">${workshop_title}</td>
+            </tr>
+            ${start_date ? `<tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Start Date:</td>
+              <td style="padding: 6px 0; color: #0f172a;">${start_date}</td>
+            </tr>` : ''}
+            ${timing ? `<tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Daily Timings:</td>
+              <td style="padding: 6px 0; color: #0f172a; font-weight: bold; color: #FF2D8D;">${timing}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Platform:</td>
+              <td style="padding: 6px 0; color: #0f172a;">${platform}</td>
+            </tr>
+            ${meeting_id ? `<tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Meeting ID:</td>
+              <td style="padding: 6px 0; color: #0f172a; font-family: monospace;">${meeting_id}</td>
+            </tr>` : ''}
+            ${passcode ? `<tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: bold;">Passcode:</td>
+              <td style="padding: 6px 0; color: #0f172a; font-family: monospace; font-weight: bold;">${passcode}</td>
+            </tr>` : ''}
+          </table>
+        </div>
+
+        <!-- Call to Action Button -->
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${meeting_link}" target="_blank" style="background: linear-gradient(135deg, #FF2D8D, #9C27FF); color: #ffffff; padding: 14px 32px; font-weight: bold; border-radius: 999px; text-decoration: none; display: inline-block; font-size: 15px; box-shadow: 0 4px 14px rgba(255,45,141,0.35);">
+            🚀 Join ${platform} Meeting Now
+          </a>
+          <p style="margin-top: 10px; font-size: 11px; color: #94a3b8;">
+            Link: <a href="${meeting_link}" style="color: #9C27FF; text-decoration: underline;">${meeting_link}</a>
+          </p>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+          <strong>Tip:</strong> Please join the session 5 minutes prior to the scheduled start time with a stable internet connection. Keep a notebook handy!
+        </p>
+
+        <p style="margin-top: 24px; font-size: 14px;">
+          Warm regards,<br />
+          <strong>Workshop & Academic Coordination Team</strong><br />
+          GRAVITY by AAGAJ Foundation<br />
+          <span style="font-size: 12px; color: #94a3b8;">Patna, Bihar | aagajfoundationpaliganj@gmail.com</span>
+        </p>
+      </div>
+    </div>
+  `
+
+  return sendEmail({ to, subject, html })
+}
+
