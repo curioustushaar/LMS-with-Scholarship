@@ -18,7 +18,7 @@ const defaultNavLinks: NavLinkItem[] = [
   { name: 'About', href: '#about' },
   { name: 'Courses', href: '#courses' },
   { name: 'Admissions', href: '#admissions' },
-  { name: 'Internships', href: '#internships' },
+  { name: 'Training', href: '#training' },
   { name: 'Scholarships', href: '#scholarships' },
   { name: 'Employers', href: '#employers' },
   { name: 'School Partners', href: '#school-partners' },
@@ -42,22 +42,34 @@ export default function Header() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.data && data.data.length > 0) {
-          const links = data.data
-            .filter((item: any) => item.is_visible)
-            .map((item: any) => {
-              // Replace any legacy 'Training' item with 'Notice'
-              const isTraining = item.name?.toLowerCase() === 'training' || item.href?.includes('training')
-              const name = isTraining ? 'Notice' : item.name
-              const rawHref = isTraining ? '#notices' : item.href
+          const seen = new Set<string>()
+          const links: NavLinkItem[] = []
 
-              // Convert routes to hash anchors if on home page
-              const hash = rawHref === '/' ? '#home' : rawHref.startsWith('/') ? `#${rawHref.substring(1)}` : rawHref
-              return {
-                id: item.id,
-                name: name,
-                href: hash,
-              }
+          for (const item of data.data) {
+            if (!item.is_visible) continue
+
+            let name = item.name
+            let rawHref = item.href || ''
+
+            if (item.id === 'nav-9') {
+              name = 'Notice'
+              rawHref = '#notices'
+            } else if (item.id === 'nav-5' || name?.toLowerCase().includes('internship') || rawHref.includes('internship')) {
+              name = 'Training'
+              rawHref = '#training'
+            }
+
+            const key = name.toLowerCase().trim()
+            if (seen.has(key)) continue
+            seen.add(key)
+
+            const hash = rawHref === '/' ? '#home' : rawHref.startsWith('/') ? `#${rawHref.substring(1)}` : rawHref
+            links.push({
+              id: item.id,
+              name,
+              href: hash,
             })
+          }
           setNavLinks(links)
         }
       })

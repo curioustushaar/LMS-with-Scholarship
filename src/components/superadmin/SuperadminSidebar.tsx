@@ -27,6 +27,7 @@ import {
   FiAward,
   FiLogOut,
   FiBell,
+  FiVideo,
 } from 'react-icons/fi'
 
 interface SuperadminSidebarProps {
@@ -57,7 +58,7 @@ const menuItems: MenuItem[] = [
   // ── Modules Management ──
   { name: 'Courses', icon: FiBookOpen, path: '/superadmin/courses', dividerBefore: true, sectionLabel: 'Modules' },
   { name: 'Admissions', icon: FiUserPlus, path: '/superadmin/admissions' },
-  { name: 'Internships', icon: FiBriefcase, path: '/superadmin/internships' },
+  { name: 'Workshops & Training', icon: FiVideo, path: '/superadmin/trainings' },
   { name: 'Scholarships', icon: FiAward, path: '/superadmin/scholarships' },
   {
     name: 'School / Coaching Tie-up',

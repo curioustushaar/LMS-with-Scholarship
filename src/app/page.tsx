@@ -10,7 +10,7 @@ import Footer from '@/components/landing/Footer'
 
 const Courses = dynamic(() => import('@/components/landing/Courses'))
 const Admissions = dynamic(() => import('@/components/landing/Admissions'))
-const Internships = dynamic(() => import('@/components/landing/Internships'))
+const Training = dynamic(() => import('@/components/landing/Training'))
 const Scholarships = dynamic(() => import('@/components/landing/Scholarships'))
 const Employers = dynamic(() => import('@/components/landing/Employers'))
 const SchoolPartners = dynamic(() => import('@/components/landing/SchoolPartners'))
@@ -66,8 +66,8 @@ export default function HomePage() {
       {/* 9. Admissions & Intakes (#admissions) */}
       <Admissions />
 
-      {/* 10. Latest Internships Openings (#internships) */}
-      <Internships />
+      {/* 10. Live Workshops & Hands-on Training (#training) */}
+      <Training />
 
       {/* 11. Available Scholarships (#scholarships) */}
       <Scholarships />
