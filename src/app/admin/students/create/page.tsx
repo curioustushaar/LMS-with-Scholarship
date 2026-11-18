@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiX, FiMail, FiUser, FiPhone, FiEye, FiEyeOff, FiCopy, FiCheck } from 'react-icons/fi'
 import { studentsAPI, coursesAPI } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 
 // Generate secure password
 function generatePassword() {
@@ -38,6 +39,9 @@ export default function CreateStudentPage() {
     full_name: '',
     email: '',
     phone: '',
+    parents_contact: '',
+    class: '',
+    school_coaching: '',
     password: ''
   })
   const [courses, setCourses] = useState<any[]>([])
@@ -47,6 +51,8 @@ export default function CreateStudentPage() {
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState<any>(null)
   const [copiedField, setCopiedField] = useState('')
+  const [resendingEmail, setResendingEmail] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Generate password on component mount
   useEffect(() => {
@@ -67,8 +73,6 @@ export default function CreateStudentPage() {
     fetchAllCourses()
   }, [])
 
-
-
   const handleGeneratePassword = () => {
     setFormData(prev => ({ ...prev, password: generatePassword() }))
   }
@@ -77,6 +81,39 @@ export default function CreateStudentPage() {
     navigator.clipboard.writeText(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(''), 2000)
+  }
+
+  const handleResendEmail = async () => {
+    if (!successData) return
+    setResendingEmail(true)
+    setEmailStatus(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || localStorage.getItem('supabase.auth.token')
+      const res = await fetch('/api/admin/students/resend-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          email: successData.email,
+          password: successData.password,
+          student_id: successData.studentId,
+          student_name: successData.fullName
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEmailStatus({ type: 'success', message: `✅ Login credentials email sent successfully to ${successData.email}!` })
+      } else {
+        setEmailStatus({ type: 'error', message: `❌ Email sending failed: ${data.error || 'Please check SMTP settings in .env'}` })
+      }
+    } catch (err: any) {
+      setEmailStatus({ type: 'error', message: `❌ Error: ${err.message || 'Failed to trigger email'}` })
+    } finally {
+      setResendingEmail(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,9 +148,16 @@ export default function CreateStudentPage() {
       return
     }
 
-    // Validate phone if provided
+    // Validate student phone if provided
     if (formData.phone && !/^[0-9\s+()-]+$/.test(formData.phone)) {
-      setError('Phone number should only contain numbers and +, -, (, ) characters')
+      setError('Student phone number should only contain numbers and +, -, (, ) characters')
+      setLoading(false)
+      return
+    }
+
+    // Validate parents contact if provided
+    if (formData.parents_contact && !/^[0-9\s+()-]+$/.test(formData.parents_contact)) {
+      setError('Parents contact should only contain numbers and +, -, (, ) characters')
       setLoading(false)
       return
     }
@@ -125,11 +169,14 @@ export default function CreateStudentPage() {
     }
 
     try {
-      // Create student with explicit password
+      // Create student with explicit password and all details
       const response = await studentsAPI.create({
         email: formData.email,
         full_name: formData.full_name,
-        phone: formData.phone,
+        phone: formData.phone || undefined,
+        parents_contact: formData.parents_contact || undefined,
+        class: formData.class || undefined,
+        school_coaching: formData.school_coaching || undefined,
         password: formData.password,
         course_ids: selectedCourseIds.length ? selectedCourseIds : undefined
       })
@@ -165,7 +212,7 @@ export default function CreateStudentPage() {
               <FiCheck className="text-white text-3xl" />
             </div>
             <h1 className="text-3xl font-bold text-green-800 mb-2">Student Created Successfully!</h1>
-            <p className="text-green-700 mb-6">Share the credentials below with the student to login</p>
+            <p className="text-green-700 mb-6">Login credentials have been sent directly to student's email and are also displayed below</p>
           </div>
         </div>
 
@@ -269,10 +316,30 @@ export default function CreateStudentPage() {
               <strong>⚠️ Important:</strong> Share these credentials with the student. They should change their password on first login.
             </p>
           </div>
+
+          {/* Email Send/Resend Status Feedback */}
+          {emailStatus && (
+            <div className={`p-4 rounded-lg text-sm mt-4 font-medium ${
+              emailStatus.type === 'success' 
+                ? 'bg-green-100 text-green-800 border border-green-300' 
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {emailStatus.message}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleResendEmail}
+            disabled={resendingEmail}
+            className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 text-center"
+          >
+            <FiMail className="text-lg" />
+            <span>{resendingEmail ? 'Sending Email...' : 'Send / Resend to Email'}</span>
+          </button>
           <button
             onClick={() => router.push('/admin/students')}
             className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg font-semibold hover:shadow-lg transition-all text-center"
@@ -282,9 +349,10 @@ export default function CreateStudentPage() {
           <button
             onClick={() => {
               setSuccessData(null)
-              setFormData({ full_name: '', email: '', phone: '', password: generatePassword() })
+              setFormData({ full_name: '', email: '', phone: '', parents_contact: '', class: '', school_coaching: '', password: generatePassword() })
               setError('')
               setSelectedCourseIds([])
+              setEmailStatus(null)
             }}
             className="w-full sm:w-auto px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all text-center"
           >
@@ -313,7 +381,7 @@ export default function CreateStudentPage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-4 sm:p-6 md:p-8">
+      <form onSubmit={handleSubmit} autoComplete="off" className="bg-white rounded-xl shadow-md p-4 sm:p-6 md:p-8">
         <div className="space-y-6">
           {/* Error Display */}
           {error && (
@@ -336,6 +404,7 @@ export default function CreateStudentPage() {
                 <input
                   type="text"
                   required
+                  autoComplete="off"
                   value={formData.full_name}
                   onChange={(e) => {
                     // Only allow letters, spaces, hyphens, and apostrophes in names
@@ -353,18 +422,20 @@ export default function CreateStudentPage() {
                 <input
                   type="email"
                   required
+                  autoComplete="off"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase().trim() })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
-                  placeholder="student@example.com"
+                  placeholder="Enter student's email address"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number
+                  Student Phone Number
                 </label>
                 <input
                   type="tel"
+                  autoComplete="off"
                   value={formData.phone}
                   onChange={(e) => {
                     // Only allow numbers, spaces, hyphens, parentheses and plus sign
@@ -372,7 +443,49 @@ export default function CreateStudentPage() {
                     setFormData({ ...formData, phone: value })
                   }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
-                  placeholder="+91 98765 43210"
+                  placeholder="Enter student's phone number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Parents Contact
+                </label>
+                <input
+                  type="tel"
+                  autoComplete="off"
+                  value={formData.parents_contact}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9\s+()-]/g, '')
+                    setFormData({ ...formData, parents_contact: value })
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                  placeholder="Enter parent's contact number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Class / Grade
+                </label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={formData.class}
+                  onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                  placeholder="Enter class or grade"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  School / Coaching
+                </label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={formData.school_coaching}
+                  onChange={(e) => setFormData({ ...formData, school_coaching: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent"
+                  placeholder="Enter school or coaching name"
                 />
               </div>
             </div>

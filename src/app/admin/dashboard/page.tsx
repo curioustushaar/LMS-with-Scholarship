@@ -45,14 +45,14 @@ export default function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      console.log('Loading dashboard data...')
-      const overviewData = await api.reports.getOverview()
-      console.log('Overview:', overviewData)
+      console.log('Loading dashboard data in parallel...')
+      // Parallel execution: fetch overview and top 5 recent students simultaneously
+      const [overviewData, studentsData] = await Promise.all([
+        api.reports.getOverview(),
+        api.students.getAll({ limit: 5 })
+      ])
 
-      const studentsData = await api.students.getAll()
-      console.log('Students:', studentsData)
-
-      if (overviewData.success && overviewData.data) {
+      if (overviewData?.success && overviewData.data) {
         // Map the nested API response to DashboardStats format
         const overview = overviewData.data
         const stats: DashboardStats = {
@@ -69,7 +69,7 @@ export default function DashboardPage() {
         setStats(stats)
       }
 
-      if (studentsData.success && Array.isArray(studentsData.data)) {
+      if (studentsData?.success && Array.isArray(studentsData.data)) {
         setRecentStudents(studentsData.data.slice(0, 5) || [])
       }
     } catch (error) {

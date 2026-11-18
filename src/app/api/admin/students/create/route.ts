@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds } from '@/lib/auth'
+import { sendStudentCredentialsEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validate required fields
-    const { email, full_name, phone } = body
+    const { email, full_name, phone, parents_contact, class: studentClass, school_coaching } = body
 
-    console.log('📝 Creating student:', { email, full_name, phone })
+    console.log('📝 Creating student:', { email, full_name, phone, parents_contact, class: studentClass, school_coaching })
 
     if (!email || !full_name) {
       console.warn('⚠️ Missing required fields:', { email: !!email, full_name: !!full_name })
@@ -29,23 +30,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if email already exists in Supabase Auth first
-    try {
-      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
-      const existingAuthUser = authUsers?.users?.find(u => u.email === email)
-      
-      if (existingAuthUser) {
-        console.warn('⚠️ Email already exists in Supabase Auth:', email)
-        return NextResponse.json(
-          { error: 'A user with this email address has already been registered', success: false },
-          { status: 409 }
-        )
-      }
-    } catch (authCheckError: any) {
-      console.warn('⚠️ Could not check auth users:', authCheckError.message)
-    }
-
-    // Check if email already exists in profiles table
+    // Check if email already exists in profiles table (fast indexed query)
     const { data: existingProfile, error: existError } = await supabaseAdmin
       .from('profiles')
       .select('email')
@@ -74,7 +59,10 @@ export async function POST(request: NextRequest) {
       user_metadata: { 
         full_name: full_name,
         role: 'student',
-        phone: phone || null
+        phone: phone || null,
+        parents_contact: parents_contact || null,
+        class: studentClass || null,
+        school_coaching: school_coaching || null
       }
     })
 
@@ -98,24 +86,81 @@ export async function POST(request: NextRequest) {
     console.log('✅ Auth account created:', authUser.user.id)
 
     // 2. Insert into public.profiles table (Database)
+    const assignedSchoolId = authResult.assigned_school_id || authResult.school_id
+    const assignedSchoolName = authResult.assigned_school_name
     const studentData: any = {
       id: authUser.user.id,
       email,
       full_name,
       role: 'student',
       account_status: 'active',
+      phone: phone || null,
+      parents_contact: parents_contact || null,
+      class: studentClass || null,
+      school_coaching: school_coaching || assignedSchoolName || null,
+      school_id: assignedSchoolId || null,
       created_at: new Date().toISOString(), // Explicitly set created_at
-      created_by_admin_id: authResult.id  // Track which admin created this student
+      created_by_admin_id: authResult.id  // Track which admin/school created this student
     }
 
-    // Note: Phone is stored in user_metadata, not in profiles table
     console.log('📤 Inserting student data into profiles table:', studentData)
 
-    const { data: dbUser, error: dbError } = await supabaseAdmin
+    let dbUser: any = null
+    let dbError: any = null
+
+    // Try full insert with all new fields
+    const insertRes = await supabaseAdmin
       .from('profiles')
-      .upsert(studentData)
+      .upsert(studentData, { onConflict: 'id' })
       .select()
       .single()
+
+    dbUser = insertRes.data
+    dbError = insertRes.error
+
+    // Resilient fallback if custom columns have not been migrated yet in Postgres
+    if (dbError && (dbError.message?.includes('column') || dbError.code === '42703')) {
+      console.warn('⚠️ Custom columns may not exist yet in profiles table, attempting fallback:', dbError.message)
+      const fallbackData: any = {
+        id: authUser.user.id,
+        email,
+        full_name,
+        role: 'student',
+        account_status: 'active',
+        phone: phone || null,
+        created_at: studentData.created_at,
+        created_by_admin_id: authResult.id
+      }
+      const retryRes = await supabaseAdmin
+        .from('profiles')
+        .upsert(fallbackData)
+        .select()
+        .single()
+
+      dbUser = retryRes.data
+      dbError = retryRes.error
+
+      // If even phone column is not in profiles, try minimal base profile
+      if (dbError && (dbError.message?.includes('column') || dbError.code === '42703')) {
+        const baseData: any = {
+          id: authUser.user.id,
+          email,
+          full_name,
+          role: 'student',
+          account_status: 'active',
+          created_at: studentData.created_at,
+          created_by_admin_id: authResult.id
+        }
+        const baseRes = await supabaseAdmin
+          .from('profiles')
+          .upsert(baseData)
+          .select()
+          .single()
+
+        dbUser = baseRes.data
+        dbError = baseRes.error
+      }
+    }
 
     if (dbError) {
       console.error('❌ Database insert error (profiles table):', dbError.message)
@@ -143,16 +188,11 @@ export async function POST(request: NextRequest) {
       // Use explicitly provided courses
       coursesToEnroll = body.course_ids
       console.log('📋 Using provided course IDs:', coursesToEnroll)
-    } else if (authResult.role === 'admin') {
-      // Auto-enroll in admin's assigned courses
-      console.log('📋 No courses provided, fetching admin\'s assigned courses...')
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
-      
-      coursesToEnroll = assignments?.map(a => a.course_id) || []
-      console.log(`📋 Auto-enrolling in ${coursesToEnroll.length} admin-assigned courses`)
+    } else if (authResult.role === 'admin' || authResult.role === 'school') {
+      // Auto-enroll in assigned courses
+      console.log('📋 No courses provided, fetching assigned courses...')
+      coursesToEnroll = await getAllowedCourseIds(authResult)
+      console.log(`📋 Auto-enrolling in ${coursesToEnroll.length} assigned courses`)
     }
 
     // Enroll student into courses
@@ -184,13 +224,36 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ No courses to enroll student in')
     }
 
+    // Send login credentials to student email asynchronously in the background
+    // (Never block API response - ensures student creation returns instantly)
+    console.log('📧 Dispatching credentials email to student:', email, 'ID:', authUser.user.id)
+    sendStudentCredentialsEmail({
+      to: email,
+      student_id: authUser.user.id,
+      student_name: full_name,
+      email,
+      password,
+      phone,
+      student_class: studentClass,
+      school_coaching
+    }).then(res => {
+      if (res?.success) console.log('✅ Student credentials email sent successfully to:', email)
+      else console.warn('⚠️ Student credentials email sending failed:', res?.error)
+    }).catch(emailErr => {
+      console.error('⚠️ Could not send student credentials email:', emailErr?.message || emailErr)
+    })
+
     return NextResponse.json({
       success: true,
       data: {
         ...(dbUser || studentData),
+        phone: phone || (dbUser?.phone ?? null),
+        parents_contact: parents_contact || (dbUser?.parents_contact ?? null),
+        class: studentClass || (dbUser?.class ?? null),
+        school_coaching: school_coaching || (dbUser?.school_coaching ?? null),
         password: password // Return password so admin can see it once
       },
-      message: 'Student created successfully with login access'
+      message: 'Student created successfully with login access and email dispatched'
     }, { status: 201 })
 
   } catch (error: any) {

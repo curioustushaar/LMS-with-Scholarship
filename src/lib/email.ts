@@ -1,29 +1,31 @@
 import nodemailer from 'nodemailer'
 
-const EMAIL_USER = process.env.EMAIL_USER || ''
-const EMAIL_PASS = process.env.EMAIL_PASS || ''
+const getEmailUser = () => process.env.EMAIL_USER || 'aagajfoundationpaliganj@gmail.com'
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // true for 465, false for other ports
-  family: 4, // Force IPv4 to prevent IPv6 ConnectTimeoutError on Windows
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-  pool: true,          // Use connection pool — reuse SMTP connections instead of open/close per email
-  maxConnections: 3,   // Max 3 simultaneous SMTP connections (safe for Gmail)
-  maxMessages: 50,     // Max messages per connection before reconnect
-} as any)
+function getTransporter() {
+  const EMAIL_USER = getEmailUser()
+  const EMAIL_PASS = process.env.EMAIL_PASS || ''
 
-// Increase listener limit to prevent MaxListenersExceededWarning under concurrent payments
-// (each sendMail attaches listeners; default Node.js limit is 10)
-transporter.setMaxListeners(30)
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // true for 465, false for other ports
+    family: 4, // Force IPv4 to prevent IPv6 ConnectTimeoutError on Windows
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 5000, // 5s connection timeout
+    greetingTimeout: 5000,   // 5s greeting timeout
+    socketTimeout: 7000,     // 7s socket timeout
+  } as any)
+
+  return { transporter, EMAIL_USER }
+}
 
 interface SendEmailParams {
   to: string | string[]
@@ -37,6 +39,7 @@ interface SendEmailParams {
  */
 export async function sendEmail({ to, subject, html, text }: SendEmailParams) {
   try {
+    const { transporter, EMAIL_USER } = getTransporter()
     const info = await transporter.sendMail({
       from: `"GRAVITY by AAGAJ Foundation" <${EMAIL_USER}>`,
       to,
@@ -111,7 +114,7 @@ export async function sendContactFormEmails(data: {
 
   await Promise.allSettled([
     sendEmail({
-      to: EMAIL_USER,
+      to: getEmailUser(),
       subject: `[Contact Form] ${subject || 'New Inquiry'} from ${sender_name}`,
       html: adminHtml,
     }),
@@ -341,4 +344,199 @@ export async function sendWorkshopRegistrationEmail(data: {
 
   return sendEmail({ to, subject, html })
 }
+
+/**
+ * Send Student Login Credentials Email
+ */
+export async function sendStudentCredentialsEmail(data: {
+  to: string
+  student_name: string
+  student_id?: string
+  email: string
+  password: string
+  phone?: string
+  student_class?: string
+  school_coaching?: string
+}) {
+  const { to, student_name, student_id, email, password, phone, student_class, school_coaching } = data
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aagajfoundation.in'
+  const loginUrl = `${APP_URL}/login`
+
+  const subject = `🎓 Welcome to GRAVITY LMS - Your Student Account Login Credentials`
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #C81E4E, #D91E5B); padding: 28px 24px; text-align: center; border-radius: 12px 12px 0 0; color: white;">
+        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+          Student Access Portal
+        </span>
+        <h1 style="margin: 12px 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Welcome to GRAVITY LMS!</h1>
+        <p style="margin: 0; font-size: 13px; opacity: 0.95;">AAGAJ Foundation Learning Management System</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 24px; line-height: 1.6;">
+        <p style="font-size: 15px; margin-top: 0;">Dear <strong>${student_name}</strong>,</p>
+        <p style="font-size: 14px; color: #475569;">
+          Your student account has been successfully created on the <strong>GRAVITY LMS</strong> portal. You can now log in to access your assigned courses, learning modules, projects, quizzes, and certificates.
+        </p>
+
+        <!-- Credentials Card -->
+        <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 20px; margin: 24px 0;">
+          <h3 style="margin: 0 0 14px 0; color: #9f1239; font-size: 16px; font-weight: 700; border-bottom: 1px solid #fecdd3; padding-bottom: 8px;">
+            🔑 Your Login Credentials
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 7px 0; color: #475569; width: 140px; font-weight: 600;">Login Portal:</td>
+              <td style="padding: 7px 0;"><a href="${loginUrl}" style="color: #C81E4E; text-decoration: underline; font-weight: 600;">${loginUrl}</a></td>
+            </tr>
+            ${student_id ? `
+            <tr>
+              <td style="padding: 7px 0; color: #475569; font-weight: 600;">Student ID:</td>
+              <td style="padding: 7px 0;"><code style="background: #ffffff; border: 1px solid #fda4af; padding: 3px 8px; border-radius: 4px; font-family: Courier, monospace; font-size: 14px; font-weight: 700; color: #0f172a;">${student_id}</code></td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 7px 0; color: #475569; font-weight: 600;">Username (Email):</td>
+              <td style="padding: 7px 0; font-weight: 700; color: #0f172a;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #475569; font-weight: 600;">Temporary Password:</td>
+              <td style="padding: 7px 0;">
+                <code style="background: #ffffff; border: 1px solid #fda4af; padding: 4px 10px; border-radius: 6px; font-family: Courier, monospace; font-size: 15px; font-weight: 700; color: #be123c; letter-spacing: 0.5px;">${password}</code>
+              </td>
+            </tr>
+            ${student_class ? `
+            <tr>
+              <td style="padding: 7px 0; color: #475569; font-weight: 600;">Class / Grade:</td>
+              <td style="padding: 7px 0; color: #0f172a;">${student_class}</td>
+            </tr>` : ''}
+            ${school_coaching ? `
+            <tr>
+              <td style="padding: 7px 0; color: #475569; font-weight: 600;">School / Coaching:</td>
+              <td style="padding: 7px 0; color: #0f172a;">${school_coaching}</td>
+            </tr>` : ''}
+          </table>
+        </div>
+
+        <!-- Call to Action -->
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${loginUrl}" target="_blank" style="background: linear-gradient(135deg, #C81E4E, #D91E5B); color: #ffffff; padding: 14px 34px; font-weight: 700; border-radius: 999px; text-decoration: none; display: inline-block; font-size: 15px; box-shadow: 0 4px 14px rgba(200,30,78,0.35);">
+            🚀 Login to LMS Portal
+          </a>
+        </div>
+
+        <!-- Security Tip -->
+        <div style="background: #f8fafc; border-left: 4px solid #f59e0b; padding: 14px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 13px; color: #92400e;">
+            <strong>⚠️ Security Notice:</strong> Please keep this password confidential. We strongly recommend changing your password right after your first successful login.
+          </p>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+          Need assistance? Feel free to reach out to us at <a href="mailto:aagajfoundationpaliganj@gmail.com" style="color: #C81E4E;">aagajfoundationpaliganj@gmail.com</a> or helpline <strong>+91 9431430464</strong>.
+        </p>
+
+        <p style="margin-top: 18px; font-size: 14px;">
+          Best wishes for your learning journey,<br />
+          <strong>Academic & Support Team</strong><br />
+          GRAVITY by AAGAJ Foundation<br />
+          <span style="font-size: 12px; color: #94a3b8;"><a href="https://aagajfoundation.in" style="color: #94a3b8; text-decoration: none;">https://aagajfoundation.in</a></span>
+        </p>
+      </div>
+    </div>
+  `
+
+  return sendEmail({ to, subject, html })
+}
+
+/**
+ * Send Administrator Login Credentials Email
+ */
+export async function sendAdminCredentialsEmail(data: {
+  to: string
+  admin_name: string
+  email: string
+  password: string
+  phone?: string
+}) {
+  const { to, admin_name, email, password, phone } = data
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aagajfoundation.in'
+  const loginUrl = `${APP_URL}/login`
+
+  const subject = `🛡️ Welcome to GRAVITY Administration - Your Admin Portal Credentials`
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 28px 24px; text-align: center; border-radius: 12px 12px 0 0; color: white;">
+        <span style="background: rgba(200,30,78,0.3); border: 1px solid rgba(200,30,78,0.5); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #fda4af;">
+          Admin Access Granted
+        </span>
+        <h1 style="margin: 12px 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Welcome to Administration</h1>
+        <p style="margin: 0; font-size: 13px; opacity: 0.9;">GRAVITY LMS Management Portal</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 24px; line-height: 1.6;">
+        <p style="font-size: 15px; margin-top: 0;">Dear <strong>${admin_name}</strong>,</p>
+        <p style="font-size: 14px; color: #475569;">
+          Your Administrator account has been successfully created by the Superadmin on the <strong>GRAVITY LMS</strong> platform. You now have administrative privileges to manage assigned courses, students, evaluations, and projects.
+        </p>
+
+        <!-- Credentials Card -->
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; margin: 24px 0;">
+          <h3 style="margin: 0 0 14px 0; color: #0f172a; font-size: 16px; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+            🔐 Admin Login Credentials
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 7px 0; color: #64748b; width: 140px; font-weight: 600;">Login Portal:</td>
+              <td style="padding: 7px 0;"><a href="${loginUrl}" style="color: #C81E4E; text-decoration: underline; font-weight: 600;">${loginUrl}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748b; font-weight: 600;">Role:</td>
+              <td style="padding: 7px 0;"><span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">ADMIN</span></td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748b; font-weight: 600;">Email (Username):</td>
+              <td style="padding: 7px 0; font-weight: 700; color: #0f172a;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748b; font-weight: 600;">Temporary Password:</td>
+              <td style="padding: 7px 0;">
+                <code style="background: #ffffff; border: 1px solid #94a3b8; padding: 4px 10px; border-radius: 6px; font-family: Courier, monospace; font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: 0.5px;">${password}</code>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Call to Action -->
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${loginUrl}" target="_blank" style="background: linear-gradient(135deg, #C81E4E, #D91E5B); color: #ffffff; padding: 14px 34px; font-weight: 700; border-radius: 999px; text-decoration: none; display: inline-block; font-size: 15px; box-shadow: 0 4px 14px rgba(200,30,78,0.35);">
+            ⚡ Access Admin Dashboard
+          </a>
+        </div>
+
+        <!-- Security Tip -->
+        <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 14px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 13px; color: #991b1b;">
+            <strong>🔒 Administrative Security Notice:</strong> Admin access grants privileged controls over the platform. Do NOT share your credentials with anyone. Please change your password upon your first login.
+          </p>
+        </div>
+
+        <p style="margin-top: 24px; font-size: 14px;">
+          Best Regards,<br />
+          <strong>Superadmin Directorate</strong><br />
+          GRAVITY by AAGAJ Foundation<br />
+          <span style="font-size: 12px; color: #94a3b8;"><a href="https://aagajfoundation.in" style="color: #94a3b8; text-decoration: none;">https://aagajfoundation.in</a></span>
+        </p>
+      </div>
+    </div>
+  `
+
+  return sendEmail({ to, subject, html })
+}
+
 

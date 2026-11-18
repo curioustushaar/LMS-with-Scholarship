@@ -20,6 +20,73 @@ export async function GET(request: Request) {
     const examStatus = searchParams.get('exam_status')
     const meritStatus = searchParams.get('merit_status')
     const query = searchParams.get('query')?.toLowerCase().trim()
+    const studentType = searchParams.get('type') // 'lms' or 'scholarship'
+
+    // If requesting LMS course-enrolled students
+    if (studentType === 'lms') {
+      let pQuery = supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('role', 'student')
+        .or(`school_id.eq.${schoolId},school_coaching.ilike.%${auth.school.name}%`)
+        .order('created_at', { ascending: false })
+
+      const { data: lmsStudents, error: lmsErr } = await pQuery
+
+      if (lmsErr) {
+        console.warn('LMS students fetch issue:', lmsErr.message)
+      }
+
+      const studentList = lmsStudents || []
+      const studentIds = studentList.map((s: any) => s.id)
+      let enrollmentsMap: Record<string, string[]> = {}
+
+      if (studentIds.length > 0) {
+        try {
+          const { data: enrollments } = await supabaseAdmin
+            .from('enrollments')
+            .select('user_id, course_id, courses(id, title)')
+            .in('user_id', studentIds)
+
+          if (enrollments) {
+            enrollments.forEach((e: any) => {
+              if (!enrollmentsMap[e.user_id]) enrollmentsMap[e.user_id] = []
+              const title = e.courses?.title || e.course_id
+              if (title) enrollmentsMap[e.user_id].push(title)
+            })
+          }
+        } catch (eErr) {
+          console.warn('Enrollment courses lookup notice:', eErr)
+        }
+      }
+
+      let formattedLms = studentList.map((s: any) => ({
+        id: s.id,
+        applicant_name: s.full_name,
+        applicant_email: s.email,
+        applicant_phone: s.phone,
+        parents_contact: s.parents_contact,
+        school_class: s.class,
+        school_coaching: s.school_coaching,
+        enrolled_courses: enrollmentsMap[s.id] || [],
+        created_at: s.created_at,
+        source: 'LMS_COURSE'
+      }))
+
+      if (query) {
+        formattedLms = formattedLms.filter((s: any) =>
+          s.applicant_name?.toLowerCase().includes(query) ||
+          s.applicant_email?.toLowerCase().includes(query) ||
+          s.applicant_phone?.toLowerCase().includes(query)
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        total: formattedLms.length,
+        data: formattedLms
+      })
+    }
 
     let dbQuery = supabaseAdmin
       .from('scholarship_applications')

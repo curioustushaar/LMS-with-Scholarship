@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { FiArrowLeft, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiMail, FiPhone, FiCalendar, FiExternalLink } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiMail, FiPhone, FiCalendar, FiExternalLink, FiFolder } from 'react-icons/fi'
 import { api } from '@/lib/api'
 
 export default function StudentDetailPage() {
@@ -131,14 +131,26 @@ export default function StudentDetailPage() {
                   Student
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-gray-600">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-4 text-sm text-gray-600">
                 <div className="flex items-center space-x-2">
                   <FiMail className="text-[#C81E4E]" />
-                  <span>{student.email || '-'}</span>
+                  <span className="truncate">{student.email || '-'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <FiPhone className="text-[#C81E4E]" />
-                  <span>{student.phone || '-'}</span>
+                  <span>Phone: {student.phone || '-'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-semibold text-xs text-[#C81E4E] border border-[#C81E4E] rounded px-1">Parents</span>
+                  <span>{student.parents_contact || '-'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-semibold text-xs text-purple-600 border border-purple-600 rounded px-1">Class</span>
+                  <span>{student.class || '-'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-semibold text-xs text-blue-600 border border-blue-600 rounded px-1">School</span>
+                  <span className="truncate" title={student.school_coaching}>{student.school_coaching || '-'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <FiCalendar className="text-[#C81E4E]" />
@@ -149,17 +161,24 @@ export default function StudentDetailPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link 
+              href={`/admin/projects?assignUserId=${params.id}`}
+              className="px-4 py-2 bg-gradient-to-r from-[#C81E4E] to-[#D91E5B] text-white rounded-lg hover:shadow-md transition-all flex items-center space-x-2 text-sm font-semibold"
+            >
+              <FiFolder />
+              <span>Assign Project</span>
+            </Link>
             <button 
               onClick={() => setIsEditing(true)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all flex items-center space-x-2"
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all flex items-center space-x-2 text-sm font-medium"
             >
               <FiEdit />
               <span>Edit Profile</span>
             </button>
             <button 
               onClick={handleResetPassword}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all flex items-center space-x-2"
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all flex items-center space-x-2 text-sm font-medium"
             >
               <FiRefreshCw />
               <span>Reset Password</span>
@@ -304,12 +323,57 @@ function ProfileTab({ student, isEditing, editData, setEditData, onSave, onCance
 
         {/* Phone Number */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Student Phone Number</label>
           <input 
             type="tel" 
             value={editData.phone || ''} 
             onChange={(e) => isEditing && setEditData({ ...editData, phone: e.target.value })}
             readOnly={!isEditing}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
+          />
+        </div>
+
+        {/* Parents Contact */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Parents Contact</label>
+          <input 
+            type="tel" 
+            value={editData.parents_contact || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, parents_contact: e.target.value })}
+            readOnly={!isEditing}
+            placeholder={isEditing ? "+91 98765 43210" : "-"}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
+          />
+        </div>
+
+        {/* Class */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Class / Grade</label>
+          <input 
+            type="text" 
+            value={editData.class || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, class: e.target.value })}
+            readOnly={!isEditing}
+            placeholder={isEditing ? "e.g. 10th, 12th, B.Tech..." : "-"}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
+              isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
+            }`}
+          />
+        </div>
+
+        {/* School / Coaching */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">School / Coaching</label>
+          <input 
+            type="text" 
+            value={editData.school_coaching || ''} 
+            onChange={(e) => isEditing && setEditData({ ...editData, school_coaching: e.target.value })}
+            readOnly={!isEditing}
+            placeholder={isEditing ? "e.g. DPS, Allen Career Institute..." : "-"}
             className={`w-full px-4 py-3 border border-gray-300 rounded-lg ${
               isEditing ? 'bg-white focus:outline-none focus:ring-2 focus:ring-[#C81E4E]' : 'bg-gray-50'
             }`}

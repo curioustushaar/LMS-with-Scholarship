@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds, getAllowedStudentIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,38 +20,15 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Fetching tickets with filters:', { status, priority, assigned_to, role: authResult.role })
 
-    // For admins, filter by students from assigned courses
+    // For admins and school partners, filter by allowed students
     let allowedStudentIds: string[] = []
-    if (authResult.role === 'admin') {
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      const courseIds = await getAllowedCourseIds(authResult)
+      allowedStudentIds = await getAllowedStudentIds(authResult, courseIds)
 
-      const courseIds = assignments?.map(a => a.course_id) || []
-      
-      console.log(`📚 Admin has ${courseIds.length} assigned courses`)
+      console.log(`👥 User can see tickets from ${allowedStudentIds.length} students`)
 
-      if (courseIds.length === 0) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          count: 0,
-          message: 'No courses assigned to you yet'
-        })
-      }
-
-      // Get students enrolled in these courses
-      const { data: enrollments } = await supabaseAdmin
-        .from('enrollments')
-        .select('user_id')
-        .in('course_id', courseIds)
-
-      allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-      
-      console.log(`👥 Admin can see tickets from ${allowedStudentIds.length} students`)
-
-      if (allowedStudentIds.length === 0) {
+      if (authResult.role === 'admin' && courseIds.length > 0 && allowedStudentIds.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
@@ -65,8 +42,8 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    // Filter by admin's allowed students
-    if (authResult.role === 'admin' && allowedStudentIds.length > 0) {
+    // Filter by allowed students
+    if ((authResult.role === 'admin' || authResult.role === 'school') && allowedStudentIds.length > 0) {
       query = query.in('user_id', allowedStudentIds)
     }
 

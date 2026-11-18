@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,16 +38,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If admin (not superadmin), verify access to this course
-    if (authResult.role === 'admin') {
-      const { data: assignment } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
-        .eq('course_id', course_id)
-        .single()
-
-      if (!assignment) {
+    // If admin or school partner (not superadmin), verify access to this course
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      const allowedCourseIds = await getAllowedCourseIds(authResult)
+      if (allowedCourseIds.length > 0 && !allowedCourseIds.includes(course_id)) {
         return NextResponse.json(
           { error: 'Access denied. You can only create tasks for your assigned courses.', success: false },
           { status: 403 }
@@ -146,19 +140,13 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Fetching tasks with filters:', { status, course_id, domain, role: authResult.role })
 
-    // For admins, filter by assigned courses
+    // For admins and school partners, filter by assigned courses
     let allowedCourseIds: string[] = []
-    if (authResult.role === 'admin') {
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      allowedCourseIds = await getAllowedCourseIds(authResult)
+      console.log(`📚 User has ${allowedCourseIds.length} assigned courses`)
 
-      allowedCourseIds = assignments?.map(a => a.course_id) || []
-      
-      console.log(`📚 Admin has ${allowedCourseIds.length} assigned courses`)
-
-      if (allowedCourseIds.length === 0) {
+      if (authResult.role === 'admin' && allowedCourseIds.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
@@ -173,8 +161,8 @@ export async function GET(request: NextRequest) {
       .select('*, courses(title, domain)')
       .order('created_at', { ascending: false })
 
-    // Filter by admin's assigned courses
-    if (authResult.role === 'admin' && allowedCourseIds.length > 0) {
+    // Filter by assigned courses
+    if ((authResult.role === 'admin' || authResult.role === 'school') && allowedCourseIds.length > 0) {
       query = query.in('course_id', allowedCourseIds)
     }
 

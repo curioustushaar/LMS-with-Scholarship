@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { sendAdminCredentialsEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -219,6 +220,8 @@ export async function GET(req: NextRequest) {
           role: admin.role,
           account_status: admin.account_status || 'active',
           admin_since: admin.created_at,
+          assigned_school_id: admin.assigned_school_id || null,
+          assigned_school_name: admin.assigned_school_name || null,
           assigned_courses_count: assignedCoursesCount || 0,
           assigned_students_count: assignedStudentsCount,
           assigned_tasks_count: assignedTasksCount,
@@ -261,7 +264,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { email, password, full_name, phone } = body
+    const { email, password, full_name, phone, assigned_school_id, assigned_school_name } = body
 
     // Validation
     if (!email || !password || !full_name) {
@@ -358,21 +361,49 @@ export async function POST(req: NextRequest) {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Update or insert profile with admin role
-    const { data: profileData, error: profileError } = await supabaseAdmin
+    const adminProfilePayload: any = { 
+      id: authData.user.id,
+      email: email,
+      role: 'admin',
+      full_name,
+      phone: phone || null,
+      account_status: 'active',
+      created_at: new Date().toISOString()
+    }
+
+    if (assigned_school_id) {
+      adminProfilePayload.assigned_school_id = assigned_school_id
+      adminProfilePayload.assigned_school_name = assigned_school_name || null
+    }
+
+    let { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .upsert({ 
+      .upsert(adminProfilePayload, {
+        onConflict: 'id'
+      })
+      .select()
+      .single()
+
+    // Resilient fallback if custom column not yet created in Postgres
+    if (profileError && (profileError.message?.includes('column') || profileError.code === '42703')) {
+      console.warn('⚠️ assigned_school column fallback during admin creation:', profileError.message)
+      const fallbackPayload = {
         id: authData.user.id,
         email: email,
         role: 'admin',
         full_name,
         phone: phone || null,
         account_status: 'active',
-        created_at: new Date().toISOString()
-      }, {
-        onConflict: 'id'
-      })
-      .select()
-      .single()
+        created_at: adminProfilePayload.created_at
+      }
+      const retry = await supabaseAdmin
+        .from('profiles')
+        .upsert(fallbackPayload, { onConflict: 'id' })
+        .select()
+        .single()
+      profileData = retry.data
+      profileError = retry.error
+    }
 
     if (profileError) {
       console.error('Error updating profile:', profileError)
@@ -384,11 +415,41 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Also link admin to schools table if school was assigned
+    if (assigned_school_id) {
+      try {
+        await supabaseAdmin
+          .from('schools')
+          .update({
+            assigned_admin_id: authData.user.id,
+            assigned_admin_name: full_name
+          })
+          .or(`school_id.eq.${assigned_school_id},id.eq.${assigned_school_id}`)
+      } catch (schoolLinkErr) {
+        console.warn('⚠️ Could not update school assigned_admin:', schoolLinkErr)
+      }
+    }
+
     console.log('✅ Admin profile created/updated:', profileData)
+
+    // Send login credentials to the newly created admin's email
+    try {
+      console.log('📧 Sending credentials email to admin:', email)
+      await sendAdminCredentialsEmail({
+        to: email,
+        admin_name: full_name,
+        email,
+        password,
+        phone
+      })
+      console.log('✅ Admin credentials email sent successfully')
+    } catch (emailErr: any) {
+      console.error('⚠️ Could not send admin credentials email:', emailErr.message)
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Admin created successfully',
+      message: 'Admin created successfully and credentials emailed',
       data: {
         id: authData.user.id,
         email: authData.user.email,

@@ -14,6 +14,9 @@ import {
   FiLogOut,
   FiX,
   FiBookOpen,
+  FiVideo,
+  FiMessageSquare,
+  FiFolder,
 } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
 
@@ -34,6 +37,12 @@ export default function SchoolSidebar({ isOpen, onClose, schoolName = 'Instituti
     { name: 'Dashboard', icon: FiHome, path: '/school-portal/dashboard' },
     { name: 'Scholarships', icon: FiAward, path: '/school-portal/scholarships' },
     { name: 'Registered Students', icon: FiUsers, path: '/school-portal/students' },
+    { name: 'Course Videos', icon: FiBookOpen, path: '/school-portal/courses/videos' },
+    { name: 'Tasks & Assignments', icon: FiCheckSquare, path: '/school-portal/tasks' },
+    { name: 'Projects', icon: FiFolder, path: '/school-portal/projects' },
+    { name: 'Certificates', icon: FiAward, path: '/school-portal/certificates' },
+    { name: 'Support Tickets', icon: FiMessageSquare, path: '/school-portal/support' },
+    { name: 'Workshops & Training', icon: FiVideo, path: '/school-portal/workshops' },
     { name: 'Exam Results', icon: FiCheckSquare, path: '/school-portal/results' },
     { name: 'Incentives & Earnings', icon: FiDollarSign, path: '/school-portal/incentives' },
     { name: 'Download Reports', icon: FiFileText, path: '/school-portal/reports' },

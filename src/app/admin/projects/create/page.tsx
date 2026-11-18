@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { FiArrowLeft } from 'react-icons/fi'
 import { api } from '@/lib/api'
 
@@ -20,32 +20,42 @@ interface User {
   domain?: string
 }
 
-export default function CreateProjectPage() {
+function CreateProjectForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialUserId = searchParams.get('user_id') || searchParams.get('student_id') || ''
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     course_id: '',
-    user_id: '',
+    user_id: initialUserId,
     deadline: ''
   })
 
   const [courses, setCourses] = useState<Course[]>([])
   const [allStudents, setAllStudents] = useState<User[]>([])
-  const [filteredStudents, setFilteredStudents] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (initialUserId) {
+      setFormData(prev => ({ ...prev, user_id: initialUserId }))
+    }
+  }, [initialUserId])
 
   useEffect(() => {
     loadCourses()
     loadStudents()
   }, [])
 
-  // Filter students when course selection changes
+  const [enrolledStudentIds, setEnrolledStudentIds] = useState<string[]>([])
+
+  // Track enrolled students when course selection changes
   useEffect(() => {
-    filterStudentsByDomain()
-  }, [formData.course_id, allStudents])
+    checkCourseEnrollments()
+  }, [formData.course_id])
 
   const loadCourses = async () => {
     try {
@@ -64,51 +74,30 @@ export default function CreateProjectPage() {
       if (result.success && result.data) {
         const studentsList = Array.isArray(result.data) ? result.data : []
         setAllStudents(studentsList)
-        setFilteredStudents(studentsList)
       }
     } catch (error) {
       console.error('Failed to load students:', error)
     }
   }
 
-  const filterStudentsByDomain = async () => {
+  const checkCourseEnrollments = async () => {
     if (!formData.course_id) {
-      setFilteredStudents(allStudents)
+      setEnrolledStudentIds([])
       return
     }
 
     try {
-      // Get enrollments for the selected course
       const enrollmentsResult = await api.courses.getEnrollments(formData.course_id)
-      
-      if (!enrollmentsResult.success || !enrollmentsResult.data) {
-        console.log('No enrollments found for this course')
-        setFilteredStudents([])
-        return
-      }
-
-      const enrollments = Array.isArray(enrollmentsResult.data) ? enrollmentsResult.data : []
-      
-      // Extract enrolled student IDs
-      const enrolledUserIds = enrollments.map((e: any) => e.user_id || e.user?.id).filter(Boolean)
-      
-      // Filter students who are enrolled in this course
-      const filtered = allStudents.filter(student => 
-        enrolledUserIds.includes(student.id)
-      )
-
-      console.log(`📚 Course selected: ${formData.course_id}`)
-      console.log(`✅ Found ${filtered.length} enrolled students`)
-      
-      setFilteredStudents(filtered)
-      
-      // Reset student selection if current selection is not in filtered list
-      if (formData.user_id && !filtered.find(s => s.id === formData.user_id)) {
-        setFormData(prev => ({ ...prev, user_id: '' }))
+      if (enrollmentsResult.success && enrollmentsResult.data) {
+        const enrollments = Array.isArray(enrollmentsResult.data) ? enrollmentsResult.data : []
+        const enrolledUserIds = enrollments.map((e: any) => e.user_id || e.user?.id).filter(Boolean)
+        setEnrolledStudentIds(enrolledUserIds)
+      } else {
+        setEnrolledStudentIds([])
       }
     } catch (error) {
-      console.error('Error filtering students:', error)
-      setFilteredStudents([])
+      console.error('Error fetching enrollments for course:', error)
+      setEnrolledStudentIds([])
     }
   }
 
@@ -246,13 +235,9 @@ export default function CreateProjectPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Assign to Student <span className="text-red-500">*</span>
             </label>
-            {!formData.course_id ? (
-              <div className="px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 text-sm">
-                Please select a course first to see enrolled students
-              </div>
-            ) : filteredStudents.length === 0 ? (
-              <div className="px-4 py-3 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-700 text-sm">
-                ⚠️ No students enrolled in this course. Please enroll students first from the course page.
+            {allStudents.length === 0 ? (
+              <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 text-sm">
+                No students found. Please add students first from the Students page.
               </div>
             ) : (
               <select
@@ -263,19 +248,19 @@ export default function CreateProjectPage() {
                 disabled={loading}
               >
                 <option value="">Select a student...</option>
-                {filteredStudents.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.full_name} ({student.email})
-                  </option>
-                ))}
+                {allStudents.map(student => {
+                  const isEnrolled = enrolledStudentIds.includes(student.id)
+                  return (
+                    <option key={student.id} value={student.id}>
+                      {student.full_name} ({student.email}) {formData.course_id ? (isEnrolled ? '⭐ Enrolled' : '• Will auto-enroll') : ''}
+                    </option>
+                  )
+                })}
               </select>
             )}
-            {formData.course_id && filteredStudents.length > 0 && (
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <span className="mr-1">✅</span>
-                Showing {filteredStudents.length} enrolled student(s) in this course
-              </p>
-            )}
+            <p className="text-xs text-gray-500 mt-1.5">
+              💡 You can assign a project to any student. The student will be automatically enrolled in the course if not already enrolled.
+            </p>
           </div>
 
           {/* Deadline Selection */}
@@ -317,5 +302,20 @@ export default function CreateProjectPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function CreateProjectPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C81E4E] mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    }>
+      <CreateProjectForm />
+    </Suspense>
   )
 }

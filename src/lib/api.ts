@@ -47,11 +47,11 @@ async function apiRequest<T = any>(
         if (session?.access_token) {
           token = session.access_token
         } else {
-          token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
+          token = localStorage.getItem('school_token') || localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
         }
       } catch (authErr) {
         console.warn('⚠️ Supabase session retrieval error:', authErr)
-        token = localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
+        token = localStorage.getItem('school_token') || localStorage.getItem('supabase.auth.token') || localStorage.getItem('token')
       }
     }
 
@@ -116,10 +116,11 @@ export const studentsAPI = {
   /**
    * Get all students with optional filters
    */
-  getAll: async (filters?: { status?: string; search?: string }) => {
+  getAll: async (filters?: { status?: string; search?: string; limit?: number }) => {
     const params = new URLSearchParams()
     if (filters?.status) params.append('status', filters.status)
     if (filters?.search) params.append('search', filters.search)
+    if (filters?.limit) params.append('limit', filters.limit.toString())
 
     const query = params.toString() ? `?${params.toString()}` : ''
     return apiRequest(`/students${query}`)
@@ -146,6 +147,9 @@ export const studentsAPI = {
     email: string
     full_name: string
     phone?: string
+    parents_contact?: string
+    class?: string
+    school_coaching?: string
     password?: string
     course_ids?: string[]
   }) => {
@@ -162,6 +166,9 @@ export const studentsAPI = {
     full_name: string
     email: string
     phone: string
+    parents_contact: string
+    class: string
+    school_coaching: string
     status: string
     profile_image_url: string
   }>) => {
@@ -500,6 +507,7 @@ export const projectsAPI = {
     description?: string
     course_id: string
     user_id: string
+    deadline?: string
   }) => {
     return apiRequest(`/projects`, {
       method: 'POST',

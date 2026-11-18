@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,18 +146,17 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    // If admin (not superadmin), filter by assigned courses only
-    if (authResult.role === 'admin') {
-      // Get admin's assigned course IDs
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+    // If admin or school partner (not superadmin), filter by assigned courses
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      const assignedCourseIds = await getAllowedCourseIds(authResult)
 
-      const assignedCourseIds = assignments?.map(a => a.course_id) || []
-      
-      if (assignedCourseIds.length === 0) {
-        // Admin has no assigned courses
+      if (assignedCourseIds.length > 0) {
+        query = query.in('id', assignedCourseIds)
+      } else if (authResult.role === 'school') {
+        // Fallback for school partner if no courses explicitly mapped yet: allow active courses
+        query = query.eq('is_active', true)
+      } else {
+        // Admin with no courses
         console.log('⚠️ Admin has no assigned courses')
         return NextResponse.json({
           success: true,
@@ -166,8 +165,6 @@ export async function GET(request: NextRequest) {
           message: 'No courses assigned to you yet'
         })
       }
-
-      query = query.in('id', assignedCourseIds)
     }
 
     if (status) {

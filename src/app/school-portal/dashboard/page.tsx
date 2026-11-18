@@ -15,10 +15,14 @@ import {
   FiRefreshCw,
   FiClock,
   FiFileText,
+  FiVideo,
+  FiCalendar,
+  FiExternalLink,
 } from 'react-icons/fi'
 
 export default function SchoolDashboardPage() {
   const [data, setData] = useState<any>(null)
+  const [workshops, setWorkshops] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const getToken = async () => await getSchoolClientAuthToken()
@@ -27,12 +31,16 @@ export default function SchoolDashboardPage() {
     setLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch('/api/school/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const json = await res.json()
+      const [dashRes, workshopsRes] = await Promise.all([
+        fetch('/api/school/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/school/workshops?filter=upcoming', { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      const [json, wJson] = await Promise.all([dashRes.json(), workshopsRes.json()])
       if (json.success) {
         setData(json)
+      }
+      if (wJson.success && Array.isArray(wJson.data)) {
+        setWorkshops(wJson.data.slice(0, 3))
       }
     } catch (err) {
       console.error('Fetch school dashboard error:', err)
@@ -70,20 +78,26 @@ export default function SchoolDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 relative z-10">
+        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
           <Link
-            href="/school-portal/students/register"
-            className="px-4 py-2.5 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            href="/school-portal/students/create"
+            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
           >
             <FiPlus />
-            Register Student
+            Add Student & Course
           </Link>
           <Link
-            href="/school-portal/students/bulk"
+            href="/school-portal/workshops"
             className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10"
           >
-            <FiUploadCloud />
-            Bulk CSV Upload
+            <FiVideo />
+            Workshops Schedule
+          </Link>
+          <Link
+            href="/school-portal/students/register"
+            className="px-3.5 py-2.5 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
+          >
+            Scholarship Reg.
           </Link>
         </div>
       </div>
@@ -125,6 +139,173 @@ export default function SchoolDashboardPage() {
           <p className="text-2xl font-extrabold text-pink-700 mt-1">₹{metrics.total_incentive_earned.toLocaleString()}</p>
           <span className="text-[10px] text-pink-500 font-semibold">Paid: ₹{metrics.total_incentive_paid.toLocaleString()}</span>
         </div>
+      </div>
+
+      {/* Prebuilt LMS Academic Controls */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+            <span className="p-1.5 bg-pink-100 text-[#FF2D8D] rounded-xl text-xs">🎓</span>
+            Academic & Learning Management Controls
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Manage course video content, weekly tasks, student projects, tickets, and certificates
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Link
+            href="/school-portal/courses/videos"
+            className="p-4 rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50/40 border border-pink-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-pink-500/10 text-[#FF2D8D] flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              🎬
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-[#FF2D8D] transition-colors">Course Videos</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Upload lectures</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/school-portal/tasks"
+            className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/40 border border-purple-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-700 flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              📝
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-purple-700 transition-colors">Tasks & HW</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Create & evaluate</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/school-portal/projects"
+            className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50/40 border border-blue-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-700 flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              💼
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-blue-700 transition-colors">Projects</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Review submissions</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/school-portal/certificates"
+            className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50/40 border border-amber-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              🎓
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-amber-700 transition-colors">Certificates</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Issue & download</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/school-portal/support"
+            className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/40 border border-emerald-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              🎫
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">Student Helpdesk</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Resolve queries</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/school-portal/students/create"
+            className="p-4 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50/40 border border-violet-100/70 hover:shadow-md transition-all flex flex-col justify-between group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-violet-500/10 text-violet-700 flex items-center justify-center font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+              👥
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 group-hover:text-violet-700 transition-colors">Add Student</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Enroll in courses</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Upcoming Training & Workshops Section */}
+      <div className="bg-gradient-to-br from-indigo-50/70 via-purple-50/40 to-white rounded-3xl border border-indigo-100 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+              <FiVideo className="text-indigo-600" />
+              Upcoming Training Workshops
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Workshops scheduled by the LMS administration for your school and faculty
+            </p>
+          </div>
+          <Link
+            href="/school-portal/workshops"
+            className="text-xs font-bold text-indigo-700 hover:underline flex items-center gap-1"
+          >
+            All Workshops <FiArrowRight />
+          </Link>
+        </div>
+
+        {workshops.length === 0 ? (
+          <div className="p-6 bg-white/80 rounded-2xl border border-indigo-100/60 text-center text-xs text-gray-500">
+            No upcoming workshops scheduled right now. Check the workshops tab for recordings and past events.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {workshops.map((w: any) => (
+              <div
+                key={w.id}
+                className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-xs flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-[10px] font-bold uppercase">
+                      {w.duration_badge || 'Workshop'}
+                    </span>
+                    <span className="text-[10px] font-bold text-indigo-600">{w.platform || 'Online'}</span>
+                  </div>
+                  <h4 className="text-xs font-extrabold text-gray-900 line-clamp-1">{w.title}</h4>
+                  <div className="mt-2 space-y-1 text-[11px] text-gray-600">
+                    <div className="flex items-center gap-1.5 font-semibold text-gray-800">
+                      <FiCalendar className="text-purple-600 shrink-0 text-xs" />
+                      <span>{w.start_date ? new Date(w.start_date).toLocaleDateString() : 'Date TBA'}</span>
+                    </div>
+                    {w.timing && (
+                      <div className="flex items-center gap-1.5">
+                        <FiClock className="text-pink-600 shrink-0 text-xs" />
+                        <span>{w.timing}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                  {w.instructor_name && (
+                    <span className="text-[10px] text-gray-500 truncate">By {w.instructor_name}</span>
+                  )}
+                  {w.meeting_link && (
+                    <a
+                      href={w.meeting_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 ml-auto"
+                    >
+                      Join <FiExternalLink className="text-[11px]" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Associated Scholarships Grid */}

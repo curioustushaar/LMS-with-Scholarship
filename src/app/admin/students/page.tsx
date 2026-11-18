@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FiSearch, FiPlus, FiEye, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiFilter, FiX, FiCheck, FiCopy, FiEyeOff } from 'react-icons/fi'
+import { FiSearch, FiPlus, FiEye, FiEdit, FiLock, FiUnlock, FiRefreshCw, FiFilter, FiX, FiCheck, FiCopy, FiEyeOff, FiFolder } from 'react-icons/fi'
 import { studentsAPI } from '@/lib/api'
 
 interface Student {
@@ -12,6 +12,9 @@ interface Student {
   email: string
   full_name: string
   phone?: string
+  parents_contact?: string
+  class?: string
+  school_coaching?: string
   role: string
   status: string
   enrollment_date?: string
@@ -262,16 +265,17 @@ export default function StudentsPage() {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Parents Contact</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Class / School</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Enrolled</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Active</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C81E4E]"></div>
                       <p className="mt-4 text-gray-600">Loading students...</p>
@@ -280,7 +284,7 @@ export default function StudentsPage() {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No students found. {searchQuery || filterStatus !== 'all' ? 'Try adjusting your filters.' : 'Add your first student to get started.'}
                   </td>
                 </tr>
@@ -296,7 +300,24 @@ export default function StudentsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.phone || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{student.phone || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.parents_contact || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <div>
+                        {student.class ? (
+                          <span className="inline-block px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 rounded border border-purple-200">
+                            {student.class}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                        {student.school_coaching && (
+                          <p className="text-xs text-gray-500 truncate max-w-[170px] mt-0.5" title={student.school_coaching}>
+                            {student.school_coaching}
+                          </p>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                         student.status === 'active' ? 'bg-green-100 text-green-800' : 
@@ -307,7 +328,6 @@ export default function StudentsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(student.enrollment_date)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(student.last_active)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-3">
                         <Link 
@@ -316,6 +336,13 @@ export default function StudentsPage() {
                           title="View Profile"
                         >
                           <FiEye className="text-lg" />
+                        </Link>
+                        <Link
+                          href={`/admin/projects?assignUserId=${student.id}`}
+                          className="text-purple-600 hover:text-purple-800 transition-colors"
+                          title="Assign Project to Student"
+                        >
+                          <FiFolder className="text-lg" />
                         </Link>
                         <button 
                           onClick={() => handleResetPassword(student.id, student.full_name)}

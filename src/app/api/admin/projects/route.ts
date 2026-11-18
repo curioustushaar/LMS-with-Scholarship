@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds, getAllowedStudentIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,30 +20,15 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Fetching projects with filters:', { status, user_id, course_id, role: authResult.role })
 
-    // For admins, only show projects from students in assigned courses
+    // For admins and school partners, only show projects from allowed students
     let allowedStudentIds: string[] = []
-    if (authResult.role === 'admin') {
-      // Get admin's assigned courses
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      const courseIds = await getAllowedCourseIds(authResult)
+      allowedStudentIds = await getAllowedStudentIds(authResult, courseIds)
 
-      const courseIds = assignments?.map(a => a.course_id) || []
+      console.log(`👥 User can see projects from ${allowedStudentIds.length} students`)
 
-      if (courseIds.length > 0) {
-        // Get students enrolled in these courses
-        const { data: enrollments } = await supabaseAdmin
-          .from('enrollments')
-          .select('user_id')
-          .in('course_id', courseIds)
-
-        allowedStudentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-      }
-
-      console.log(`👥 Admin can see projects from ${allowedStudentIds.length} students`)
-
-      if (allowedStudentIds.length === 0) {
+      if (authResult.role === 'admin' && courseIds.length > 0 && allowedStudentIds.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
@@ -58,8 +43,8 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    // Filter by allowed students for admin
-    if (authResult.role === 'admin' && allowedStudentIds.length > 0) {
+    // Filter by allowed students for admin/school (only if restricted)
+    if ((authResult.role === 'admin' || authResult.role === 'school') && allowedStudentIds.length > 0) {
       query = query.in('user_id', allowedStudentIds)
     }
 
@@ -247,10 +232,35 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Project created successfully:', data.id)
 
+    // Ensure student is enrolled in this course so that permissions, progress, and evaluations remain valid
+    if (course_id && user_id) {
+      try {
+        const { data: existingEnrollment } = await supabaseAdmin
+          .from('enrollments')
+          .select('id')
+          .eq('user_id', user_id)
+          .eq('course_id', course_id)
+          .maybeSingle()
+
+        if (!existingEnrollment) {
+          console.log(`📝 Auto-enrolling student ${user_id} into course ${course_id}`)
+          await supabaseAdmin
+            .from('enrollments')
+            .insert([{
+              user_id,
+              course_id,
+              enrolled_at: new Date().toISOString()
+            }])
+        }
+      } catch (enrollErr: any) {
+        console.warn('⚠️ Auto-enrollment warning:', enrollErr?.message)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data,
-      message: 'Project created successfully'
+      message: 'Project created and assigned successfully'
     }, { status: 201 })
 
   } catch (error: any) {
