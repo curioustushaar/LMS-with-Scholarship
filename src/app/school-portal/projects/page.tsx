@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { ProjectsPageContent } from '@/app/admin/projects/page'
+import ProjectsPageContent from '@/components/ProjectsPageContent'
 
 export default function SchoolProjectsPage() {
   return (

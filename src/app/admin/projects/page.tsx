@@ -71,7 +71,7 @@ interface StudentUser {
   status?: string
 }
 
-export function ProjectsPageContent() {
+function ProjectsPageContent() {
   const searchParams = useSearchParams()
   const initialAssignUserId = searchParams.get('assignUserId') || searchParams.get('student_id') || ''
 
