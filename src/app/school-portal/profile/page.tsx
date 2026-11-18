@@ -181,6 +181,15 @@ export default function SchoolProfilePage() {
             <span className="font-bold text-gray-800">{profile.contact_person_name} ({profile.designation})</span>
           </div>
         </div>
+
+        {profile.assigned_admin_name && (
+          <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+            <span className="text-gray-500 font-medium">Assigned LMS Partner Coordinator:</span>
+            <span className="font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200">
+              👤 {profile.assigned_admin_name}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Bank Payout / KYC Details Card */}

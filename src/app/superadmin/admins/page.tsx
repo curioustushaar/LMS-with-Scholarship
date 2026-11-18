@@ -25,6 +25,8 @@ interface Admin {
   role: string
   account_status: string
   admin_since: string
+  assigned_school_id?: string
+  assigned_school_name?: string
   assigned_courses_count: number
   assigned_students_count: number
   assigned_tasks_count: number
@@ -168,6 +170,11 @@ export default function AdminsManagement() {
                       <p className="text-xs text-gray-400 mt-1">
                         {admin.role === 'superadmin' ? '👑 Superadmin' : 'Admin'} • Since {new Date(admin.admin_since).toLocaleDateString()}
                       </p>
+                      {admin.assigned_school_name && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md mt-1 border border-purple-200">
+                          🏫 {admin.assigned_school_name}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-4 px-4 text-center">
@@ -282,6 +289,11 @@ export default function AdminsManagement() {
                 <p className="text-xs text-gray-400 mt-1">
                   {admin.role === 'superadmin' ? '👑 Superadmin' : 'Admin'} • Since {new Date(admin.admin_since).toLocaleDateString()}
                 </p>
+                {admin.assigned_school_name && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md mt-1 border border-purple-200">
+                    🏫 {admin.assigned_school_name}
+                  </span>
+                )}
               </div>
               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                 admin.account_status === 'active' 
@@ -385,17 +397,36 @@ function CreateAdminModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     password: '',
     full_name: '',
     phone: '',
+    assigned_school_id: '',
+    assigned_school_name: '',
   })
   const [selectedCourses, setSelectedCourses] = useState<string[]>([])
   const [courses, setCourses] = useState<any[]>([])
+  const [schools, setSchools] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingCourses, setLoadingCourses] = useState(true)
   const [error, setError] = useState('')
 
-  // Fetch available courses
+  // Fetch available courses and registered schools
   useEffect(() => {
     loadCourses()
+    loadSchools()
   }, [])
+
+  const loadSchools = async () => {
+    try {
+      const session = (await supabase.auth.getSession()).data.session
+      const res = await fetch('/api/superadmin/schools', {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+      })
+      const data = await res.json()
+      if (data.success && Array.isArray(data.data)) {
+        setSchools(data.data)
+      }
+    } catch (err) {
+      console.warn('Could not load schools list for admin creation:', err)
+    }
+  }
 
   const loadCourses = async () => {
     try {
@@ -489,11 +520,11 @@ function CreateAdminModal({ onClose, onSuccess }: { onClose: () => void; onSucce
             alert('Admin created but course assignment failed. You can assign courses later.')
           } else {
             console.log('✅ Courses assigned successfully')
-            alert('Admin created and courses assigned successfully!')
+            alert(`Admin created and courses assigned successfully!\nLogin credentials have been emailed to ${formData.email}.`)
           }
         } else {
           console.log('ℹ️ No courses selected or admin ID missing')
-          alert('Admin created successfully!')
+          alert(`Admin created successfully!\nLogin credentials have been emailed to ${formData.email}.`)
         }
         
         onSuccess()
@@ -612,6 +643,36 @@ function CreateAdminModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               placeholder="Minimum 6 characters"
             />
             <p className="text-xs text-gray-500 mt-1">At least 6 characters required</p>
+          </div>
+
+          {/* School Assignment */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Assign to Partner School / Institution (Optional)
+            </label>
+            <select
+              value={formData.assigned_school_id}
+              onChange={(e) => {
+                const selectedId = e.target.value
+                const foundSchool = schools.find((s: any) => s.school_id === selectedId || s.id === selectedId)
+                setFormData({
+                  ...formData,
+                  assigned_school_id: selectedId,
+                  assigned_school_name: foundSchool ? foundSchool.name : '',
+                })
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C81E4E] focus:border-transparent bg-white text-sm"
+            >
+              <option value="">-- None (Central Faculty / General Admin) --</option>
+              {schools.map((school: any) => (
+                <option key={school.id || school.school_id} value={school.school_id || school.id}>
+                  {school.name} ({school.school_id})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              This admin will be assigned as the designated partner coordinator for this school.
+            </p>
           </div>
 
           {/* Course Assignment */}

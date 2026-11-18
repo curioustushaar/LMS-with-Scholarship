@@ -44,9 +44,22 @@ export async function GET(
       )
     }
 
+    // Also fetch auth metadata to supplement phone, parents_contact, class, school_coaching
+    let authMetadata: any = {}
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id)
+      authMetadata = authUser?.user?.user_metadata || {}
+    } catch (e: any) {
+      console.warn('⚠️ Could not fetch auth user metadata for student:', e.message)
+    }
+
     // Map account_status to status for frontend compatibility
     const studentData = {
       ...data,
+      phone: data.phone || authMetadata.phone || null,
+      parents_contact: data.parents_contact || authMetadata.parents_contact || null,
+      class: data.class || authMetadata.class || null,
+      school_coaching: data.school_coaching || authMetadata.school_coaching || null,
       status: data.account_status || 'active'
     }
 
@@ -88,6 +101,9 @@ export async function PATCH(
       'full_name',
       'email',
       'phone',
+      'parents_contact',
+      'class',
+      'school_coaching',
       'status',
       'profile_image_url'
     ]
@@ -107,6 +123,24 @@ export async function PATCH(
       )
     }
 
+    // Update Auth user_metadata to keep in sync
+    try {
+      const metaUpdates: any = {}
+      if (updateData.full_name !== undefined) metaUpdates.full_name = updateData.full_name
+      if (updateData.phone !== undefined) metaUpdates.phone = updateData.phone
+      if (updateData.parents_contact !== undefined) metaUpdates.parents_contact = updateData.parents_contact
+      if (updateData.class !== undefined) metaUpdates.class = updateData.class
+      if (updateData.school_coaching !== undefined) metaUpdates.school_coaching = updateData.school_coaching
+
+      if (Object.keys(metaUpdates).length > 0) {
+        await supabaseAdmin.auth.admin.updateUserById(id, {
+          user_metadata: metaUpdates
+        })
+      }
+    } catch (authUpdateErr: any) {
+      console.warn('⚠️ Could not sync metadata in auth.users:', authUpdateErr.message)
+    }
+
     // Map status to account_status for profiles table
     if (updateData.status) {
       updateData.account_status = updateData.status
@@ -114,13 +148,40 @@ export async function PATCH(
     }
 
     // Use supabaseAdmin to bypass RLS
-    const { data, error } = await supabaseAdmin
+    let data: any = null
+    let error: any = null
+
+    const profileRes = await supabaseAdmin
       .from('profiles')
       .update(updateData)
       .eq('id', id)
       .eq('role', 'student')
       .select('*')
       .single()
+
+    data = profileRes.data
+    error = profileRes.error
+
+    // Resilient fallback if custom columns do not exist yet in profiles table
+    if (error && (error.message?.includes('column') || error.code === '42703')) {
+      console.warn('⚠️ Some custom columns may not exist yet in profiles, falling back to base fields:', error.message)
+      const baseUpdate: Record<string, any> = {}
+      const allowedBase = ['full_name', 'email', 'phone', 'account_status', 'profile_image_url']
+      allowedBase.forEach(k => {
+        if ((updateData as any)[k] !== undefined) {
+          baseUpdate[k] = (updateData as any)[k]
+        }
+      })
+      const fallbackRes = await supabaseAdmin
+        .from('profiles')
+        .update(baseUpdate)
+        .eq('id', id)
+        .eq('role', 'student')
+        .select('*')
+        .single()
+      data = fallbackRes.data
+      error = fallbackRes.error
+    }
 
     if (error) {
       console.error('❌ Database update error:', {
@@ -138,7 +199,13 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      data,
+      data: {
+        ...data,
+        phone: updateData.phone !== undefined ? updateData.phone : data?.phone,
+        parents_contact: updateData.parents_contact !== undefined ? updateData.parents_contact : data?.parents_contact,
+        class: updateData.class !== undefined ? updateData.class : data?.class,
+        school_coaching: updateData.school_coaching !== undefined ? updateData.school_coaching : data?.school_coaching,
+      },
       message: 'Student updated successfully'
     })
 

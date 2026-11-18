@@ -20,28 +20,35 @@ export async function GET(request: NextRequest) {
     let studentIds: string[] = []
     let courseIds: string[] = []
 
-    // If admin (not superadmin), filter by assigned courses
+    // If admin (not superadmin), filter by assigned courses & students created by this admin
     if (authResult.role === 'admin') {
-      // Get admin's assigned course IDs
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+      const [assignmentsRes, createdStudentsRes] = await Promise.all([
+        supabaseAdmin
+          .from('admin_course_assignments')
+          .select('course_id')
+          .eq('admin_id', authResult.id),
+        supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('created_by_admin_id', authResult.id)
+      ])
 
-      courseIds = assignments?.map(a => a.course_id) || []
-      
-      console.log(`📚 Admin has ${courseIds.length} assigned courses`)
+      courseIds = assignmentsRes.data?.map(a => a.course_id) || []
+      const createdIds = createdStudentsRes.data?.map(s => s.id) || []
 
       if (courseIds.length > 0) {
-        // Get students enrolled in admin's assigned courses
         const { data: enrollments } = await supabaseAdmin
           .from('enrollments')
           .select('user_id')
           .in('course_id', courseIds)
 
-        studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-        console.log(`👥 Admin has ${studentIds.length} students in assigned courses`)
+        const enrolledIds = enrollments?.map(e => e.user_id) || []
+        studentIds = Array.from(new Set([...createdIds, ...enrolledIds]))
+      } else {
+        studentIds = createdIds
       }
+
+      console.log(`📚 Admin courseIds: ${courseIds.length}, studentIds: ${studentIds.length}`)
     }
 
     // Get all statistics in parallel

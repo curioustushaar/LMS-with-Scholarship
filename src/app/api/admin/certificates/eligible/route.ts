@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,16 +23,10 @@ export async function GET(request: NextRequest) {
             )
         }
 
-        // If admin (not superadmin), verify access to this course
-        if (authResult.role === 'admin') {
-            const { data: assignment } = await supabase
-                .from('admin_course_assignments')
-                .select('course_id')
-                .eq('admin_id', authResult.id)
-                .eq('course_id', courseId)
-                .single()
-
-            if (!assignment) {
+        // If admin or school partner (not superadmin), verify access to this course
+        if (authResult.role === 'admin' || authResult.role === 'school') {
+            const allowedCourseIds = await getAllowedCourseIds(authResult)
+            if (allowedCourseIds.length > 0 && !allowedCourseIds.includes(courseId)) {
                 return NextResponse.json(
                     { error: 'Access denied to this course' },
                     { status: 403 }

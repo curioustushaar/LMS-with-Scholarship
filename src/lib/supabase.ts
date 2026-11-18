@@ -1,5 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Prioritize IPv4 on Node.js to eliminate 10-20s undici connection timeouts on Windows and AWS
+if (typeof window === 'undefined') {
+  try {
+    const dns = require('node:dns')
+    if (typeof dns.setDefaultResultOrder === 'function') {
+      dns.setDefaultResultOrder('ipv4first')
+    }
+  } catch (e) {
+    // Edge runtime / browser fallback
+  }
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds, getAllowedStudentIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,62 +18,41 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const limitParam = searchParams.get('limit')
+    const limit = limitParam ? parseInt(limitParam) : null
 
-    console.log('📥 Fetching students with filters:', { status, search, role: authResult.role })
+    console.log('📥 Fetching students with filters:', { status, search, limit, role: authResult.role })
 
-    // If admin (not superadmin), get only students from assigned courses
-    if (authResult.role === 'admin') {
-      // Get admin's assigned course IDs
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
-
-      const assignedCourseIds = assignments?.map(a => a.course_id) || []
-      
-      console.log(`📚 Admin has ${assignedCourseIds.length} assigned courses`)
-
-      if (assignedCourseIds.length === 0) {
-        console.log('⚠️ No courses assigned to admin')
-        return NextResponse.json({
-          success: true,
-          data: [],
-          count: 0,
-          message: 'No courses assigned to you yet'
-        })
-      }
-
-      // Get students enrolled in admin's assigned courses
-      const { data: enrollments } = await supabaseAdmin
-        .from('enrollments')
-        .select('user_id')
-        .in('course_id', assignedCourseIds)
-
-      const studentIds = Array.from(new Set(enrollments?.map(e => e.user_id) || []))
-
-      console.log(`👥 Found ${studentIds.length} students in assigned courses`)
-
-      if (studentIds.length === 0) {
-        console.log('⚠️ No students enrolled in assigned courses')
-        return NextResponse.json({
-          success: true,
-          data: [],
-          count: 0,
-          message: 'No students enrolled in your courses yet'
-        })
-      }
+    // If admin or school partner (not superadmin), get students from allowed scope
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      const allowedCourseIds = await getAllowedCourseIds(authResult)
+      const allowedStudentIds = await getAllowedStudentIds(authResult, allowedCourseIds)
 
       // Fetch student profiles
       let query = supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('role', 'student')
-        .in('id', studentIds)
         .order('created_at', { ascending: false })
+
+      // Filter by allowed students
+      if (allowedStudentIds.length > 0) {
+        query = query.or(`id.in.(${allowedStudentIds.join(',')}),created_by_admin_id.eq.${authResult.id}`)
+      } else if (authResult.role === 'school') {
+        // School partner with no students registered yet
+        return NextResponse.json({
+          success: true,
+          data: [],
+          count: 0
+        })
+      } else {
+        query = query.eq('created_by_admin_id', authResult.id)
+      }
 
       // Apply filters
       if (status) query = query.eq('account_status', status)
       if (search) query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+      if (limit && !isNaN(limit)) query = query.limit(limit)
 
       const { data, error } = await query
 
@@ -84,8 +63,6 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-
-      console.log(`✅ Found ${data?.length || 0} students in assigned courses`)
 
       const students = (data || []).map(s => ({
         ...s,
@@ -106,6 +83,7 @@ export async function GET(request: NextRequest) {
       // Apply filters
       if (status) query = query.eq('account_status', status)
       if (search) query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+      if (limit && !isNaN(limit)) query = query.limit(limit)
 
       const { data, error } = await query
 
@@ -116,8 +94,6 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-
-      console.log(`✅ Found ${data?.length || 0} students (superadmin view)`)
 
       const students = (data || []).map(s => ({
         ...s,

@@ -44,43 +44,30 @@ export default function LoginPage() {
         tokenLength: authData.session.access_token.length
       })
 
-      // Get current session to verify persistence
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        console.warn('⚠️ Session not persisted, storing token manually')
-        localStorage.setItem('supabase.auth.token', authData.session.access_token)
-      }
+      const token = authData.session.access_token
+      localStorage.setItem('supabase.auth.token', token)
 
-      // Check user role from database
-      console.log('Checking role for user ID:', authData.user.id)
-      
-      // Fetch role from profiles table
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', authData.user.id)
-        .maybeSingle()
+      // Step 2: Strict Server-Side RBAC Verification
+      console.log('🛡️ Verifying admin role with server RBAC...')
+      const verifyRes = await fetch('/api/auth/verify-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
-      // Final Role Determination
-      const role = userData?.role || authData.user.app_metadata?.role || authData.user.user_metadata?.role || 'student'
-      
-      console.log('Final Role determined:', role)
+      const verifyData = await verifyRes.json()
 
-      // SECURITY: Only allow admin and student roles on this login page
-      // Superadmin must use /superadmin/login
-      if (role === 'superadmin') {
-        console.warn('⚠️ Superadmin trying to login via admin page')
+      if (!verifyRes.ok || !verifyData.allowed) {
+        console.warn('⛔ RBAC Access Denied:', verifyData.error)
         await supabase.auth.signOut()
-        throw new Error('Access denied. Please use the Superadmin login portal.')
+        localStorage.removeItem('supabase.auth.token')
+        throw new Error(verifyData.error || 'Access Denied: You do not have administrator permissions.')
       }
 
-      if (role === 'admin') {
-        console.log('✅ Admin verified, redirecting to dashboard')
-        router.push('/admin/dashboard')
-      } else {
-        console.log('✅ Student verified, redirecting to real Students LMS portal')
-        window.location.href = 'https://students.aagajfoundation.in/login'
-      }
+      console.log('✅ Admin RBAC verified successfully:', verifyData.user?.email)
+      router.push('/admin/dashboard')
     } catch (err: any) {
       console.error('❌ Login error:', err)
       if (err.message === 'Failed to fetch' || err?.name === 'TypeError' || err.message?.includes('fetch')) {

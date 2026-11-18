@@ -20,7 +20,7 @@ interface Certificate {
   status?: string
 }
 
-export default function CertificatesPage() {
+export function CertificatesPageContent() {
   // State management - Removed filterCourse as it will be automatic
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [courses, setCourses] = useState<any[]>([])
@@ -605,5 +605,9 @@ export default function CertificatesPage() {
       )}
     </div>
   )
+}
+
+export default function CertificatesPage() {
+  return <CertificatesPageContent />
 }
 

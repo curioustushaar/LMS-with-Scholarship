@@ -364,10 +364,16 @@ export default function SchoolStudentsPage() {
             <FiUploadCloud /> Bulk Upload
           </Link>
           <Link
-            href="/school-portal/students/register"
-            className="px-4 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            href="/school-portal/students/create"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
           >
-            <FiPlus /> Register Student
+            <FiPlus /> Add Student & Enroll Course
+          </Link>
+          <Link
+            href="/school-portal/students/register"
+            className="px-3.5 py-2 bg-gradient-to-r from-[#FF2D8D] to-[#9C27FF] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+          >
+            <FiShield /> Scholarship Register
           </Link>
         </div>
       </div>

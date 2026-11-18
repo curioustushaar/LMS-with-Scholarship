@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Topbar from '@/components/layout/Topbar'
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function AdminLayoutClient({ children }: { children: ReactNode }) {
@@ -12,6 +12,8 @@ export default function AdminLayoutClient({ children }: { children: ReactNode })
   const router = useRouter()
 
   useEffect(() => {
+    let isMounted = true
+
     const checkAdmin = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -22,45 +24,33 @@ export default function AdminLayoutClient({ children }: { children: ReactNode })
           return
         }
 
-        console.log('Admin layout: Checking role for user:', session.user.id)
+        console.log('Admin layout: Verifying RBAC with server for user:', session.user.id)
 
-        // Try to verify admin role from database using supabaseAdmin (bypasses RLS)
-        const { data: userData, error } = await supabaseAdmin
-          .from('profiles')
-          .select('role, account_status')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        if (error) {
-          console.error('Error fetching user profile:', error)
-          // If RLS is blocking, check auth metadata as fallback
-          const authRole = session.user.app_metadata?.role || session.user.user_metadata?.role
-          if (authRole === 'admin') {
-            console.log('Using auth metadata role: admin')
-            setIsLoading(false)
-            return
+        // Strict Server-Side RBAC Verification
+        const verifyRes = await fetch('/api/auth/verify-admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           }
-          if (typeof window !== 'undefined') window.location.replace('/login')
-          return
-        }
+        })
 
-        if (!userData || userData.role !== 'admin') {
-          console.warn('Unauthorized access to admin portal. Role:', userData?.role)
-          if (typeof window !== 'undefined') window.location.replace('/login')
-          return
-        }
+        const verifyData = await verifyRes.json()
 
-        // Check if account is active
-        if (userData.account_status !== 'active') {
-          console.warn('⛔ Account is suspended or inactive. Status:', userData.account_status)
-          alert('Your account has been suspended. Please contact the administrator.')
+        if (!verifyRes.ok || !verifyData.allowed) {
+          console.warn('⛔ RBAC Access Denied in AdminLayout:', verifyData.error)
           await supabase.auth.signOut()
-          if (typeof window !== 'undefined') window.location.replace('/login')
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('supabase.auth.token')
+            window.location.replace('/login')
+          }
           return
         }
 
-        console.log('✅ Admin verified successfully')
-        setIsLoading(false)
+        if (isMounted) {
+          console.log('✅ Admin verified successfully by server RBAC')
+          setIsLoading(false)
+        }
       } catch (err) {
         console.error('Exception in checkAdmin:', err)
         if (typeof window !== 'undefined') window.location.replace('/login')
@@ -79,30 +69,37 @@ export default function AdminLayoutClient({ children }: { children: ReactNode })
       window.addEventListener('pageshow', handlePageShow)
     }
 
-    // Set up periodic check for account status (every 30 seconds)
+    // Set up periodic check for account status & RBAC (every 60 seconds)
     const intervalId = setInterval(async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
 
-        const { data: userData } = await supabaseAdmin
-          .from('profiles')
-          .select('account_status')
-          .eq('id', session.user.id)
-          .maybeSingle()
+        const verifyRes = await fetch('/api/auth/verify-admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
+        const verifyData = await verifyRes.json()
 
-        if (userData && userData.account_status !== 'active') {
-          console.warn('⛔ Account status changed to:', userData.account_status)
-          alert('Your account has been suspended. You will be logged out.')
+        if (!verifyRes.ok || !verifyData.allowed) {
+          console.warn('⛔ Account revoked or not admin during periodic check')
+          alert(verifyData.error || 'Your admin session has ended or account is suspended.')
           await supabase.auth.signOut()
-          if (typeof window !== 'undefined') window.location.replace('/login')
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('supabase.auth.token')
+            window.location.replace('/login')
+          }
         }
       } catch (err) {
         console.error('Error checking account status:', err)
       }
-    }, 30000)
+    }, 60000)
 
     return () => {
+      isMounted = false
       clearInterval(intervalId)
       if (typeof window !== 'undefined') {
         window.removeEventListener('pageshow', handlePageShow)

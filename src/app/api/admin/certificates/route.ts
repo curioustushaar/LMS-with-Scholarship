@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, getAllowedCourseIds } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,18 +19,13 @@ export async function GET(request: NextRequest) {
 
     console.log('📜 Fetching certificates with filters:', { status, course_id, role: authResult.role })
 
-    // If admin (not superadmin), get only certificates from assigned courses
+    // If admin or school partner (not superadmin), get only certificates from assigned courses
     let allowedCourseIds: string[] = []
-    if (authResult.role === 'admin') {
-      const { data: assignments } = await supabaseAdmin
-        .from('admin_course_assignments')
-        .select('course_id')
-        .eq('admin_id', authResult.id)
+    if (authResult.role === 'admin' || authResult.role === 'school') {
+      allowedCourseIds = await getAllowedCourseIds(authResult)
+      console.log(`📚 User has ${allowedCourseIds.length} assigned courses`)
 
-      allowedCourseIds = assignments?.map(a => a.course_id) || []
-      console.log(`📚 Admin has ${allowedCourseIds.length} assigned courses`)
-
-      if (allowedCourseIds.length === 0) {
+      if (authResult.role === 'admin' && allowedCourseIds.length === 0) {
         console.log('⚠️ Admin has no assigned courses')
         return NextResponse.json({
           success: true,
@@ -46,8 +41,8 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('issued_at', { ascending: false })
 
-    // Apply admin's course restriction
-    if (authResult.role === 'admin' && allowedCourseIds.length > 0) {
+    // Apply course restriction
+    if ((authResult.role === 'admin' || authResult.role === 'school') && allowedCourseIds.length > 0) {
       certQuery = certQuery.in('course_id', allowedCourseIds)
     }
 
